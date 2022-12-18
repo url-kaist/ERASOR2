@@ -41,6 +41,7 @@
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Path.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_broadcaster.h>
 #include <std_msgs/Float32.h>
@@ -79,7 +80,7 @@ namespace erasor_utils {
             PCL_ERROR ("Couldn't read file!!! \n");
             return (-1);
         }
-        std::cout << "Complete!" << std::endl;
+//        std::cout << "Complete!" << std::endl;
 //        std::cout << "Loaded " << dst->size() << " data points from " << pcd_name << std::endl;
         return 0;
     }
@@ -93,6 +94,8 @@ namespace erasor_utils {
         std::cout << "Loaded " << dst.size() << " data points from " << pcd_name << std::endl;
         return 0;
     }
+
+    bool load_labels(const std::string& label_name, std::vector<uint32_t>& labels);
 
     geometry_msgs::Pose eigen2geoPose(Eigen::Matrix4f pose);
 

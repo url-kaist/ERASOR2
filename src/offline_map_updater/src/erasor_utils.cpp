@@ -77,6 +77,25 @@ namespace erasor_utils {
         }
     }
 
+    bool load_labels(const std::string& label_name, std::vector<uint32_t>& labels) {
+        std::ifstream label_input(label_name, std::ios::binary);
+        if (!label_input.is_open()) {
+            std::cerr << "Could not open the label!" << std::endl;
+            return false;
+        }
+//        std::cout << "Load complete" << std::endl;
+        label_input.seekg(0, std::ios::end);
+        uint32_t num_points = label_input.tellg() / sizeof(uint32_t);
+//        std::cout << num_points << std::endl;
+        label_input.seekg(0, std::ios::beg);
+
+        labels.resize(num_points);
+        label_input.read((char*)&labels[0], num_points * sizeof(uint32_t));
+
+        label_input.close();
+        return true;
+    }
+
     void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size) {
         /**< IMPORTANT
          * Because PCL voxlizaiton just does average the intensity of point cloud,

@@ -196,8 +196,6 @@ void OfflineMapUpdater::save_static_map(float voxel_size) {
 
 }
 
-
-
 /**
  * @brief Callback function for node data
  */
@@ -251,53 +249,53 @@ void OfflineMapUpdater::callback_node(const erasor::node::ConstPtr &msg) {
             reassign_submap(x_curr, y_curr);
         }
 
-        auto start_voi = ros::Time::now().toSec();
-        fetch_VoI(x_curr, y_curr, *map_voi_, *map_outskirts_);
-        auto end_voi = ros::Time::now().toSec();
-
-        ROS_INFO_STREAM("\033[1;32m" << setw(22) << "Extracting VoI takes " << end_voi - start_voi << "s\033[0m");
-
-        pub_debug_map_egocentric_.publish(erasor_utils::cloud2msg(*map_voi_));
-        pub_debug_query_egocentric_.publish(erasor_utils::cloud2msg(*query_voi_));
-
-        /**< 3. Conduct Scan Ratio Test & set map_static_estimate and map_egocentric_complement
-         * Note that inputs should be previously transformed into egocentric frame */
-        auto start = ros::Time::now().toSec();
-
-        erasor_->set_inputs(*map_voi_, *query_voi_);
-        if (erasor_version_ == 2) {
-            erasor_->compare_vois_and_revert_ground(msg->header.seq);
-            erasor_->get_static_estimate(*map_static_estimate_, *map_egocentric_complement_);
-        } else if (erasor_version_ == 3) {
-            erasor_->compare_vois_and_revert_ground_w_block(msg->header.seq);
-            erasor_->get_static_estimate(*map_static_estimate_, *map_egocentric_complement_);
-            erasor_->viz_pseudo_occupancy();
-        } else {
-            throw invalid_argument("Other version is not implemented!");
-        }
-
-        auto middle = ros::Time::now().toSec();
-
-        ROS_INFO_STREAM("\033[1;32m" << setw(22) << "ERASOR takes " << middle - start << "s\033[0m");
-
-        *map_filtered_ = *map_static_estimate_ + *map_egocentric_complement_;
-
-        /*** Get currently rejected pts */
-        erasor_->get_outliers(*map_rejected_, *query_rejected_);
-
-        body2origin(*map_filtered_, *map_filtered_);
-        body2origin(*map_rejected_, *map_rejected_);
-        body2origin(*query_rejected_, *query_rejected_);
-
-        *map_arranged_ = *map_filtered_ + *map_outskirts_;
-
-        auto end = ros::Time::now().toSec();
-
-        erasor_utils::parse_dynamic_obj(*map_arranged_, *dynamic_objs_to_viz_, *static_objs_to_viz_);
-
-        /*** Just for debugging */
-        *total_map_rejected_ += *map_rejected_;
-        *total_query_rejected_ += *query_rejected_;
+//        auto start_voi = ros::Time::now().toSec();
+//        fetch_VoI(x_curr, y_curr, *map_voi_, *map_outskirts_);
+//        auto end_voi = ros::Time::now().toSec();
+//
+//        ROS_INFO_STREAM("\033[1;32m" << setw(22) << "Extracting VoI takes " << end_voi - start_voi << "s\033[0m");
+//
+//        pub_debug_map_egocentric_.publish(erasor_utils::cloud2msg(*map_voi_));
+//        pub_debug_query_egocentric_.publish(erasor_utils::cloud2msg(*query_voi_));
+//
+//        /**< 3. Conduct Scan Ratio Test & set map_static_estimate and map_egocentric_complement
+//         * Note that inputs should be previously transformed into egocentric frame */
+//        auto start = ros::Time::now().toSec();
+//
+//        erasor_->set_inputs(*map_voi_, *query_voi_);
+//        if (erasor_version_ == 2) {
+//            erasor_->compare_vois_and_revert_ground(msg->header.seq);
+//            erasor_->get_static_estimate(*map_static_estimate_, *map_egocentric_complement_);
+//        } else if (erasor_version_ == 3) {
+//            erasor_->compare_vois_and_revert_ground_w_block(msg->header.seq);
+//            erasor_->get_static_estimate(*map_static_estimate_, *map_egocentric_complement_);
+////            erasor_->viz_pseudo_occupancy();
+//        } else {
+//            throw invalid_argument("Other version is not implemented!");
+//        }
+//
+//        auto middle = ros::Time::now().toSec();
+//
+//        ROS_INFO_STREAM("\033[1;32m" << setw(22) << "ERASOR takes " << middle - start << "s\033[0m");
+//
+//        *map_filtered_ = *map_static_estimate_ + *map_egocentric_complement_;
+//
+//        /*** Get currently rejected pts */
+//        erasor_->get_outliers(*map_rejected_, *query_rejected_);
+//
+//        body2origin(*map_filtered_, *map_filtered_);
+//        body2origin(*map_rejected_, *map_rejected_);
+//        body2origin(*query_rejected_, *query_rejected_);
+//
+//        *map_arranged_ = *map_filtered_ + *map_outskirts_;
+//
+//        auto end = ros::Time::now().toSec();
+//
+//        erasor_utils::parse_dynamic_obj(*map_arranged_, *dynamic_objs_to_viz_, *static_objs_to_viz_);
+//
+//        /*** Just for debugging */
+//        *total_map_rejected_ += *map_rejected_;
+//        *total_query_rejected_ += *query_rejected_;
 
 //        if (stack_count % global_voxelization_period_ == 0) { // 1 indicates init voxelization
 //            pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_src(new pcl::PointCloud<pcl::PointXYZI>);
@@ -365,7 +363,7 @@ void OfflineMapUpdater::set_submap(
         double x, double y, double submap_size) {
 
     submap.clear();
-    submap.reserve(NUM_PTS_LARGE_ENOUGH_FOR_MAP);
+    submap.reserve(NUM_PTS_LARGE_ENOUGH_FOR_MAP);;
     submap_complement.clear();
     submap_complement.reserve(NUM_PTS_LARGE_ENOUGH_FOR_MAP);
 
