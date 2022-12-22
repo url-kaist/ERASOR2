@@ -1,12 +1,8 @@
 #include "tools/erasor_utils.hpp"
 
 #define INF 10000000000000.0
-#define PI 3.1415926535
 #define ENOUGH_NUM 8000
 
-#define EMPTY 0
-#define MAP 1
-#define PC_CURR 2
 // COLORS:
 // 0 -> BLUE
 #define MAP_IS_HIGHER 0.5
@@ -61,7 +57,7 @@ public:
         nh.param("/erasor/map_voxel_size", map_voxel_size_, 0.2);
 
         ring_size   = max_r / num_rings;
-        sector_size = 2 * PI / num_sectors;
+        sector_size = 2 * M_PI / num_sectors;
 
         // SCDR is our project's name
         pub_map_rejected  = nh.advertise<sensor_msgs::PointCloud2>("/SCDR/debug/map_rejected", 100);

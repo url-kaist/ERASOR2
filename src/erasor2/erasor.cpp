@@ -12,7 +12,7 @@ double ERASOR::xy2theta(const double &x, const double &y) { // 0 ~ 2 * PI
     if (y >= 0) {
         return atan2(y, x); // 1, 2 quadrant
     } else {
-        return 2 * PI + atan2(y, x);// 3, 4 quadrant
+        return 2 * M_PI + atan2(y, x);// 3, 4 quadrant
     }
 }
 
@@ -402,7 +402,6 @@ void ERASOR::compare_vois_and_revert_ground(int frame) {
                                          curr_h_diff / map_h_diff);
 
                 if (scan_ratio < scan_ratio_threshold) { // find dynamic!
-
                     if (map_h_diff >= curr_h_diff) { // Occupied -> Disappear  <<green>>
                         auto polygons = set_polygons(r, theta, 3);
                         polygons.header = poly_list.header;
@@ -436,7 +435,6 @@ void ERASOR::compare_vois_and_revert_ground(int frame) {
                             debug_curr_rejected += bin_curr.points;
                         }
                     }
-
                 } else {
                     auto polygons = set_polygons(r, theta, 3);
                     polygons.header = poly_list.header;

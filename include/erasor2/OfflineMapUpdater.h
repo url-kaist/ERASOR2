@@ -1,7 +1,7 @@
 #ifndef OFFLINEMAPUPDATER_H
 #define OFFLINEMAPUPDATER_H
 
-#include "erasor.h"
+#include "erasor2.h"
 
 #define NUM_PTS_LARGE_ENOUGH 200000
 #define NUM_PTS_LARGE_ENOUGH_FOR_MAP 20000000

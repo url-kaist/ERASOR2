@@ -23,25 +23,38 @@ def concentric_zone_based_ground_segmentation(points, range_thrs, height_thrs):
 
 vis = o3d.visualization.Visualizer()
 if __name__ == "__main__":
-    save_ground_labels = True
+    save_ground_labels = False
     save_instance_labels = True
+    use_pre_extracted_ground_label = True
+    version = "V2" # "V1": Ground is considered as '9', "V2": Ground is considered as '1'
+    if (version == "V1"):
+        GROUND_LABEL = 9
+    else:
+        GROUND_LABEL = 1
 
-    abs_ground_dir = "/media/shapelim/UX980/erasor_inputs/bongeunsa_dataset/ground_labels"
-    abs_instance_dir = "/media/shapelim/UX980/erasor_inputs/bongeunsa_dataset/instance_labels"
+    abs_ground_dir = "/media/shapelim/UX980/erasor_inputs/bongeunsa_dataset/ground_labels_via_patchwork2"
+    abs_instance_dir = "/media/shapelim/UX980/erasor_inputs/bongeunsa_dataset/instance_labels_via_patchwork2"
 
     for i in range(0, 1320):
-        pcd_path = "/media/shapelim/UX980/erasor_inputs/bongeunsa_dataset/pcds/" + str(i).zfill(6) + ".pcd"
+        zfilled_idx = str(i).zfill(6)
+        pcd_path = "/media/shapelim/UX980/erasor_inputs/bongeunsa_dataset/pcds/" + zfilled_idx + ".pcd"
         pcd = o3d.io.read_point_cloud(pcd_path)
 
         num_pts = np.asarray(pcd.points).shape[0]
-        ground_inliers = concentric_zone_based_ground_segmentation(pcd.points, [4.0, 10.0, float('inf')], [-1.35, -1.2, -1.0])
+        if (use_pre_extracted_ground_label):
+            ground_file = f'/media/shapelim/UX980/erasor_inputs/bongeunsa_dataset/ground_labels_via_patchwork2/{zfilled_idx}.label'
+            ground_labels = np.fromfile(ground_file, dtype=np.uint32)
+            ground_labels.reshape((-1))
+            ground_inliers = list(np.where(ground_labels == GROUND_LABEL)[0])
+        else:
+            ground_inliers = concentric_zone_based_ground_segmentation(pcd.points, [4.0, 10.0, float('inf')], [-1.35, -1.2, -1.0])
 
         ##################
-        if (save_ground_labels):
-            output_fname = abs_ground_dir + "/" + str(i).zfill(6) + ".label"
-            ground_labels = np.zeros(num_pts, dtype=np.uint32)
-            ground_labels[ground_inliers] = 9
-            ground_labels.astype(np.uint32).tofile(output_fname)
+        # if (save_ground_labels):
+        #     output_fname = abs_ground_dir + "/" + str(i).zfill(6) + ".label"
+        #     ground_labels = np.zeros(num_pts, dtype=np.uint32)
+        #     ground_labels[ground_inliers] = GROUND_LABEL
+        #     ground_labels.astype(np.uint32).tofile(output_fname)
         ##################
 
         pcd_ = pcd.select_by_index(ground_inliers, invert=True)
@@ -84,6 +97,8 @@ if __name__ == "__main__":
             ins = pred.astype(int) + 1
             pred_eval = sem + (ins << 16)
             pred_eval.astype(np.uint32).tofile(output_fname)
+        else:
+            o3d.visualization.draw_geometries([pcd])
         ##################
 
         # o3d.visualization.draw_geometries([pcd])
