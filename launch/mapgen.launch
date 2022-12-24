@@ -1,13 +1,16 @@
 <launch>
 
-<node name="kitti_mapgen" pkg="erasor" type="kitti_mapgen" output="screen">
-    <rosparam param="/map/voxelsize">0.2</rosparam>		
-    <rosparam param="/map/target_rosbag">"02_860_to_950_w_interval_2_node.bag"</rosparam>
-    <rosparam param="/map/save_path">"/media/shapelim/UX980/erasor_outputs"</rosparam>
-    <rosparam param="/map/viz_interval">5</rosparam>
-    <rosparam param="/large_scale/is_large_scale">true</rosparam>
-</node>
+<arg name="seq" default="05"/>
+<arg name="start_frame" default="2300"/>
+<arg name="end_frame" default="2600" />
 
-<node name="rviz" pkg="rviz" type="rviz" args="-d $(find erasor)/rviz/kitti_mapgen.rviz"/>
+<rosparam command="load" file="$(find erasor2)/config/kitti_mapgen.yaml" />
 
+<rosparam param="/dataloader/sequence" subst_value="true">"$(arg seq)"</rosparam>
+<rosparam param="/start_frame" subst_value="true">$(arg start_frame)</rosparam>
+<rosparam param="/end_frame" subst_value="true">$(arg end_frame)</rosparam>
+
+<node name="mapgen" pkg="erasor2" type="mapgen" output="screen" />
+
+<node name="rviz" pkg="rviz" type="rviz" args="-d $(find erasor2)/rviz/kitti_mapgen.rviz" />
 </launch>

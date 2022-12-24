@@ -95,10 +95,11 @@ add_dependencies(inheritance_test erasor_generate_messages_cpp)
 #add_executable(compare_map src/compare_map.cpp src/offline_map_updater/src/erasor_utils.cpp)
 #target_link_libraries(compare_map ${catkin_LIBRARIES})
 #
-#set(mapgen_src
-#    src/erasor2/erasor_utils.cpp
-#)
-#
-#add_executable(mapgen src/mapgen/main.cpp ${mapgen_src})
-#target_link_libraries(mapgen ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} stdc++fs)
-#add_dependencies(mapgen erasor2_generate_messages_cpp)
+set(mapgen_src
+    src/erasor2/erasor_utils.cpp
+    src/dataloader/dataloader.cpp
+)
+
+add_executable(mapgen src/mapgen/main.cpp ${mapgen_src})
+target_link_libraries(mapgen ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} stdc++fs)
+add_dependencies(mapgen erasor2_generate_messages_cpp)

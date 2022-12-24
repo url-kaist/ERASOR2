@@ -44,8 +44,12 @@
 #include <tf/transform_broadcaster.h>
 #include <std_msgs/Float32.h>
 #include "signal.h"
+#include "nanoflann/nanoflann.hpp"
+#include "nanoflann/nanoflann_utils.hpp"
 
 using namespace std;
+
+using num_t = float;
 
 namespace erasor_utils {
     template<typename T>
@@ -94,6 +98,8 @@ namespace erasor_utils {
         return 0;
     }
 
+    std::string format(float f, int digits);
+
     bool load_labels(const std::string& label_name, std::vector<uint32_t>& labels);
 
     geometry_msgs::Pose eigen2geoPose(Eigen::Matrix4f pose);
@@ -105,6 +111,8 @@ namespace erasor_utils {
             pcl::PointCloud<pcl::PointXYZI> &staticOut);
 
     void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size);
+
+    void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size);
 
     void count_stat_dyn(const pcl::PointCloud<pcl::PointXYZI> &cloudIn, int &num_static, int &num_dynamic);
 

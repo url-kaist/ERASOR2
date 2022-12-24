@@ -43,18 +43,34 @@ public:
     bool verbose_;
     bool is_large_scale_;
 
-    int init_idx_;
-    int end_idx_;
+    int start_frame_;
+    int end_frame_;
     int viz_interval_;
+    int accum_interval_;
 
     float voxel_size_;
+    float map_voxel_size_;
 
     string dataset_name_;
+    string abs_save_dir_;
+    string abs_data_dir_;
     string cloud_dir_;
     string cloud_format_;
     string pose_path_;
     string sequence_;
 
+    // Pointclouds
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_curr_wrt_world_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_map_;
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr debug_curr_rejected_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr debug_map_rejected_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr map_complement_;
+
+    // ROS msgs
+    nav_msgs::Path nav_path_;
+
+    // ROS publishers
     ros::Publisher PathPublisher;
 
     ros::Publisher MapCloudPublisher;
@@ -68,20 +84,23 @@ public:
 
     RosParamServer()
     {
-        nh_.param<string>("dataloader/dataset_name", dataset_name_, "");
-        nh_.param<string>("dataloader/cloud_dir", cloud_dir_, "");
-        nh_.param<string>("dataloader/cloud_format", cloud_format_,"");
-        nh_.param<string>("dataloader/pose_path", pose_path_, "");
-        nh_.param<string>("dataloader/sequence", sequence_, "");
+        nh_.param<string>("/dataloader/dataset_name", dataset_name_, "");
+        nh_.param<string>("/dataloader/abs_data_dir", abs_data_dir_, "");
+        nh_.param<string>("/dataloader/cloud_dir", cloud_dir_, "");
+        nh_.param<string>("/dataloader/cloud_format", cloud_format_,"");
+        nh_.param<string>("/dataloader/pose_path", pose_path_, "");
+        nh_.param<string>("/dataloader/sequence", sequence_, "");
+        nh_.param<string>("/dataloader/abs_save_dir", abs_save_dir_, "/");
+        nh_.param<int>("/dataloader/accum_interval", accum_interval_, 2);
+        nh_.param<float>("/dataloader/voxel_size", voxel_size_, (float) 0.05);
+        nh_.param<float>("/dataloader/map_voxel_size", map_voxel_size_, (float) 0.2);
 
-        nh_.param<int>("init_idx", init_idx_, 0);
-        nh_.param<int>("end_idx", end_idx_, -1);
-        nh_.param<int>("viz_interval", viz_interval_, 10);
+        nh_.param<int>("/start_frame", start_frame_, 0);
+        nh_.param<int>("/end_frame", end_frame_, -1);
+        nh_.param<int>("/viz_interval", viz_interval_, 10);
 
-        nh_.param<bool>("is_large_scale", is_large_scale_, true);
+        nh_.param<bool>("/is_large_scale", is_large_scale_, true);
 
-        nh_.param<float>("voxel_size", voxel_size_, (float) 0.05);
-//        nh_.param<std::string>("save_path", save_path, "/");
 
         nh_.param<float>("/erasor2/min_z_voi", min_z_voi_, -1.6);
         nh_.param<float>("/erasor2/max_z_voi", max_z_voi_, 1.3);
@@ -96,6 +115,13 @@ public:
         ext_rot_ = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(ext_rot_vec_.data(), 3, 3);
         ext_trans_ = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(ext_trans_vec_.data(), 3, 1);
 
+        cout << "Extrinsic - Rot" << endl;
+        cout << ext_rot_ << endl;
+        cout << "Extrinsic - Trans" << endl;
+        cout << ext_trans_ << endl;
+
+        PathPublisher  = nh_.advertise<nav_msgs::Path>("/path", 100);
+
         MapCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/map", 100, true);
         DynMapPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dyn_points_all", 100, true);
         CurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/curr_scan", 100, true);
@@ -104,8 +130,8 @@ public:
         EgocentricGridPublisher = nh_.advertise<grid_map_msgs::GridMap>("/erasor2/gridmap_egocentric", 100, true);
         GridPublisher = nh_.advertise<grid_map_msgs::GridMap>("/erasor2/gridmap", 100, true);
         VizMarkerPublisher = nh_.advertise<visualization_msgs::Marker>("/erasor2/target_grid_loc", 100, true);
-
-        // On ERASOR2
+//
+//        // On ERASOR2
 //        nh_.param<string>("/data_dir", DATA_DIR, "/");
 //        nh_.param<float>("/voxel_size", VOXEL_SIZE, 0.075);
 //        nh_.param<float>("/grid_resolution", grid_resolution, 0.4);
@@ -118,7 +144,23 @@ public:
 
         tf_h_of_ground_to_be_zero(2, 3) = sensor_height_;
         usleep(100);
+
+        initializePointClouds();
     }
+
+    void initializePointClouds() {
+        int num_pts_for_reserve = 200000;
+        cloud_curr_wrt_world_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+        cloud_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+
+        debug_curr_rejected_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+        debug_map_rejected_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+        map_complement_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+
+        cloud_curr_wrt_world_->points.reserve(num_pts_for_reserve);
+    }
+
+    ~RosParamServer() {}
 };
 #endif
 

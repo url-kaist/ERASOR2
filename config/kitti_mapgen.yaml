@@ -1,0 +1,22 @@
+dataloader:
+    dataset_name: "SemanticKITTI"
+    abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
+    cloud_dir: ""
+    cloud_format: ""
+    pose_path: ""
+    sequence: ""
+    abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+    
+    accum_interval: 2
+    voxel_size: 0.2
+    map_voxel_size: 0.2	
+    
+viz_interval: 10
+
+extrinsic:
+    robot_body_size: 2.7
+    sensor_height: 1.73
+    rotation: [ 1, 0, 0,
+                0, 1, 0,
+                0, 0, 1 ]
+    translation: [ 0.0, 0.0, 0.0 ]

@@ -36,10 +36,10 @@ struct DynamicBinIdx {
 typedef vector<vector<Bin> > R_POD;
 typedef vector<Bin>          Ring;
 
-class ERASOR {
+class ERASOR2 {
 public:
 
-    ERASOR(ros::NodeHandle *nodehandler) : nh(*nodehandler) {
+    ERASOR2(ros::NodeHandle *nodehandler) : nh(*nodehandler) {
         nh.param("/erasor/max_range", max_r, 10.0);
         nh.param("/erasor/num_rings", num_rings, 20);
         nh.param("/erasor/num_sectors", num_sectors, 60);
@@ -134,9 +134,7 @@ public:
             pcl::PointCloud<pcl::PointXYZI> &map_rejected,
             pcl::PointCloud<pcl::PointXYZI> &curr_rejected);
 
-    pcl::PointCloud<pcl::PointXYZI> debug_curr_rejected;
-    pcl::PointCloud<pcl::PointXYZI> debug_map_rejected;
-    pcl::PointCloud<pcl::PointXYZI> map_complement;
+
 
     R_POD r_pod_map; // R_POD of Map
     R_POD r_pod_curr; // R_POD of current pointcloud

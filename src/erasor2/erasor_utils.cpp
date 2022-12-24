@@ -77,6 +77,13 @@ namespace erasor_utils {
         }
     }
 
+    string format(float f, int digits) {
+        std::ostringstream ss;
+        ss.precision(digits);
+        ss << f;
+        return ss.str();
+    }
+
     bool load_labels(const std::string& label_name, std::vector<uint32_t>& labels) {
         std::ifstream label_input(label_name, std::ios::binary);
         if (!label_input.is_open()) {
@@ -130,6 +137,53 @@ namespace erasor_utils {
             }
         }
         dst = *ptr_reassigned;
+    }
+
+    void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size) {
+        pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_voxelized(new pcl::PointCloud<pcl::PointXYZI>);
+
+        // 1. Voxelization
+        static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
+        voxel_filter.setInputCloud(src);
+        voxel_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
+        voxel_filter.filter(*ptr_voxelized);
+
+        // 2. Find nearest point to update intensity (index and id)
+        int N = src->points.size();
+        PointCloud<num_t> cloud;
+        cloud.pts.resize(N);
+        for (size_t i = 0; i < N; i++)
+        {
+            cloud.pts[i].x = src->points[i].x;
+            cloud.pts[i].y = src->points[i].y;
+            cloud.pts[i].z = src->points[i].z;
+        }
+
+        // construct a kd-tree index:
+        using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
+                nanoflann::L2_Simple_Adaptor<num_t, PointCloud<num_t>>,
+                PointCloud<num_t>, 3 /* dim */
+        >;
+
+        my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+
+
+        for (auto &query_pcl: ptr_voxelized->points) {
+            const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
+            {
+                size_t num_results = 1;
+                std::vector<uint32_t> ret_index(num_results);
+                std::vector<num_t> out_dist_sqr(num_results);
+
+                num_results = index.knnSearch(
+                        &query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
+
+                ret_index.resize(num_results);
+                out_dist_sqr.resize(num_results);
+                query_pcl.intensity = src->points[ret_index[0]].intensity;
+            }
+        }
+        dst = *ptr_voxelized;
     }
 
     void count_stat_dyn(const pcl::PointCloud<pcl::PointXYZI> &cloudIn, int &num_static, int &num_dynamic) {
