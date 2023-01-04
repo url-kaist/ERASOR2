@@ -162,7 +162,7 @@ void ERASOR2::updateSteppableRegion() {
                                                     th_bin_max_h_, verbose_)) {
 //                        cout << "Success! " << endl;
                         if (gridmap_submap_.at("steppable", idx) == UNKNOWN) {
-                            gridmap_submap_.at("steppable", idx) = POTENTIAL_GROUND;
+                            gridmap_submap_.at("steppable", idx) = initial_ground_likelihood_;
                         } else {
                             gridmap_submap_.at("steppable", idx) += increment_ground_likelihood_;
                         }
@@ -197,7 +197,7 @@ void ERASOR2::updateSteppableRegion() {
 }
 
 // Re-project ground likelihood to each scan
-void ERASOR2::reprojectGroundLikelihood() {
+void ERASOR2::detectDynamicObjects() {
     for (int k = 0; k < num_data_; ++k) {
         vector<float> dyn_cand_ids;
 
@@ -206,7 +206,7 @@ void ERASOR2::reprojectGroundLikelihood() {
 
         grid_map::Index idx;
         int             count = 0;
-        // Searching
+        // Detect dynamic objects' ids per scan
         for (int        h     = h_pc - neighboring_height_ / 2; h < h_pc + neighboring_height_ / 2; ++h) {
             for (int w = w_pc - neighboring_width_ / 2; w < w_pc + neighboring_width_ / 2; ++w) {
                 idx(0) = w;
@@ -266,7 +266,7 @@ void ERASOR2::reprojectGroundLikelihood() {
         }
         (*map_dynamic_) += (*dynamic_points_each_scan);
 
-        if (viz_reproject_) {
+        if (viz_detect_) {
             cout << "Total " << ids.size() << "dyn. objects are detected!" << endl;
             CurrCloudPublisher.publish(erasor_utils::cloud2msg(each_pc));
             DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*dynamic_points_each_scan));
@@ -566,7 +566,7 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(float range,
             if (!xygrid[i].points.empty() && isLikelyToBeGround(xygrid[i])) {
                 idx(0)                       = u;
                 idx(1)                       = v;
-                gridmap.at("steppable", idx) = POTENTIAL_GROUND;
+                gridmap.at("steppable", idx) = initial_ground_likelihood_;
             }
         }
     }

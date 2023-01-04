@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     erasor2->setSubmap();
     erasor2->updateSteppableRegion();
 //    erasor2->dilateAndErode();
-    erasor2->reprojectGroundLikelihood();
+    erasor2->detectDynamicObjects();
     erasor2->saveStaticMap(map_path);
     erasor2->publishStaticMapResults();
 

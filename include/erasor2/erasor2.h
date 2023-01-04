@@ -75,7 +75,7 @@ public:
 
     void updateSteppableRegion();
 
-    void reprojectGroundLikelihood();
+    void detectDynamicObjects();
 
     void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI>& cloud, const std::vector<float>& dyn_ids,
                       std::vector<bool>& static_mask);

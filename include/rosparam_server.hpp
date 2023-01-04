@@ -39,6 +39,7 @@ public:
     float max_z_voi_;
     float scan_ratio_threshold_;
     float th_bin_max_h_;
+    float initial_ground_likelihood_;
     float increment_ground_likelihood_;
     float decrement_ground_likelihood_;
 
@@ -49,7 +50,7 @@ public:
     bool viz_set_scan_and_pose_ = false;
     bool viz_set_submap_ = false;
     bool viz_update_ = false;
-    bool viz_reproject_ = false;
+    bool viz_detect_ = false;
 
     int start_frame_;
     int end_frame_;
@@ -111,6 +112,7 @@ public:
         nh_.param<float>("/erasor2/max_z_voi", max_z_voi_, 1.3);
         nh_.param<float>("/erasor2/scan_ratio_threshold", scan_ratio_threshold_, 0.3);
         nh_.param<float>("/erasor2/th_bin_max_h", th_bin_max_h_, 0.3);
+        nh_.param<float>("/erasor2/ground_likelihood/initial", initial_ground_likelihood_, 0.5);
         nh_.param<float>("/erasor2/ground_likelihood/increment", increment_ground_likelihood_, 0.3);
         nh_.param<float>("/erasor2/ground_likelihood/decrement", decrement_ground_likelihood_, 0.1);
         nh_.param<float>("/erasor2/ground_likelihood_thr", ground_likelihood_thr_, 0.5);
@@ -125,7 +127,7 @@ public:
         nh_.param<bool>("/erasor2/viz_flag/set_scan_and_pose", viz_set_scan_and_pose_, false);
         nh_.param<bool>("/erasor2/viz_flag/set_submap", viz_set_submap_, false);
         nh_.param<bool>("/erasor2/viz_flag/update", viz_update_, false);
-        nh_.param<bool>("/erasor2/viz_flag/reproject", viz_reproject_, false);
+        nh_.param<bool>("/erasor2/viz_flag/detect", viz_detect_, false);
 
         neighboring_width_ = static_cast<int>(2.0 * range_of_interest_ / grid_resolution_);
         neighboring_height_ = static_cast<int>(2.0 * range_of_interest_ / grid_resolution_);

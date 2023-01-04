@@ -54,7 +54,6 @@
 #define NOT_INTEREST 0 // ground and noisy points in the estimated labels
 // Gridmap characteristics
 #define UNKNOWN -1
-#define POTENTIAL_GROUND 0.5
 // Just for visualization
 #define DIST_FROM_GROUND_TO_ORIGIN -4.2
 
