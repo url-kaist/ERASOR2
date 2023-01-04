@@ -40,7 +40,13 @@ int main(int argc, char **argv) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr noise(new pcl::PointCloud<pcl::PointXYZI>);
 
         Eigen::Matrix4f pose = Eigen::Matrix4f::Identity();
-        loader->getScanAndPose(i, *cloud_raw, pose);
+        if (dataset_name == "SemanticKITTI") {
+            loader->getGTLabeledScan(i, *cloud_raw);
+            pose = loader->poses_gt_[i];
+        }else {
+            loader->getScanAndPose(i, *cloud_raw, pose);
+        }
+
         loader->rejectNeighboringPoints(*cloud_raw, mapgen->robot_body_size_, *cloud, *noise);
         mapgen->accumPointCloud(*cloud, pose);
     }

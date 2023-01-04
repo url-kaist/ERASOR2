@@ -18,9 +18,15 @@ public:
     // ROS can only publish point cloud whose volume is under the 1 GB
     std::vector<pcl::PointCloud<pcl::PointXYZI> > submaps;
 
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_curr_wrt_world_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_map_;
+
     std::string save_path_;
 
     Mapgen() {
+        cloud_curr_wrt_world_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+        cloud_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+
         std::cout << "\033[1;32m";
         std::cout << "[MAPGEN]: Voxelization size - " << voxel_size_ << std::endl;
         std::cout << "[MAPGEN]: Target seq -  " << sequence_ << std::endl;
@@ -42,8 +48,9 @@ public:
         nav_path_.header = pose_stamped.header;
         nav_path_.poses.emplace_back(pose_stamped);
 
+        // NOTE: `tf_h_of_ground_to_be_zero_` is not necessary, but we follow the legacy of ERASOR 1.0
         pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_transformed(new pcl::PointCloud<pcl::PointXYZI>);
-        pcl::transformPointCloud(cloud, *ptr_transformed, tf_h_of_ground_to_be_zero);
+        pcl::transformPointCloud(cloud, *ptr_transformed, tf_h_of_ground_to_be_zero_);
 
         std::cout << std::setprecision(3) << std::left << setw(print_width) << setfill(separator) << "=> [Pose] "
                   << pose(0, 3) << ", " << pose(1, 3) << ", " << pose(2, 3) << std::endl;

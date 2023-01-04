@@ -144,24 +144,6 @@ void assignLabels(const std::vector<uint32_t> ground_labels, const std::vector<u
     }
 }
 
-void calcMinMaxXY(const vector<pcl::PointCloud<PointType>>& pcs, float& min_x, float& min_y,
-                            float& max_x, float& max_y) {
-    min_x = numeric_limits<float>::max();
-    max_x = numeric_limits<float>::lowest();
-    min_y = numeric_limits<float>::max();
-    max_y = numeric_limits<float>::lowest();
-
-    PointType min_pt, max_pt;
-    for (const auto& cloud : pcs) {
-        pcl::getMinMax3D(cloud, min_pt, max_pt);
-
-        min_x = min(min_pt.x, min_x);
-        min_y = min(min_pt.y, min_y);
-        max_x = max(max_pt.x, max_x);
-        max_y = max(max_pt.y, max_y);
-    }
-}
-
 nav_msgs::OccupancyGrid setOccupancyGridMap(const float min_x, const float min_y,
                                             const float max_x, const float max_y,
                                             const float occugrid_resolution) {
@@ -538,7 +520,7 @@ int main(int argc, char **argv)
     voxel_filter.filter(*map_partial);
 
     float min_x, min_y, max_x, max_y;
-    calcMinMaxXY(pcs, min_x, min_y, max_x, max_y);
+    erasor_utils::calcMinMaxXY(pcs, min_x, min_y, max_x, max_y);
     GridMapInfo grid_map_info = setGridMapParams(min_x, min_y, max_x, max_y, grid_resolution);
     grid_map::GridMap gridmap_submap = setMapcentricGridMap(grid_map_info);
 
@@ -591,23 +573,7 @@ int main(int argc, char **argv)
                         } else {
                             gridmap_submap.at("steppable", idx) += INCREMENT_GROUND_LIKELIHOOD;
                         }
-//                    } else {
-//                        if (gridmap_submap.at("steppable", idx) == UNKNOWN) {
-//                            gridmap_submap.at("steppable", idx) = POTENTIAL_NONGROUND;
-//                        } else {
-//                            gridmap_submap.at("steppable", idx) -= DECREMENT_GROUND_LIKELIHOOD;
-//                            float likelihood = gridmap_submap.at("steppable", idx);
-//                            if (gridmap_submap.at("steppable", idx) < LOWEST_LIKELIHOOD) {
-//                                 gridmap_submap.at("steppable", idx) = LOWEST_LIKELIHOOD;
-//                            }
-//                        }
                     }
-//                    grid_map::Position pos_each_wh;
-//                    gridmap_submap.getPosition(idx, pos_each_wh);
-//                    visualization_msgs::Marker marker = setVisualMarker(VOXEL_SIZE, pos_each_wh(0), pos_each_wh(1));
-//                    VizMarkerPublisher.publish(marker);
-//                    ros::spinOnce();
-//                    cin.ignore();
                 }
                 ++count;
             }

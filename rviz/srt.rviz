@@ -80,7 +80,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.20000000298023224
       Style: Flat Squares
-      Topic: /SCDR/debug/curr_init
+      Topic: /erasor2/curr_init
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -108,7 +108,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.25
       Style: Flat Squares
-      Topic: /SCDR/debug/ground
+      Topic: /erasor2/ground
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -147,7 +147,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.07999999821186066
       Style: Flat Squares
-      Topic: /SCDR/debug/map_init
+      Topic: /erasor2/map_init
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: false
@@ -175,7 +175,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.15000000596046448
       Style: Flat Squares
-      Topic: /SCDR/debug/map_rejected
+      Topic: /erasor2/map_rejected
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -186,7 +186,7 @@ Visualization Manager:
       Enabled: false
       Name: PolygonArray
       Queue Size: 10
-      Topic: /SCDR/debug/polygons_marker
+      Topic: /erasor2/polygons_marker
       Unreliable: false
       Value: false
       coloring: Liekelihood
@@ -200,7 +200,7 @@ Visualization Manager:
       Enabled: false
       Name: curr_rpod
       Queue Size: 10
-      Topic: /SCDR/debug/curr_marker
+      Topic: /erasor2/curr_marker
       Unreliable: false
       Value: false
       coloring: Liekelihood
@@ -214,7 +214,7 @@ Visualization Manager:
       Enabled: false
       Name: map_rpod
       Queue Size: 10
-      Topic: /SCDR/debug/map_marker
+      Topic: /erasor2/map_marker
       Unreliable: false
       Value: false
       coloring: Liekelihood

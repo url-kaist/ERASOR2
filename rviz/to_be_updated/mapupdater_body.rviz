@@ -262,7 +262,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.10000000149011612
       Style: Flat Squares
-      Topic: /SCDR/debug/curr_init
+      Topic: /erasor2/curr_init
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -292,7 +292,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.10000000149011612
       Style: Flat Squares
-      Topic: /SCDR/debug/map_init
+      Topic: /erasor2/map_init
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -329,7 +329,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.07000000029802322
       Style: Flat Squares
-      Topic: /SCDR/debug/arranged
+      Topic: /erasor2/arranged
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true

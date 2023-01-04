@@ -173,6 +173,9 @@ def evaluate(gt, estimate, voxelsize=0.2):
     # 1. Set data to xyz
     gt_xyz = data2xyz_np(gt)
     estimate_xyz = data2xyz_np(estimate)
+    
+    print("# points of GT: ", gt_xyz.shape[0])
+    print("# points of Est: ", estimate_xyz.shape[0])
 
     nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(estimate_xyz)
     # indices: gt -> estimates

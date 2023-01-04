@@ -1,35 +1,51 @@
-idx: 450
-erasor: 
-    max_range: 80.0
-    num_rings: 20
-    num_sectors: 108
-    min_h: -0.8 # [m] Note that it depends on the distance between body frame and ground contact point of mobile robots
-    max_h: 3.1 # [m] Note that it depends on the distance between body frame and ground contact point of mobile robots
-    th_bin_max_h: 0.2 # [m]
-    scan_ratio_threshold: 0.20 # The Larger, the more aggressive!!
-    minimum_num_pts: 6
+start_frame: 630
+end_frame: 820
+viz_interval: 10
+is_large_scale: true
+
+dataloader:
+    dataset_name: "SemanticKITTI"
+    abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
+    cloud_dir: ""
+    cloud_format: ""
+    pose_path: ""
+    sequence: "07"
+    abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+
+    accum_interval: 2
+    voxel_size: 0.2
+    map_voxel_size: 0.2
+
+erasor2:
+    # min_z_voi 와 max_z_voi 는 raw cloud 기준 (ERASOR 1.0과 다름!!!)
+    min_z_voi: -3.0
+    max_z_voi: 1.4
+    th_bin_max_h: 0.4 # [m] 바닥이 0 m라고 가정 (ERASOR 1.0과 같음!!!!)
+    scan_ratio_threshold: 0.1 # The Larger, the more aggressive!!
+    ground_likelihood:
+        increment: 0.3
+        decrement: 0.1
+    ground_likelihood_thr: 1.0
+
+    minimum_num_pts: 5
     rejection_ratio: 0
-    gf_dist_thr: 0.125
-    gf_iter: 3
-    gf_num_lpr: 10
-    gf_th_seeds_height: 0.5
-    version: 3 # 2: R-GPF / 3: R-GPF w/ blocking (not in paper)
-    num_lowest_pts: 1
 
+    grid_resolution: 1.0
+    egocentric_grid_resolution: 0.6
+    range_of_interest: 80.0
 
-MapUpdater:
-    data_name: "07"
-    initial_map_path: "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/src_0_2/07_630_to_820_w_interval2_voxel_0.200000.pcd"
-    env: "outdoor"
-    save_path: "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/erasor_v2"
-    query_voxel_size: 0.2  
-    map_voxel_size: 0.2 
-    voxelization_interval: 10
-    removal_interval: 5
+    viz_flag:
+        set_scan_and_pose: false
+        set_submap: false
+        update: false
+        reproject: false
 
-tf:
-     lidar2body: [0.0, 0.0, 1.73, 0, 0.0, 0.0, 1.0] # xyz q_x, q_y, q_z, q_w in order
+stop_for_each_frame: true
 
-verbose: true
-
-
+extrinsic:
+    robot_body_size: 2.7
+    sensor_height: 1.73
+    rotation: [ 1, 0, 0,
+                0, 1, 0,
+                0, 0, 1 ]
+    translation: [ 0.0, 0.0, 0.0 ]

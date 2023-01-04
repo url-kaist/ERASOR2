@@ -84,7 +84,7 @@ namespace erasor_utils {
         return ss.str();
     }
 
-    bool load_labels(const std::string& label_name, std::vector<uint32_t>& labels) {
+    bool load_labels(const std::string &label_name, std::vector<uint32_t> &labels) {
         std::ifstream label_input(label_name, std::ios::binary);
         if (!label_input.is_open()) {
             std::cerr << "Could not open the label!" << std::endl;
@@ -97,13 +97,14 @@ namespace erasor_utils {
         label_input.seekg(0, std::ios::beg);
 
         labels.resize(num_points);
-        label_input.read((char*)&labels[0], num_points * sizeof(uint32_t));
+        label_input.read((char *) &labels[0], num_points * sizeof(uint32_t));
 
         label_input.close();
         return true;
     }
 
-    void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size) {
+    void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst,
+                                    double leaf_size) {
         /**< IMPORTANT
          * Because PCL voxlizaiton just does average the intensity of point cloud,
          * so this function is to conduct voxelization followed by nearest points search to re-assign the label of each point */
@@ -139,21 +140,22 @@ namespace erasor_utils {
         dst = *ptr_reassigned;
     }
 
-    void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size) {
+    void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
+                                                 pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_voxelized(new pcl::PointCloud<pcl::PointXYZI>);
 
         // 1. Voxelization
         static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
         voxel_filter.setInputCloud(src);
+//        voxel_filter.setMinimumPointsNumberPerVoxel(3);
         voxel_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
         voxel_filter.filter(*ptr_voxelized);
 
         // 2. Find nearest point to update intensity (index and id)
-        int N = src->points.size();
+        int               N = src->points.size();
         PointCloud<num_t> cloud;
         cloud.pts.resize(N);
-        for (size_t i = 0; i < N; i++)
-        {
+        for (size_t i = 0; i < N; i++) {
             cloud.pts[i].x = src->points[i].x;
             cloud.pts[i].y = src->points[i].y;
             cloud.pts[i].z = src->points[i].z;
@@ -171,9 +173,9 @@ namespace erasor_utils {
         for (auto &query_pcl: ptr_voxelized->points) {
             const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
             {
-                size_t num_results = 1;
+                size_t                num_results = 1;
                 std::vector<uint32_t> ret_index(num_results);
-                std::vector<num_t> out_dist_sqr(num_results);
+                std::vector<num_t>    out_dist_sqr(num_results);
 
                 num_results = index.knnSearch(
                         &query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
@@ -211,7 +213,39 @@ namespace erasor_utils {
     }
 
     void signal_callback_handler(int signum) {
-    cout << "Caught Ctrl + c " << endl;
-    exit(signum);
+        cout << "Caught Ctrl + c " << endl;
+        exit(signum);
+    }
+
+    void calcMinMaxXY(const vector<pcl::PointCloud<pcl::PointXYZI>> &pcs, float &min_x, float &min_y, float &max_x,
+                      float &max_y) {
+        min_x = numeric_limits<float>::max();
+        max_x = numeric_limits<float>::lowest();
+        min_y = numeric_limits<float>::max();
+        max_y = numeric_limits<float>::lowest();
+
+        pcl::PointXYZI  min_pt, max_pt;
+        for (const auto &cloud: pcs) {
+            pcl::getMinMax3D(cloud, min_pt, max_pt);
+            std::cout << min_pt.x << ", " << min_pt.y << std::endl;
+            min_x = min(min_pt.x, min_x);
+            min_y = min(min_pt.y, min_y);
+            max_x = max(max_pt.x, max_x);
+            max_y = max(max_pt.y, max_y);
+        }
+    }
+
+    void calcMinMaxZWithoutGround(const pcl::PointCloud<pcl::PointXYZI> &pcs, float &min_z, float &max_z) {
+        min_z       = numeric_limits<float>::max();
+        max_z       = numeric_limits<float>::lowest();
+
+        int num_pts = pcs.points.size();
+        for (size_t i = 0; i < num_pts; i++) {
+            const auto &pt = pcs.points.at(i);
+            if (pt.intensity != GROUND_LABEL && pt.intensity != NOT_VOLUME_OF_INTEREST) {
+                min_z = min(min_z, pt.z);
+                max_z = max(max_z, pt.z);
+            }
+        }
     }
 }

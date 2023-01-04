@@ -54,16 +54,21 @@ inline void DataLoader::countNumFrames(const string &pcd_dir, const string &pcd_
     }
 }
 
-inline Eigen::Matrix4f DataLoader::getPose(size_t i) {
-    return poses_gt_[i];
+inline void DataLoader::getPose(const size_t i, Eigen::Matrix4f& pose) {
+    pose = poses_gt_[i];
 }
 
 SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir, const string &seq) {
     // Follow the KITTI format
-    cloud_dir_    = abs_data_dir + "/" + seq + "/velodyne";
-    gt_label_dir_ = abs_data_dir + "/" + seq + "/labels";
-    cloud_format_ = "bin";
-    pose_path_    = abs_data_dir + "/" + seq + "/poses.txt";
+    cloud_dir_        = abs_data_dir + "/" + seq + "/velodyne";
+    gt_label_dir_     = abs_data_dir + "/" + seq + "/labels";
+//    pose_path_        = abs_data_dir + "/" + seq + "/poses.txt";
+    pose_path_        = abs_data_dir + "/" + seq + "/suma_pose.txt";
+//    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork";
+    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork_filtered";
+    est_label_dir_    = abs_data_dir + "/" + seq + "/cais";
+
+    cloud_format_     = "bin";
 
     countNumFrames(cloud_dir_, cloud_format_);
     loadAllPoses(pose_path_, poses_gt_);
@@ -101,27 +106,93 @@ void SemanticKITTILoader::loadAllPoses(string pose_path, vector<Eigen::Matrix4f>
     std::cout << "Total " << count << " poses are loaded" << std::endl;
 }
 
-void SemanticKITTILoader::getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI> &cloud, Eigen::Matrix4f &pose) {
-    loadCloud(i, cloud);
-//    cout << "# of cloud: " << cloud.points.size() << endl;
-//    vector<uint32_t> label;
-    shared_ptr <vector<uint32_t>> label(new vector <uint32_t>);
+//inline Eigen::Matrix4f SemanticKITTILoader::getPose(size_t i) {
+//    return poses_gt_[i];
+//}
 
+void SemanticKITTILoader::getGTLabeledScan(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud) {
+    loadCloud(i, cloud);
+
+    shared_ptr<vector<uint32_t>> label(new vector<uint32_t>);
     loadGTLabel(i, *label);
-    // HT: I decide to follow the format of ERASOR ver. 1
-    // The intensity is replaced with the raw label data
-    // shared_ptr <vector<uint32_t>> semantic_label(new vector <uint32_t>);
-    // shared_ptr <vector<uint32_t>> obj_id(new vector <uint32_t>);
-    // parseGTLabel(*label, *semantic_label, *obj_id);
-    if (cloud.points.size() == label->size()) {
-        for (int j = 0; j < cloud.points.size(); ++j) {
-            auto &pt = cloud.points[j];
-            pt.intensity = static_cast<float>((*label)[j]);
-        }
-    } else {
+
+    if (cloud.points.size() != label->size()) {
         throw invalid_argument("Something's wrong! The numbers of points are not matched to each other");
     }
-    pose = getPose(i);
+
+    // The intensity is replaced with the raw label data
+    for (int j = 0; j < cloud.points.size(); ++j) {
+        auto &pt = cloud.points[j];
+        pt.intensity = static_cast<float>((*label)[j]);
+    }
+}
+
+void SemanticKITTILoader::getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI> &cloud, Eigen::Matrix4f &pose) {
+    loadCloud(i, cloud);
+
+    shared_ptr<vector<uint32_t>> label(new vector<uint32_t>);
+    loadGTLabel(i, *label);
+
+    if (cloud.points.size() != label->size()) {
+        throw invalid_argument("Something's wrong! The numbers of points are not matched to each other");
+    }
+
+    shared_ptr<vector<uint32_t>> ground_label(new vector<uint32_t>);
+    shared_ptr<vector<uint32_t>> instance_label(new vector<uint32_t>);
+    uint32_t max_instance;
+    loadEstGroundAndInstanceLabels(i, *ground_label, *instance_label);
+    assignLabels(*ground_label, *instance_label,
+                      cloud, max_instance);
+
+    getPose(i, pose);
+}
+
+void SemanticKITTILoader::loadEstGroundAndInstanceLabels(const int i, std::vector<uint32_t>& ground_label,
+                                                         std::vector<uint32_t>& instance_label) {
+    string inst_label_name = (boost::format("%s/%06d.label") % est_label_dir_ % i).str();
+    string ground_label_name = (boost::format("%s/%06d.label") % ground_label_dir_ % i).str();
+
+    erasor_utils::load_labels(inst_label_name, instance_label);
+    erasor_utils::load_labels(ground_label_name, ground_label);
+
+    if (instance_label.size() != ground_label.size()) {
+        throw invalid_argument("[Loading] Something's wrong!");
+    }
+
+    static bool is_initial = true;
+    if (is_initial) {
+        std::vector<uint32_t> tmp_ground_label = ground_label;
+        std::sort(tmp_ground_label.begin(), tmp_ground_label.end());
+        auto last = std::unique(tmp_ground_label.begin(), tmp_ground_label.end());
+        tmp_ground_label.erase(last, tmp_ground_label.end());
+        std::cout << "\033[1;33m[NOTE] Ground label contains ";
+        for (int j = 0; j < tmp_ground_label.size(); ++j) {
+            std::cout << tmp_ground_label[j];
+            if (j < tmp_ground_label.size() - 1) {
+                std::cout << ", ";
+            } else {
+                std::cout << std::endl;
+            }
+        }
+        std::cout << "(check the function `assignLabel()` in `dataloader.cpp`)\033[0m" << std::endl;
+        is_initial = false;
+    }
+}
+
+void SemanticKITTILoader::assignLabels(const std::vector<uint32_t> ground_labels, const std::vector<uint32_t> instance_labels,
+                  pcl::PointCloud<pcl::PointXYZI>& src_cloud, uint32_t& max_instance) {
+    max_instance = 0;
+    for (int j = 0; j < src_cloud.points.size(); ++j) {
+        // Follow Rhiney and Lucas's format.
+        if (ground_labels[j]) {
+            src_cloud.points[j].intensity = GROUND_LABEL;
+        } else { // For non-ground points
+            uint32_t inst_label            = instance_labels[j] >> 16;
+            src_cloud.points[j].intensity = inst_label;
+//                std::cout << inst_label << ", ";
+            max_instance = max(max_instance, inst_label);
+        }
+    }
 }
 
 void SemanticKITTILoader::loadGTLabel(const size_t idx, vector<uint32_t> &labels) {

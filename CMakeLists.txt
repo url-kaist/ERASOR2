@@ -103,3 +103,13 @@ set(mapgen_src
 add_executable(mapgen src/mapgen/main.cpp ${mapgen_src})
 target_link_libraries(mapgen ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} stdc++fs)
 add_dependencies(mapgen erasor2_generate_messages_cpp)
+
+set(erasor2_src
+    src/erasor2/erasor_utils.cpp
+    src/erasor2/erasor2.cpp
+    src/dataloader/dataloader.cpp
+)
+
+add_executable(run_erasor2 src/erasor2/main.cpp ${erasor2_src})
+target_link_libraries(run_erasor2 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} stdc++fs)
+add_dependencies(run_erasor2 erasor2_generate_messages_cpp)

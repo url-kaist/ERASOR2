@@ -1,3 +1,8 @@
+start_frame: 130
+end_frame: 270
+viz_interval: 10
+is_large_scale: true
+
 dataloader:
     dataset_name: "SemanticKITTI"
     abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
@@ -9,9 +14,26 @@ dataloader:
     
     accum_interval: 2
     voxel_size: 0.2
-    map_voxel_size: 0.2	
-    
-viz_interval: 10
+    map_voxel_size: 0.2
+
+erasor2:
+    min_z_voi: -4.0
+    max_z_voi: 1.3
+    scan_ratio_threshold: 0.1 # The Larger, the more aggressive!!
+    th_bin_max_h: -1.0 # [m]
+    ground_likelihood:
+        increment: 0.3
+        decrement: 0.1
+    ground_likelihood_thr: 0.5
+
+    minimum_num_pts: 5
+    rejection_ratio: 0
+
+    grid_resolution: 1.0
+    egocentric_grid_resolution: 0.2
+    range_of_interest: 12.0
+
+stop_for_each_frame: false
 
 extrinsic:
     robot_body_size: 2.7

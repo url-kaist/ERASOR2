@@ -47,6 +47,17 @@
 #include "nanoflann/nanoflann.hpp"
 #include "nanoflann/nanoflann_utils.hpp"
 
+// Point-wise label
+#define GROUND_LABEL -1
+#define NOISE_LABEL -2
+#define NOT_VOLUME_OF_INTEREST -3
+#define NOT_INTEREST 0 // ground and noisy points in the estimated labels
+// Gridmap characteristics
+#define UNKNOWN -1
+#define POTENTIAL_GROUND 0.5
+// Just for visualization
+#define DIST_FROM_GROUND_TO_ORIGIN -4.2
+
 using namespace std;
 
 using num_t = float;
@@ -118,5 +129,10 @@ namespace erasor_utils {
 
     void signal_callback_handler(int signum);
 
+    visualization_msgs::Marker setVisualMarker(const float voxel_size, const float pos_x, const float pos_y);
+
+    void calcMinMaxXY(const vector<pcl::PointCloud<pcl::PointXYZI>>& pcs, float& min_x, float& min_y, float& max_x, float& max_y);
+
+    void calcMinMaxZWithoutGround(const pcl::PointCloud<pcl::PointXYZI>& pcs, float& min_z, float& max_z);
 }
 #endif // ERASOR_UTILS_H

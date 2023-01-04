@@ -266,7 +266,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.100000001
       Style: Flat Squares
-      Topic: /SCDR/debug/curr_init
+      Topic: /erasor2/curr_init
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -296,7 +296,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.100000001
       Style: Flat Squares
-      Topic: /SCDR/debug/map_init
+      Topic: /erasor2/map_init
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -326,7 +326,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.200000003
       Style: Flat Squares
-      Topic: /SCDR/debug/ground
+      Topic: /erasor2/ground
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -356,7 +356,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.119999997
       Style: Flat Squares
-      Topic: /SCDR/debug/map_rejected
+      Topic: /erasor2/map_rejected
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -386,14 +386,14 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.100000001
       Style: Flat Squares
-      Topic: /SCDR/debug/curr_rejected
+      Topic: /erasor2/curr_rejected
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
     - Class: rviz/Marker
       Enabled: false
-      Marker Topic: /SCDR/debug/curr_marker
+      Marker Topic: /erasor2/curr_marker
       Name: curr_marker
       Namespaces:
         {}
@@ -401,7 +401,7 @@ Visualization Manager:
       Value: false
     - Class: rviz/Marker
       Enabled: false
-      Marker Topic: /SCDR/debug/map_marker
+      Marker Topic: /erasor2/map_marker
       Name: map_marker
       Namespaces:
         {}
@@ -409,7 +409,7 @@ Visualization Manager:
       Value: false
     - Class: rviz/Marker
       Enabled: false
-      Marker Topic: /SCDR/debug/candidates_marker
+      Marker Topic: /erasor2/candidates_marker
       Name: dynamic_marker
       Namespaces:
         {}
@@ -447,7 +447,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.0700000003
       Style: Flat Squares
-      Topic: /SCDR/debug/arranged
+      Topic: /erasor2/arranged
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true

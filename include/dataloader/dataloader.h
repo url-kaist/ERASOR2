@@ -56,7 +56,7 @@ public:
 
     inline void countNumFrames(const string &pcd_dir, const string &pcd_format);
 
-    inline Eigen::Matrix4f getPose(size_t i);
+    inline void getPose(const size_t i, Eigen::Matrix4f& pose);
 
     /*
      * Virtual functions
@@ -66,11 +66,19 @@ public:
     virtual void loadAllPoses(const string pose_path, vector<Eigen::Matrix4f> &poses) {}
 
     template<typename T>
-    int loadCloud(size_t idx, pcl::PointCloud<T> &cloud) const {};
+    int loadCloud(size_t idx, pcl::PointCloud<T> &cloud) const {}
 
+    virtual void getGTLabeledScan(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud) {}
+
+    // Estimated labels are added
     virtual void getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud, Eigen::Matrix4f &pose) {}
 
-    // Only for SemanticKITTI
+    virtual void loadEstGroundAndInstanceLabels(const int i, std::vector<uint32_t>& ground_label,
+                                                         std::vector<uint32_t>& instance_label) {}
+
+    virtual void assignLabels(const std::vector<uint32_t> ground_labels, const std::vector<uint32_t> instance_labels,
+                  const float min_z_voi, const float max_z_voi,
+                  pcl::PointCloud<pcl::PointXYZI>& src_cloud, uint32_t& max_instance) {}
 
     virtual void testInheritance() { cout << "Test inheritance" << endl; }
 
@@ -80,7 +88,7 @@ public:
     string                  pose_path_;
     string                  gt_label_dir_;
     string                  ground_label_dir_;
-    string                  instance_label_dir_;
+    string                  est_label_dir_;
     vector<Eigen::Matrix4f> poses_gt_;
 };
 
@@ -139,7 +147,20 @@ public:
     void parseGTLabel(const vector<uint32_t> &labels,
                       vector<uint32_t> &semantic_labels, vector<uint32_t> &obj_ids);
 
+//    inline Eigen::Matrix4f getPose(size_t i);
+
+    // Only for SemanticKITTI
+    void getGTLabeledScan(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud);
+
+    // Estimated labels are added
     void getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud, Eigen::Matrix4f &pose);
+
+    void loadEstGroundAndInstanceLabels(const int i, std::vector<uint32_t>& ground_label,
+                                                         std::vector<uint32_t>& instance_label);
+
+    void assignLabels(const std::vector<uint32_t> ground_labels, const std::vector<uint32_t> instance_labels,
+                  pcl::PointCloud<pcl::PointXYZI>& src_cloud, uint32_t& max_instance);
+
 //
     pcl::PointCloud<pcl::PointXYZ> getAllPositions() const {
         // For fetching loops
@@ -155,7 +176,6 @@ public:
     void testInheritance() {
         cout << "print from SemanticKITTIloader" << endl;
     }
-
 };
 
 //class BongeunsaLoader : public DataLoader {

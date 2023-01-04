@@ -1,8 +1,8 @@
 <launch>
 
-<arg name="seq" default="05"/>
-<arg name="start_frame" default="2300"/>
-<arg name="end_frame" default="2600" />
+<arg name="seq" default="02"/>
+<arg name="start_frame" default="860"/>
+<arg name="end_frame" default="950" />
 
 <rosparam command="load" file="$(find erasor2)/config/kitti_mapgen.yaml" />
 
