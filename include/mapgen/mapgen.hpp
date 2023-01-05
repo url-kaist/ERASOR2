@@ -30,7 +30,8 @@ public:
         std::cout << "\033[1;32m";
         std::cout << "[MAPGEN]: Voxelization size - " << voxel_size_ << std::endl;
         std::cout << "[MAPGEN]: Target seq -  " << sequence_ << std::endl;
-        std::cout << "[MAPGEN]: From " << start_frame_ << ", " << end_frame_ << std::endl;
+        std::cout << "[MAPGEN]: From " << start_frame_ << " to " << end_frame_ << std::endl;
+        std::cout << "[MAPGEN]: Accum. interval " << accum_interval_ << std::endl;
         std::cout << "[MAPGEN]: Is the map large-scale? " << (is_large_scale_ ? "Yes" : "No") << "\033[0m" << std::endl;
     }
 

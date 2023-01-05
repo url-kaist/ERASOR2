@@ -39,9 +39,12 @@ public:
     float max_z_voi_;
     float scan_ratio_threshold_;
     float th_bin_max_h_;
-    float initial_ground_likelihood_;
-    float increment_ground_likelihood_;
-    float decrement_ground_likelihood_;
+    float unknown_prior_;
+    float informative_prior_;
+    float initial_prior_;
+    float increment_gain_; // Should be larger than one
+    float increment_;
+    float ratio_num_pts_;
 
     bool verbose_;
     bool is_large_scale_;
@@ -59,6 +62,8 @@ public:
 
     int neighboring_width_;
     int neighboring_height_;
+    int kernel_size_;
+    int minimum_num_pts_;
 
     float voxel_size_;
     float map_voxel_size_;
@@ -82,8 +87,13 @@ public:
 
     ros::Publisher MapCloudPublisher;
     ros::Publisher DynMapPublisher;
+    ros::Publisher NoiseMapPublisher;
     ros::Publisher CurrCloudPublisher;
     ros::Publisher DynCurrCloudPublisher;
+    ros::Publisher RejectedDynCurrCloudPublisher;
+    ros::Publisher AcceptedMovingObjScorePublisher;
+    ros::Publisher RejectedMovingObjScorePublisher;
+    ros::Publisher NoiseCurrCloudPublisher;
 
     ros::Publisher EgocentricGridPublisher;
     ros::Publisher GridPublisher;
@@ -112,10 +122,16 @@ public:
         nh_.param<float>("/erasor2/max_z_voi", max_z_voi_, 1.3);
         nh_.param<float>("/erasor2/scan_ratio_threshold", scan_ratio_threshold_, 0.3);
         nh_.param<float>("/erasor2/th_bin_max_h", th_bin_max_h_, 0.3);
-        nh_.param<float>("/erasor2/ground_likelihood/initial", initial_ground_likelihood_, 0.5);
-        nh_.param<float>("/erasor2/ground_likelihood/increment", increment_ground_likelihood_, 0.3);
-        nh_.param<float>("/erasor2/ground_likelihood/decrement", decrement_ground_likelihood_, 0.1);
+        nh_.param<float>("/erasor2/ground_likelihood/unknown_prior", unknown_prior_, -2.0);
+        nh_.param<float>("/erasor2/ground_likelihood/informative_prior", informative_prior_, 2.0);
+        nh_.param<float>("/erasor2/ground_likelihood/initial_prior", initial_prior_, 0.5);
+        nh_.param<float>("/erasor2/ground_likelihood/increment_gain", increment_gain_, 0.3);
+        nh_.param<float>("/erasor2/ground_likelihood/increment", increment_, 0.3);
         nh_.param<float>("/erasor2/ground_likelihood_thr", ground_likelihood_thr_, 0.5);
+        nh_.param<int>("/erasor2/kernel_size", kernel_size_, 3);
+
+        nh_.param<float>("/erasor2/ratio_num_pts", ratio_num_pts_, 0.95);
+        nh_.param<int>("/erasor2/minimum_num_pts", minimum_num_pts_, 3);
 
         nh_.param<float>("/erasor2/grid_resolution", grid_resolution_, 0.4);
         nh_.param<float>("/erasor2/egocentric_grid_resolution", egocentric_grid_resolution_, 0.2);
@@ -154,8 +170,13 @@ public:
 
         MapCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/map", 100, true);
         DynMapPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dyn_points_all", 100, true);
+        NoiseMapPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/noise_points_all", 100, true);
         CurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/curr_scan", 100, true);
         DynCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dyn_points", 100, true);
+        RejectedDynCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/rejected_dyn_points", 100, true);
+        AcceptedMovingObjScorePublisher = nh_.advertise<visualization_msgs::MarkerArray>("/erasor2/accetped_moving_obj_scores", 100, true);
+        RejectedMovingObjScorePublisher = nh_.advertise<visualization_msgs::MarkerArray>("/erasor2/rejected_moving_obj_scores", 100, true);
+        NoiseCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/noise_points", 100, true);
 
         EgocentricGridPublisher = nh_.advertise<grid_map_msgs::GridMap>("/erasor2/gridmap_egocentric", 100, true);
         GridPublisher = nh_.advertise<grid_map_msgs::GridMap>("/erasor2/gridmap", 100, true);

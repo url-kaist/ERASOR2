@@ -53,9 +53,12 @@
 #define NOT_VOLUME_OF_INTEREST -3
 #define NOT_INTEREST 0 // ground and noisy points in the estimated labels
 // Gridmap characteristics
-#define UNKNOWN -1
 // Just for visualization
-#define DIST_FROM_GROUND_TO_ORIGIN -4.2
+#define DIST_FROM_GROUND_TO_ORIGIN -2.3
+
+#define IS_STATIC 100000
+#define IS_DYNAMIC 100001
+#define IS_NOISE_YET_POTENTIAL_DYNAMIC 100002
 
 using namespace std;
 

@@ -21,25 +21,25 @@ erasor2:
     min_z_voi: -3.0
     max_z_voi: 1.4
     th_bin_max_h: 0.4 # [m] 바닥이 0 m라고 가정 (ERASOR 1.0과 같음!!!!)
-    scan_ratio_threshold: 0.1 # The Larger, the more aggressive!!
+    scan_ratio_threshold: 0.2 # The Larger, the more aggressive!!
     ground_likelihood:
-        initial: 0.5
+        unknown_prior: -2.0
+        informative_prior: 0.5
+        initial_prior: 0.3
+        increment_gain: 1.0 # Should be larger than one
         increment: 0.3
-        decrement: 0.1
     ground_likelihood_thr: 0.8
+    kernel_size: 1
 
+    # For checking ground likelihood
+    ratio_num_pts: 0.95 # Percentage
     minimum_num_pts: 5
-    rejection_ratio: 0
-
-    grid_resolution: 2
-    egocentric_grid_resolution: 0.6
-    range_of_interest: 80.0
 
     viz_flag:
         set_scan_and_pose: false
         set_submap: false
         update: false
-        detect: false
+        detect: true
 
 stop_for_each_frame: true
 

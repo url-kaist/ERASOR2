@@ -11,9 +11,11 @@ Panels:
         - /check_gridmap1/GridMap1
         - /check_gridmap1/CurrScan1
         - /check_dyn_points1
-        - /check_dyn_points1/CurrScan1
-        - /check_dyn_points1/DynPoints1
-      Splitter Ratio: 0.5
+        - /check_dyn_points1/NoisePoints1
+        - /PointCloud21
+        - /GridMap1
+        - /rejected_obj_scores1
+      Splitter Ratio: 0.5285714268684387
     Tree Height: 632
   - Class: rviz/Selection
     Name: Selection
@@ -171,29 +173,85 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 25; 255; 255
+          Color Transformer: FlatColor
+          Decay Time: 0
+          Enabled: true
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: NoisePoints
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 8
+          Size (m): 0.5
+          Style: Flat Squares
+          Topic: /erasor2/noise_points
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: true
       Enabled: true
       Name: check_dyn_points
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.10000000149011612
+      Style: Flat Squares
+      Topic: /erasor2/rejected_dyn_points
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Class: grid_map_rviz_plugin/GridMap
       Color: 200; 200; 200
       Color Layer: steppable
       Color Transformer: IntensityLayer
-      Enabled: false
+      Enabled: true
       Height Layer: elevation
       Height Transformer: Layer
       History Length: 1
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 10
+      Max Intensity: 0.800000011920929
       Min Color: 0; 0; 0
-      Min Intensity: 1
+      Min Intensity: 0
       Name: GridMap
       Show Grid Lines: true
       Topic: /erasor2/gridmap
       Unreliable: false
       Use Rainbow: false
-      Value: false
+      Value: true
     - Class: rviz/Group
       Displays:
         - Alpha: 1
@@ -254,6 +312,22 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: VoI
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /erasor2/accetped_moving_obj_scores
+      Name: accepted_obj_scores
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /erasor2/rejected_moving_obj_scores
+      Name: rejected_obj_scores
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -282,7 +356,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 93.7367172241211
+      Distance: 307.9183654785156
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -290,17 +364,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -3.2995762825012207
-        Y: -4.742592811584473
-        Z: -38.56428146362305
+        X: 110.04727172851562
+        Y: -0.7799232602119446
+        Z: -246.8934326171875
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Pitch: 1.1447967290878296
       Target Frame: <Fixed Frame>
-      Yaw: 3.1052093505859375
+      Yaw: 3.140206813812256
     Saved: ~
 Window Geometry:
   Displays:
@@ -318,5 +392,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1611
-  X: 2713
-  Y: 116
+  X: 2678
+  Y: 88

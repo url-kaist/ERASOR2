@@ -42,7 +42,8 @@ int main(int argc, char **argv) {
             std::cout << "[ERASOR2] " << i << "th frame comes!" << std::endl;
         }
 
-        if (++cnt / accum_interval >= 1) {
+        // if `accum_interval` == 1, the below condition is not used
+        if (accum_interval > 1 && ++cnt / accum_interval >= 1) {
             cnt = 0;
             continue;
         }

@@ -40,18 +40,28 @@ public:
     Eigen::Matrix4f                         new_origin_ = Eigen::Matrix4f::Identity();
     vector<pcl::PointCloud<pcl::PointXYZI>> pcs_transformed_;
     vector<pcl::PointCloud<pcl::PointXYZI>> pcs_gt_transformed_;
-    vector<pcl::PointCloud<pcl::PointXYZI>> static_points_transformed_;
     vector<Eigen::Matrix4f>                 poses_submap_;
 
-    vector<vector<pcl::PointCloud<pcl::PointXYZI>>> xygrids_;
-    vector<grid_map::Index>                         idxes_approx_;
+    // Outputs
+    vector<pcl::PointCloud<pcl::PointXYZI>> noisy_points_transformed_;
+    vector<pcl::PointCloud<pcl::PointXYZI>> static_points_transformed_;
 
-    vector<vector<float>> dyn_ids_set_;
+    vector<vector<pcl::PointCloud<pcl::PointXYZI>>>          xygrids_;
+    vector<grid_map::Index>                                  idxes_approx_;
+    vector<vector<float>>                                    dyn_ids_set_;
+
+    vector<vector<pair<Eigen::Matrix<float, 4, 1>, float> >> rejected_objs_set_;
+    vector<vector<pair<Eigen::Matrix<float, 4, 1>, float> >> accepted_objs_set_;
+
+    // To flush markers. These are used in `publishObjScores`
+    int num_prev_accepted_objs_ = 0;
+    int num_prev_rejected_objs_ = 0;
 
     int               num_data_ = 0;
     GridMapInfo       grid_map_info_;
     grid_map::GridMap gridmap_submap_;
 
+    pcl::PointCloud<pcl::PointXYZI>::Ptr map_noise_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_dynamic_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_accum_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_complement_;
@@ -60,15 +70,18 @@ public:
     pcl::PointCloud<pcl::PointXYZI>::Ptr static_map_accum_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr static_map_voxelized_;
 
+    void setPriors();
+
     void initializePointClouds();
 
     // Main functions
     void setScanAndPose(const Eigen::Matrix4f &pose_raw,
                         const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label);
 
-    void setScanAndPose(const Eigen::Matrix4f& pose_raw,
-                             const pcl::PointCloud<pcl::PointXYZI>& cloud_gt_label,
-                             const pcl::PointCloud<pcl::PointXYZI>& cloud_est_label);
+    void setScanAndPose(const Eigen::Matrix4f &pose_raw,
+                        const pcl::PointCloud<pcl::PointXYZI> &cloud_gt_label,
+                        const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label);
+
     void setSubmap();
 
     void resize();
@@ -77,24 +90,27 @@ public:
 
     void detectDynamicObjects();
 
-    void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI>& cloud, const std::vector<float>& dyn_ids,
-                      std::vector<bool>& static_mask);
+    void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<float> &dyn_ids,
+                            std::vector<int> &static_mask);
 
-    void discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI>& cloud, const std::vector<bool>& static_mask,
-                              pcl::PointCloud<pcl::PointXYZI>& static_points, pcl::PointCloud<pcl::PointXYZI>& dynamic_points);
+    void updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
+                         const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
+                         std::vector<int> &static_mask);
 
-    void discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI>& cloud, const std::vector<float>& dyn_ids,
-                              pcl::PointCloud<pcl::PointXYZI>& static_points, pcl::PointCloud<pcl::PointXYZI>& dynamic_points);
-    void saveStaticMap(const string& static_map_path);
+    void
+    discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<int> &static_mask,
+                                  pcl::PointCloud<pcl::PointXYZI> &static_points,
+                                  pcl::PointCloud<pcl::PointXYZI> &dynamic_points);
+
+//    void discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI>& cloud, const std::vector<int>& dyn_ids,
+//                              pcl::PointCloud<pcl::PointXYZI>& static_points, pcl::PointCloud<pcl::PointXYZI>& dynamic_points);
+
+    void saveStaticMap(const string &static_map_path);
 
     void publishStaticMapResults();
 
-    void maskNonVoI(const pcl::PointCloud<pcl::PointXYZI>& src, pcl::PointCloud<pcl::PointXYZI>& cloud_out,
-                const float min_z_voi, const float max_z_voi);
-
-    nav_msgs::OccupancyGrid setOccupancyGridMap(const float min_x, const float min_y,
-                                                const float max_x, const float max_y,
-                                                const float occugrid_resolution);
+    void maskNonVoI(const pcl::PointCloud<pcl::PointXYZI> &src, pcl::PointCloud<pcl::PointXYZI> &cloud_out,
+                    const float min_z_voi, const float max_z_voi);
 
     GridMapInfo setGridMapParams(const float min_x, const float min_y,
                                  const float max_x, const float max_y,
@@ -106,15 +122,19 @@ public:
             pcl::PointCloud<pcl::PointXYZI> &complement, std::string format = "gridmap");
 
     void xygrid2cloud(const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid,
-            pcl::PointCloud<pcl::PointXYZI> &cloud);
+                      pcl::PointCloud<pcl::PointXYZI> &cloud);
 
-    bool isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI> pc, const float ratio_num=0.95,
-                                 const int num_min_pts=3);
+    bool isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI> pc, const float ratio_num = 0.95,
+                            const int num_min_pts = 3);
 
     bool isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
                                      const pcl::PointCloud<pcl::PointXYZI> &map_pc,
                                      const float scan_ratio_threshold, const float th_bin_max_h,
                                      const bool verbose = false);
+
+    void updatePrior(const grid_map::Index& idx, const float prior);
+
+    void updatePosterior(const grid_map::Index& idx, const float increment, const int kernel_size=3);
 
     grid_map::GridMap setMapcentricGridMap(const GridMapInfo &grid_map_info);
 
@@ -124,6 +144,10 @@ public:
 
     void dilateAndErode(grid_map::GridMap &gridmap_submap);
 
+    void erodeGridMap(grid_map::GridMap &gridmap_submap);
+
+    void publishObjScores(const ros::Publisher& publisher, const vector<pair<Eigen::Matrix<float, 4, 1>, float> >& objs,
+                               const vector<float> color, int& num_prev_objs);
 
 private:
     std::vector<int> DYNAMIC_CLASSES = {252, 253, 254, 255, 256, 257, 258, 259};

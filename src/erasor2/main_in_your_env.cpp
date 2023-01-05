@@ -26,7 +26,7 @@
 #define NOT_VOLUME_OF_INTEREST -3
 #define NOT_INTEREST 0 // ground and noisy points in the estimated labels
 // Gridmap characteristics
-#define UNKNOWN -1
+#define unknown_ground_likelihood_ -1
 // Just for visualization
 #define DIST_FROM_GROUND_TO_ORIGIN -1.8
 
@@ -162,7 +162,7 @@ nav_msgs::OccupancyGrid setOccupancyGridMap(const float min_x, const float min_y
     gridmap.info.height = height;
 
     for(int i=0;i < width * height; i++) {
-        gridmap.data.push_back(UNKNOWN);
+        gridmap.data.push_back(unknown_ground_likelihood_);
     }
     return gridmap;
 }
@@ -191,7 +191,7 @@ grid_map::GridMap setMapcentricGridMap(const GridMapInfo& grid_map_info) {
     gridmap.setGeometry(grid_map::Length(grid_map_info.x_length, grid_map_info.y_length),
                         grid_map_info.resolution);
     gridmap["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
-    gridmap["steppable"].setConstant(UNKNOWN);
+    gridmap["steppable"].setConstant(unknown_ground_likelihood_);
     gridmap.setPosition(grid_map::Position(grid_map_info.center_x, grid_map_info.center_y));
     return gridmap;
 }
@@ -333,7 +333,7 @@ nav_msgs::OccupancyGrid setEgocentricOccupancyGridMap(float range,
 
     // Initialization
     for(int i = 0;i < width * height; i++) {
-        gridmap.data.push_back(UNKNOWN);
+        gridmap.data.push_back(unknown_ground_likelihood_);
     }
     for(int i = 0;i < width * height; i++) {
         if (!xygrid[i].points.empty() && isLikelyToBeGround(xygrid[i])) {
@@ -352,7 +352,7 @@ grid_map::GridMap setEgocentricGridMap(float range,
     gridmap.setFrameId("map");
     gridmap.setGeometry(grid_map::Length(2 * range, 2 * range), grid_resolution);
     gridmap["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
-    gridmap["steppable"].setConstant(UNKNOWN);
+    gridmap["steppable"].setConstant(unknown_ground_likelihood_);
 
     const int width = static_cast<int>(2 * range / grid_resolution);
     const int height = static_cast<int>(2 * range / grid_resolution);
@@ -568,7 +568,7 @@ int main(int argc, char **argv)
 //                    std::cout << "\033[1;34m(" << w << ", " << h << ")\033[0m" << std::endl;
                     if (isLikelyToBeSteppableRegion(xygrids[k][count], map_grid[count],
                                                     scan_ratio_threshold, th_bin_max_h, verbose)) {
-                        if (gridmap_submap.at("steppable", idx) == UNKNOWN) {
+                        if (gridmap_submap.at("steppable", idx) == unknown_ground_likelihood_) {
                             gridmap_submap.at("steppable", idx) = POTENTIAL_GROUND;
                         } else {
                             gridmap_submap.at("steppable", idx) += INCREMENT_GROUND_LIKELIHOOD;

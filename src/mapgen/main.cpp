@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
             std::cout << "[MAPGEN] " << i << "th frame comes!" << std::endl;
         }
 
-        if (++cnt / accum_interval >= 1) {
+        if (accum_interval > 1 && ++cnt / accum_interval >= 1) {
             cnt = 0;
             continue;
         }

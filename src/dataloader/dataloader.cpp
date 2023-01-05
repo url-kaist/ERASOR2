@@ -174,7 +174,7 @@ void SemanticKITTILoader::loadEstGroundAndInstanceLabels(const int i, std::vecto
                 std::cout << std::endl;
             }
         }
-        std::cout << "(check the function `assignLabel()` in `dataloader.cpp`)\033[0m" << std::endl;
+        std::cout << "(check the function `assignLabel()` in `dataloader.cpp`\033[0m" << std::endl;
         is_initial = false;
     }
 }

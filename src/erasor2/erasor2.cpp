@@ -3,6 +3,14 @@
 using namespace std;
 
 ERASOR2::ERASOR2() {
+    cout << "[ERASOR2] Unknown prior: " << unknown_prior_ << endl;
+    cout << "[ERASOR2] Initial prior: " << initial_prior_ << endl;
+    cout << "[ERASOR2] Informative prior: " << informative_prior_ << endl;
+    cout << "[ERASOR2] Increment gain: " << increment_gain_ << endl;
+    cout << "[ERASOR2] Increment: " << increment_ << endl;
+    if (initial_prior_ > informative_prior_ || increment_gain_ < 1.0) {
+        throw invalid_argument("Parameters are wrongly set!");
+    }
     initializePointClouds();
 }
 
@@ -22,12 +30,14 @@ double ERASOR2::xy2radius(const double &x, const double &y) {
 
 void ERASOR2::initializePointClouds() {
     int num_pts_for_reserve = 2000000;
+    map_noise_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     map_dynamic_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     map_accum_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     map_complement_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     static_map_accum_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     static_map_voxelized_.reset(new pcl::PointCloud<pcl::PointXYZI>);
 
+    map_noise_->points.reserve(num_pts_for_reserve);
     map_dynamic_->points.reserve(num_pts_for_reserve);
     map_accum_->points.reserve(num_pts_for_reserve);
     map_complement_->points.reserve(num_pts_for_reserve);
@@ -65,14 +75,12 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
     pcs_transformed_.emplace_back(*transformed);
 
     if (viz_set_scan_and_pose_) {
-        std::cout << "publish?" << std::endl;
         ros::Rate                               sleep_rate(30);
         vector<pcl::PointCloud<pcl::PointXYZI>> xygrid;
         pcl::PointCloud<pcl::PointXYZI>         complement;
         voi2xygrid(*cloud_est_w_voi_label, 0.0, 0.0, 0.0,
                    range_of_interest_, grid_resolution_,
                    xygrid, complement, "gridmap");
-        std::cout << "publish0" << std::endl;
         grid_map::GridMap gridmap = setEgocentricGridMap(range_of_interest_,
                                                          grid_resolution_, xygrid);
 
@@ -92,20 +100,26 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
 }
 
 void ERASOR2::setSubmap() {
+    cout << "[ERASOR2] Setting submap..." << endl;
     int                                  num_data = pcs_transformed_.size();
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_partial_src(new pcl::PointCloud<pcl::PointXYZI>);
     for (int                             k        = 0; k < num_data; ++k) {
         *map_partial_src += pcs_transformed_[k];
     }
 
+    cout << "[ERASOR2] Voxelizing submap..." << endl;
     // Estimated labels are preserved!
     erasor_utils::voxelize_preserving_labels_by_nanoflann(map_partial_src, *map_accum_, map_voxel_size_);
 
+    cout << "[ERASOR2] Calculating  min-max x, y values..." << endl;
     float min_x, min_y, max_x, max_y;
     erasor_utils::calcMinMaxXY(pcs_transformed_, min_x, min_y, max_x, max_y);
+    cout << "[ERASOR2] Min-max x: " << min_x << " <-> " << max_x  << endl;
+    cout << "[ERASOR2] Min-max y: " << min_y << " <-> " << max_y  << endl;
 
     num_data_ = num_data;
 
+    cout << "[ERASOR2] Setting map-centric gridmap..." << endl;
     grid_map_info_  = setGridMapParams(min_x, min_y, max_x, max_y, grid_resolution_);
     gridmap_submap_ = setMapcentricGridMap(grid_map_info_);
 
@@ -119,6 +133,9 @@ void ERASOR2::resize() {
     xygrids_.resize(num_data_);
     idxes_approx_.resize(num_data_);
     dyn_ids_set_.resize(num_data_);
+    rejected_objs_set_.resize(num_data_);
+    accepted_objs_set_.resize(num_data_);
+    noisy_points_transformed_.resize(num_data_);
     static_points_transformed_.resize(num_data_);
 }
 
@@ -160,14 +177,12 @@ void ERASOR2::updateSteppableRegion() {
                     if (isLikelyToBeSteppableRegion(xygrids_[k][count], map_grid[count],
                                                     scan_ratio_threshold_,
                                                     th_bin_max_h_, verbose_)) {
-//                        cout << "Success! " << endl;
-                        if (gridmap_submap_.at("steppable", idx) == UNKNOWN) {
-                            gridmap_submap_.at("steppable", idx) = initial_ground_likelihood_;
-                        } else {
-                            gridmap_submap_.at("steppable", idx) += increment_ground_likelihood_;
-                        }
-                    } else {
-//                        cout << "Fail! " << endl;
+                        updatePrior(idx, informative_prior_);
+                        updatePosterior(idx, increment_ * increment_gain_);
+//                    } else if (isLikelyToBeGround(xygrids_[k][count])) {
+//                        updatePrior(idx, initial_prior_);
+//                        updatePosterior(idx, increment_);
+//                    }
                     }
                 }
                 ++count;
@@ -185,6 +200,7 @@ void ERASOR2::updateSteppableRegion() {
             MapVoIPublisher.publish(erasor_utils::cloud2msg(*map_voi));
 
             grid_map_msgs::GridMap grid_msg;
+            gridmap_submap_["steppable"] = gridmap_submap_["prior"] + gridmap_submap_["posterior"];
             grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
             GridPublisher.publish(grid_msg);
             ros::spinOnce();
@@ -194,12 +210,19 @@ void ERASOR2::updateSteppableRegion() {
             }
         }
     }
+    gridmap_submap_["steppable"] = gridmap_submap_["prior"] + gridmap_submap_["posterior"];
 }
 
 // Re-project ground likelihood to each scan
 void ERASOR2::detectDynamicObjects() {
+    dilateAndErode(gridmap_submap_);
+    grid_map_msgs::GridMap grid_msg;
+    grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
+    GridPublisher.publish(grid_msg);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr rejected_dynamic_objs(new pcl::PointCloud<pcl::PointXYZI>);
     for (int k = 0; k < num_data_; ++k) {
-        vector<float> dyn_cand_ids;
+        vector<float> dyn_cand_ids; // temp. variable
+        noisy_points_transformed_[k].reserve(100);
 
         int w_pc = idxes_approx_[k](0);
         int h_pc = idxes_approx_[k](1);
@@ -213,10 +236,12 @@ void ERASOR2::detectDynamicObjects() {
                 idx(1) = h;
                 if (gridmap_submap_.at("steppable", idx) > ground_likelihood_thr_) {
                     // Extract indices
-                    for (const auto pt: xygrids_[k][count].points) {
+                    for (const auto& pt: xygrids_[k][count].points) {
                         if ((pt.intensity != GROUND_LABEL) && (pt.intensity != NOT_INTEREST) &&
                             std::find(dyn_cand_ids.begin(), dyn_cand_ids.end(), pt.intensity) == dyn_cand_ids.end()) {
                             dyn_cand_ids.push_back(pt.intensity);
+                        } else if (pt.intensity == NOT_INTEREST) {
+                            noisy_points_transformed_[k].points.emplace_back(pt);
                         }
                     }
                 }
@@ -226,52 +251,87 @@ void ERASOR2::detectDynamicObjects() {
 
         // Filtering
         auto &ids = dyn_ids_set_[k];
+        auto &rejected_objs = rejected_objs_set_[k];
+        auto &accepted_objs = accepted_objs_set_[k];
         ids.clear();
         for (const int dyn_cand_id: dyn_cand_ids) {
             // For visualization
-            pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_points(new pcl::PointCloud<pcl::PointXYZI>);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_obj(new pcl::PointCloud<pcl::PointXYZI>);
             for (const auto                      &pt: pcs_transformed_[k]) {
                 if (pt.intensity == dyn_cand_id) {
-                    dynamic_points->points.emplace_back(pt);
+                    dynamic_obj->points.emplace_back(pt);
                 }
             }
             float                                total_score = 0;
-            for (const auto                      &dyn_pt: dynamic_points->points) {
+            for (const auto                      &dyn_pt: dynamic_obj->points) {
                 grid_map::Position p_tmp(dyn_pt.x, dyn_pt.y);
                 grid_map::Index    idx_tmp;
                 gridmap_submap_.getIndex(p_tmp, idx_tmp);
                 total_score += gridmap_submap_.at("steppable", idx_tmp);
             }
-            if (total_score / dynamic_points->points.size() > ground_likelihood_thr_) {
+
+            float moving_obj_score = total_score / dynamic_obj->points.size();
+//            if (k == 46 || k == 51) {
+//                DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*dynamic_obj));
+//                cout << "==> " << moving_obj_score << endl;
+//                cin.ignore();
+//            }
+            Eigen::Matrix<float, 4, 1> centroid;
+            pcl::compute3DCentroid(*dynamic_obj, centroid);
+            if (moving_obj_score > ground_likelihood_thr_) {
                 ids.push_back(dyn_cand_id);
+                // For visualization
+                accepted_objs.push_back({centroid, moving_obj_score});
+            } else { // it means that most parts are not in the region of interests
+                (*rejected_dynamic_objs) += (*dynamic_obj);
+                // For visualization
+                rejected_objs.push_back({centroid, moving_obj_score});
             }
         }
     }
 
+    // Finally assign the static points
     for (int k = 0; k < num_data_; ++k) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_points_each_scan(new pcl::PointCloud<pcl::PointXYZI>);
         auto                                 &each_pc = pcs_transformed_[k];
         auto                                 &ids     = dyn_ids_set_[k];
 
         static_points_transformed_[k].clear();
-        vector<bool> static_mask;
+        vector<int> static_mask;
         estimateStaticMask(each_pc, ids, static_mask);
+        // Noisy points are added by the following function:
+        updateNoisyMask(each_pc, noisy_points_transformed_[k], static_mask);
         if (dataset_name_ == "SemanticKITTI") {
-            // To preserve the SemanticKITTI labels
+            // To preserve the original SemanticKITTI labels
             discernStaticAndDynamicPoints(pcs_gt_transformed_[k], static_mask, static_points_transformed_[k],
                                           *dynamic_points_each_scan);
         } else {
             discernStaticAndDynamicPoints(each_pc, static_mask, static_points_transformed_[k],
                                           *dynamic_points_each_scan);
         }
+
+        (*map_noise_) += noisy_points_transformed_[k];
         (*map_dynamic_) += (*dynamic_points_each_scan);
 
         if (viz_detect_) {
-            cout << "Total " << ids.size() << "dyn. objects are detected!" << endl;
+            cout << k << " th: Total " << ids.size() << " dyn. objects are detected!" << endl;
+            cout << each_pc.size() << " => " << static_points_transformed_[k].points.size() << " / ";
+            cout << dynamic_points_each_scan->points.size() << " / " << noisy_points_transformed_[k].size() << endl;
             CurrCloudPublisher.publish(erasor_utils::cloud2msg(each_pc));
             DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*dynamic_points_each_scan));
+            RejectedDynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*rejected_dynamic_objs));
+            NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(noisy_points_transformed_[k]));
+            publishObjScores(RejectedMovingObjScorePublisher, rejected_objs_set_[k],
+                             {1.0, 1.0, 1.0}, num_prev_rejected_objs_);
+            publishObjScores(AcceptedMovingObjScorePublisher, accepted_objs_set_[k],
+                             {0.0, 1.0, 0.0}, num_prev_accepted_objs_);
+
+            grid_map_msgs::GridMap grid_msg;
+            grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
+            GridPublisher.publish(grid_msg);
+
             if (stop_for_each_frame_) {
-                std::cout << "[Reproject] Waiting for pressing a key" << std::endl;
+                std::cout << "[Detect] Waiting for pressing a key" << std::endl;
                 cin.ignore();
             }
         }
@@ -279,26 +339,63 @@ void ERASOR2::detectDynamicObjects() {
 }
 
 void ERASOR2::estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
-                                 const std::vector<float> &dyn_ids, std::vector<bool> &static_mask) {
+                                 const std::vector<float> &dyn_ids, std::vector<int> &static_mask) {
     static_mask.resize(cloud.points.size());
     int             count = 0;
     for (const auto &pt: cloud) {
         if (std::find(dyn_ids.begin(), dyn_ids.end(), pt.intensity) != dyn_ids.end()) {
             if (pt.intensity == NOT_VOLUME_OF_INTEREST) {
                 // ToDo Improve
-                static_mask[count] = true;
+                static_mask[count] = IS_STATIC;
             } else {
-                static_mask[count] = false;
+                static_mask[count] = IS_DYNAMIC;
             }
         } else {
-            static_mask[count] = true;
+            static_mask[count] = IS_STATIC;
         }
         ++count;
     }
 }
 
+void ERASOR2::updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
+                              const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
+                              std::vector<int> &static_mask) {
+    // construct a kd-tree index:
+    using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
+            nanoflann::L2_Simple_Adaptor<num_t, PointCloud<num_t>>,
+            PointCloud<num_t>, 3 /* dim */
+    >;
+
+    int               N = src_cloud.points.size();
+        PointCloud<num_t> cloud;
+        cloud.pts.resize(N);
+        for (size_t i = 0; i < N; i++) {
+            cloud.pts[i].x = src_cloud.points[i].x;
+            cloud.pts[i].y = src_cloud.points[i].y;
+            cloud.pts[i].z = src_cloud.points[i].z;
+        }
+
+    my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+
+    for (auto &query_pcl: noisy_points.points) {
+        const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
+        {
+            size_t                num_results = 1;
+            std::vector<uint32_t> ret_index(num_results);
+            std::vector<num_t>    out_dist_sqr(num_results);
+
+            num_results = index.knnSearch(
+                    &query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
+
+            ret_index.resize(num_results);
+            out_dist_sqr.resize(num_results);
+            static_mask[ret_index[0]] = IS_NOISE_YET_POTENTIAL_DYNAMIC;
+        }
+    }
+}
+
 void ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud,
-                                            const std::vector<bool> &static_mask,
+                                            const std::vector<int> &static_mask,
                                             pcl::PointCloud<pcl::PointXYZI> &static_points,
                                             pcl::PointCloud<pcl::PointXYZI> &dynamic_points) {
     if (cloud.size() != static_mask.size()) {
@@ -309,42 +406,44 @@ void ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI
     dynamic_points.clear();
     int             count = 0;
     for (const auto &pt: cloud) {
-        if (static_mask[count]) {
+        if (static_mask[count] == IS_STATIC) {
             static_points.points.emplace_back(pt);
         } else {
+            // Noisy points can be included
             dynamic_points.points.emplace_back(pt);
         }
         ++count;
     }
 }
 
-void
-ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<float> &dyn_ids,
-                                       pcl::PointCloud<pcl::PointXYZI> &static_points,
-                                       pcl::PointCloud<pcl::PointXYZI> &dynamic_points) {
-    for (const auto &pt: cloud) {
-        if (std::find(dyn_ids.begin(), dyn_ids.end(), pt.intensity) != dyn_ids.end()) {
-            if (pt.intensity == NOT_VOLUME_OF_INTEREST) {
-                // ToDo Improve
-                static_points.points.emplace_back(pt);
-            } else {
-                dynamic_points.points.emplace_back(pt);
-            }
-        } else {
-            static_points.points.emplace_back(pt);
-        }
-    }
-}
+//void
+//ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<int> &dyn_ids,
+//                                       pcl::PointCloud<pcl::PointXYZI> &static_points,
+//                                       pcl::PointCloud<pcl::PointXYZI> &dynamic_points) {
+//    for (const auto &pt: cloud) {
+//        if (std::find(dyn_ids.begin(), dyn_ids.end(), pt.intensity) != dyn_ids.end()) {
+//            if (pt.intensity == NOT_VOLUME_OF_INTEREST) {
+//                // ToDo Improve
+//                static_points.points.emplace_back(pt);
+//            } else {
+//                dynamic_points.points.emplace_back(pt);
+//            }
+//        } else {
+//            static_points.points.emplace_back(pt);
+//        }
+//    }
+//}
 
 void ERASOR2::publishStaticMapResults() {
     std::cout << "[ERASOR2] Publish results!" << std::endl;
-    std::cout << "# of dynamic points: " << map_dynamic_->points.size() << std::endl;
+//    std::cout << "# of dynamic points: " << map_dynamic_->points.size() << std::endl;
     std::cout << "# of static points: " << static_map_voxelized_->points.size() << std::endl;
     pcl::PointCloud<pcl::PointXYZI>::Ptr static_map_for_viz(new pcl::PointCloud<pcl::PointXYZI>);
     // Because ERASOR2 uses the local origin,
     pcl::transformPointCloud(*static_map_voxelized_, *static_map_for_viz, new_origin_.inverse());
-    DynMapPublisher.publish(erasor_utils::cloud2msg(*map_dynamic_));
     MapCloudPublisher.publish(erasor_utils::cloud2msg(*static_map_for_viz));
+    DynMapPublisher.publish(erasor_utils::cloud2msg(*map_dynamic_));
+    NoiseMapPublisher.publish(erasor_utils::cloud2msg(*map_noise_));
     ros::Rate final_loop_rate(1);
     while (ros::ok()) {
         grid_map_msgs::GridMap grid_msg;
@@ -390,29 +489,6 @@ void ERASOR2::maskNonVoI(const pcl::PointCloud<pcl::PointXYZI> &src, pcl::PointC
     }
 }
 
-nav_msgs::OccupancyGrid ERASOR2::setOccupancyGridMap(const float min_x, const float min_y,
-                                                     const float max_x, const float max_y,
-                                                     const float occugrid_resolution) {
-
-    const int               width  = static_cast<int>((max_x - min_x) / occugrid_resolution) + 1;
-    const int               height = static_cast<int>((max_y - min_y) / occugrid_resolution) + 1;
-    nav_msgs::OccupancyGrid gridmap;
-    gridmap.info.resolution = occugrid_resolution;
-    geometry_msgs::Pose origin;
-    origin.position.x    = min_x;
-    origin.position.y    = min_y;
-    origin.position.z    = DIST_FROM_GROUND_TO_ORIGIN;
-    origin.orientation.w = 1;
-    gridmap.info.origin  = origin;
-    gridmap.info.width   = width;
-    gridmap.info.height  = height;
-
-    for (int i = 0; i < width * height; i++) {
-        gridmap.data.push_back(UNKNOWN);
-    }
-    return gridmap;
-}
-
 GridMapInfo ERASOR2::setGridMapParams(const float min_x, const float min_y,
                                       const float max_x, const float max_y,
                                       const float grid_resolution) {
@@ -435,12 +511,15 @@ grid_map::GridMap ERASOR2::setMapcentricGridMap(const GridMapInfo &grid_map_info
     cout << grid_map_info.x_length << endl;
     cout << grid_map_info.y_length << endl;
     cout << grid_map_info.resolution << endl;
-    grid_map::GridMap gridmap({"elevation", "steppable"});
+    grid_map::GridMap gridmap({"elevation", "prior", "posterior", "steppable", "erosion"});
     gridmap.setFrameId("map");
     gridmap.setGeometry(grid_map::Length(grid_map_info.x_length, grid_map_info.y_length),
                         grid_map_info.resolution);
     gridmap["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
-    gridmap["steppable"].setConstant(UNKNOWN);
+    gridmap["prior"].setConstant(unknown_prior_);
+    gridmap["posterior"].setConstant(0);
+    gridmap["steppable"].setConstant(0);
+    gridmap["erosion"].setConstant(0);
     gridmap.setPosition(grid_map::Position(grid_map_info.center_x, grid_map_info.center_y));
     return gridmap;
 }
@@ -537,12 +616,55 @@ bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> 
                             curr_h_diff / map_h_diff);
 
     // Dynamic!
-    if (scan_ratio < scan_ratio_threshold && isLikelyToBeGround(curr_pc, 0.95)) { // find dynamic!
+    if (scan_ratio < scan_ratio_threshold && isLikelyToBeGround(curr_pc, ratio_num_pts_, minimum_num_pts_)) { // find dynamic!
         if (map_h_diff > th_bin_max_h) { // To reduce false positives
             return true;
         } else { return false; }
     } else {
         return false;
+    }
+}
+
+void ERASOR2::updatePrior(const grid_map::Index& idx, const float prior) {
+    // Initialization
+    if (gridmap_submap_.at("prior", idx) == unknown_prior_) {
+        gridmap_submap_.at("prior", idx) = prior;
+    }
+
+    // If a given prior is more reliable, update
+    if (gridmap_submap_.at("prior", idx) < prior) {
+        gridmap_submap_.at("prior", idx) = prior;
+    }
+}
+
+void ERASOR2::updatePosterior(const grid_map::Index& idx, const float increment, const int kernel_size) {
+    gridmap_submap_.at("posterior", idx) += increment;
+
+    auto idx_for_neighboring = idx;
+    int w = idx(0);
+    int h = idx(1);
+
+    if (kernel_size == 3) {
+        // Refer to https://www.opencv-srf.com/2018/03/gaussian-blur.html
+        vector<pair<float, float> > plus_minus_for_adjacent = {{1, 0}, {-1,0},
+                                                               {0, 1}, {0, -1}};
+        for (const auto& sign: plus_minus_for_adjacent) {
+            idx_for_neighboring(0) = w + sign.first;
+            idx_for_neighboring(1) = h + sign.second;
+            gridmap_submap_.at("posterior", idx) += increment / 2.0;
+        }
+
+        vector<pair<float, float> > plus_minus_for_diagonal = {{1, 1}, {1, -1},
+                                                              {-1, 1}, {-1, -1}};
+        for (const auto& sign: plus_minus_for_diagonal) {
+            idx_for_neighboring(0) = w + sign.first;
+            idx_for_neighboring(1) = h + sign.second;
+            gridmap_submap_.at("posterior", idx) += increment / 4.0;
+        }
+    } else if (kernel_size == 1) {
+        return;
+    } else {
+        throw invalid_argument("Not implemented");
     }
 }
 
@@ -554,7 +676,7 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(float range,
     gridmap.setFrameId("map");
     gridmap.setGeometry(grid_map::Length(2 * range, 2 * range), grid_resolution);
     gridmap["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
-    gridmap["steppable"].setConstant(UNKNOWN);
+    gridmap["steppable"].setConstant(unknown_prior_);
 
     const int width  = static_cast<int>(2.00000001 * range / grid_resolution);
     const int height = static_cast<int>(2.00000001 * range / grid_resolution);
@@ -563,34 +685,94 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(float range,
     for (int        u = 0; u < width; ++u) {
         for (int v = 0; v < height; ++v) {
             int i = u + width * v;
-            if (!xygrid[i].points.empty() && isLikelyToBeGround(xygrid[i])) {
+            if (!xygrid[i].points.empty() && isLikelyToBeGround(xygrid[i], ratio_num_pts_, minimum_num_pts_)) {
                 idx(0)                       = u;
                 idx(1)                       = v;
-                gridmap.at("steppable", idx) = initial_ground_likelihood_;
+                gridmap.at("steppable", idx) = initial_prior_;
             }
         }
     }
     return gridmap;
 }
 
-//void ERASOR2::dilateAndErode(grid_map::GridMap& gridmap_submap) {
-//    // Noise filtering?
-//    cv::Mat img, img_eroded, img_dilated;
-//    const float min_coefficient = gridmap_submap.get("steppable").minCoeff();
-//    const float max_coefficient = gridmap_submap.get("steppable").maxCoeff();
-//    std::cout << min_coefficient << ", " << max_coefficient << std::endl;
-//    grid_map::GridMapCvConverter::toImage<unsigned char, 1>(gridmap_submap, "steppable", CV_8UC1,
-//                                                            min_coefficient, max_coefficient, img);
-//    std::string save_dir = "/home/shapelim/Pictures/erasor2";
-//    cv::imwrite(save_dir + "/original.png", img);
-//    dilate(img, img_dilated, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 2);
-//    cv::imwrite(save_dir + "/dilation.png", img_dilated);
-//    erode(img_dilated, img_eroded, cv::Mat::ones(cv::Size(3,3),CV_8UC1), cv::Point(-1,-1),2);
-//    cv::imwrite(save_dir + "/erosion.png", img_eroded);
-//    grid_map::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(img_eroded, "steppable",
-//                                                                      gridmap_submap, min_coefficient, max_coefficient);
-//    const float min_coefficient_after = gridmap_submap.get("steppable").minCoeff();
-//    const float max_coefficient_after = gridmap_submap.get("steppable").maxCoeff();
-//    std::cout << min_coefficient_after << ", " << max_coefficient_after << std::endl;
-//}
+void ERASOR2::dilateAndErode(grid_map::GridMap& gridmap_submap) {
+    // Noise filtering?
+    cv::Mat img, img_eroded, img_dilated;
+    gridmap_submap["erosion"] = gridmap_submap["steppable"];
+    const float min_coefficient = gridmap_submap.get("erosion").minCoeff();
+    const float max_coefficient = gridmap_submap.get("erosion").maxCoeff();
+    std::cout << min_coefficient << ", " << max_coefficient << std::endl;
+    grid_map::GridMapCvConverter::toImage<unsigned char, 1>(gridmap_submap, "erosion", CV_8UC1,
+                                                            min_coefficient, max_coefficient, img);
+    std::string save_dir = "/home/shapelim/Pictures/erasor2";
+    cv::imwrite(save_dir + "/original.png", img);
+    dilate(img, img_dilated, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 1);
+    cv::imwrite(save_dir + "/dilation.png", img_dilated);
+    erode(img_dilated, img_eroded, cv::Mat::ones(cv::Size(3,3),CV_8UC1), cv::Point(-1,-1),4);
+    cv::imwrite(save_dir + "/erosion.png", img_eroded);
+    grid_map::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(img_eroded, "erosion",
+                                                                      gridmap_submap, min_coefficient, max_coefficient);
+    const float min_coefficient_after = gridmap_submap.get("erosion").minCoeff();
+    const float max_coefficient_after = gridmap_submap.get("erosion").maxCoeff();
+    std::cout << min_coefficient_after << ", " << max_coefficient_after << std::endl;
+}
 
+void ERASOR2::erodeGridMap(grid_map::GridMap& gridmap_submap) {
+    // Noise filtering?
+    cv::Mat img, img_eroded, img_dilated;
+    const float min_coefficient = gridmap_submap.get("steppable").minCoeff();
+    const float max_coefficient = gridmap_submap.get("steppable").maxCoeff();
+    std::cout << "\033[1;34m" << min_coefficient << ", " << max_coefficient << std::endl;
+    grid_map::GridMapCvConverter::toImage<unsigned char, 1>(gridmap_submap, "steppable", CV_8UC1,
+                                                            min_coefficient, max_coefficient, img);
+
+    erode(img, img_eroded, cv::Mat::ones(cv::Size(3,3),CV_8UC1), cv::Point(-1,-1),2);
+    grid_map::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(img_eroded, "eroded",
+                                                                      gridmap_submap, min_coefficient, max_coefficient);
+    const float min_coefficient_after = gridmap_submap.get("erroded").minCoeff();
+    const float max_coefficient_after = gridmap_submap.get("erroded").maxCoeff();
+    std::cout << min_coefficient_after << ", " << max_coefficient_after << "\033[0m" << std::endl;
+}
+
+void ERASOR2::publishObjScores(const ros::Publisher& publisher, const vector<pair<Eigen::Matrix<float, 4, 1>, float> >& objs,
+                               const vector<float> color, int& num_prev_objs) {
+    visualization_msgs::MarkerArray marker_arr;
+    visualization_msgs::Marker marker;
+    marker.header.frame_id    = "map";
+    marker.header.stamp       = ros::Time::now();
+
+    int num_curr_objs = objs.size();
+    cout << "Total " << num_curr_objs << " objs do exist." << endl;
+    for (int i = 0; i < num_curr_objs; ++i) {
+        const auto& pair = objs[i];
+        marker.id                 = i;
+        marker.text               = (boost::format("%.02f") % pair.second).str();
+        marker.type               = visualization_msgs::Marker::TEXT_VIEW_FACING;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose.position.x    = pair.first(0);
+        marker.pose.position.y    = pair.first(1);
+        marker.pose.position.z    = pair.first(2);
+        marker.pose.orientation.w = 1.0;
+//                    marker.scale.x = 1;
+//                    marker.scale.y = 0.1;
+        marker.scale.z            = 1.25;
+        marker.color.a            = 1.0; // Don't forget to set the alpha!
+        marker.color.r            = color[0];
+        marker.color.g            = color[1];
+        marker.color.b            = color[2];
+        marker_arr.markers.push_back(marker);
+    }
+
+    for (int i = num_curr_objs; i < num_prev_objs; ++i) {
+        visualization_msgs::Marker markers_to_be_removed;
+        markers_to_be_removed.id                 = i;
+        markers_to_be_removed.header.frame_id    = "map";
+        markers_to_be_removed.header.stamp       = ros::Time::now();
+        markers_to_be_removed.type               = visualization_msgs::Marker::TEXT_VIEW_FACING;
+        markers_to_be_removed.action = visualization_msgs::Marker::DELETE;
+        marker_arr.markers.push_back(markers_to_be_removed);
+    }
+    publisher.publish(marker_arr);
+
+    num_prev_objs = num_curr_objs;
+}

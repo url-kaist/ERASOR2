@@ -227,7 +227,6 @@ namespace erasor_utils {
         pcl::PointXYZI  min_pt, max_pt;
         for (const auto &cloud: pcs) {
             pcl::getMinMax3D(cloud, min_pt, max_pt);
-            std::cout << min_pt.x << ", " << min_pt.y << std::endl;
             min_x = min(min_pt.x, min_x);
             min_y = min(min_pt.y, min_y);
             max_x = max(max_pt.x, max_x);

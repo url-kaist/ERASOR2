@@ -57,7 +57,6 @@ include_directories(
 ###############
 # Online Map refinement
 set(erasor2_src
-    include/dataloader/dataloader.h
     src/dataloader/dataloader.cpp
     src/erasor2/erasor_utils.cpp
 )
@@ -65,11 +64,7 @@ set(erasor2_src
 add_executable(inheritance_test src/example/inheritance_test.cpp ${erasor2_src})
 target_link_libraries(inheritance_test ${catkin_LIBRARIES} stdc++fs)
 add_dependencies(inheritance_test erasor_generate_messages_cpp)
-#
-#add_executable(compare_map src/utils/compare_map.cpp ${unavlib_source})
-#target_link_libraries(compare_map ${catkin_LIBRARIES})
-#add_dependencies(compare_map erasor_generate_messages_cpp)
-#
+
 #add_executable(compare_complement src/utils/compare_complement.cpp ${unavlib_source})
 #target_link_libraries(compare_complement ${catkin_LIBRARIES})
 #add_dependencies(compare_complement erasor_generate_messages_cpp)
@@ -92,9 +87,10 @@ add_dependencies(inheritance_test erasor_generate_messages_cpp)
 #target_link_libraries(main ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} stdc++fs)
 #add_dependencies(main erasor2_generate_messages_cpp)
 
-#add_executable(compare_map src/compare_map.cpp src/offline_map_updater/src/erasor_utils.cpp)
-#target_link_libraries(compare_map ${catkin_LIBRARIES})
-#
+add_executable(compare_map src/compare_map.cpp src/erasor2/erasor_utils.cpp)
+target_link_libraries(compare_map ${catkin_LIBRARIES})
+add_dependencies(compare_map erasor2_generate_messages_cpp)
+
 set(mapgen_src
     src/erasor2/erasor_utils.cpp
     src/dataloader/dataloader.cpp
