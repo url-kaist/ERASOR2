@@ -53,9 +53,11 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
 void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                              const pcl::PointCloud<pcl::PointXYZI> &cloud_gt_label,
                              const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label) {
-    pcl::PointCloud<pcl::PointXYZI>::Ptr tmp_transformed(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_est_w_voi_label(new pcl::PointCloud<pcl::PointXYZI>);
+    transformed->reserve(cloud_est_label.size());
+    cloud_est_w_voi_label->reserve(cloud_est_label.size());
+
     if (is_initial_) {
         new_origin_ = pose_raw;
         is_initial_ = false;
@@ -72,6 +74,11 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
     // This affects the quality of xygrid
     maskNonVoI(cloud_est_label, *cloud_est_w_voi_label, min_z_voi_, max_z_voi_);
     pcl::transformPointCloud(*cloud_est_w_voi_label, *transformed, poses_submap_.back() * tf_h_of_ground_to_be_zero_);
+
+    // Parse VoI and Non-VoI. Because non-VoIs are not targets of static map building
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_voi(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_non_voi(new pcl::PointCloud<pcl::PointXYZI>);
     pcs_transformed_.emplace_back(*transformed);
 
     if (viz_set_scan_and_pose_) {
@@ -236,6 +243,7 @@ void ERASOR2::detectDynamicObjects() {
                 idx(1) = h;
                 if (gridmap_submap_.at("steppable", idx) > ground_likelihood_thr_) {
                     // Extract indices
+                    // Note that `xygrids_[k][count]` does not contain non-VoI points
                     for (const auto& pt: xygrids_[k][count].points) {
                         if ((pt.intensity != GROUND_LABEL) && (pt.intensity != NOT_INTEREST) &&
                             std::find(dyn_cand_ids.begin(), dyn_cand_ids.end(), pt.intensity) == dyn_cand_ids.end()) {
@@ -254,36 +262,43 @@ void ERASOR2::detectDynamicObjects() {
         auto &rejected_objs = rejected_objs_set_[k];
         auto &accepted_objs = accepted_objs_set_[k];
         ids.clear();
+
+        unordered_map<int, pcl::PointCloud<pcl::PointXYZI>> dynamic_objs;
+        pcl::PointCloud<pcl::PointXYZI> dyn_obj_dummy;
+        dyn_obj_dummy.reserve(200); // heuristic
         for (const int dyn_cand_id: dyn_cand_ids) {
-            // For visualization
-            pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_obj(new pcl::PointCloud<pcl::PointXYZI>);
-            for (const auto                      &pt: pcs_transformed_[k]) {
-                if (pt.intensity == dyn_cand_id) {
-                    dynamic_obj->points.emplace_back(pt);
-                }
+            dynamic_objs[dyn_cand_id] = dyn_obj_dummy;
+        }
+
+        for (const auto &pt: pcs_transformed_[k]) {
+            if (dynamic_objs.find(pt.intensity) != dynamic_objs.end()) {
+                dynamic_objs[pt.intensity].emplace_back(pt);
             }
+        }
+
+        for(const auto& [dyn_cand_id, dynamic_obj] : dynamic_objs) {
             float                                total_score = 0;
-            for (const auto                      &dyn_pt: dynamic_obj->points) {
+            for (const auto                      &dyn_pt: dynamic_obj.points) {
                 grid_map::Position p_tmp(dyn_pt.x, dyn_pt.y);
                 grid_map::Index    idx_tmp;
                 gridmap_submap_.getIndex(p_tmp, idx_tmp);
                 total_score += gridmap_submap_.at("steppable", idx_tmp);
             }
 
-            float moving_obj_score = total_score / dynamic_obj->points.size();
+            float moving_obj_score = total_score / dynamic_obj.points.size();
 //            if (k == 46 || k == 51) {
 //                DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*dynamic_obj));
 //                cout << "==> " << moving_obj_score << endl;
 //                cin.ignore();
 //            }
             Eigen::Matrix<float, 4, 1> centroid;
-            pcl::compute3DCentroid(*dynamic_obj, centroid);
+            pcl::compute3DCentroid(dynamic_obj, centroid);
             if (moving_obj_score > ground_likelihood_thr_) {
                 ids.push_back(dyn_cand_id);
                 // For visualization
                 accepted_objs.push_back({centroid, moving_obj_score});
             } else { // it means that most parts are not in the region of interests
-                (*rejected_dynamic_objs) += (*dynamic_obj);
+                (*rejected_dynamic_objs) += (dynamic_obj);
                 // For visualization
                 rejected_objs.push_back({centroid, moving_obj_score});
             }
@@ -480,12 +495,15 @@ void ERASOR2::saveStaticMap(const string &static_map_path) {
 void ERASOR2::maskNonVoI(const pcl::PointCloud<pcl::PointXYZI> &src, pcl::PointCloud<pcl::PointXYZI> &cloud_out,
                          const float min_z_voi, const float max_z_voi) {
     cloud_out.clear();
-    cloud_out.reserve(src.points.size());
-    for (auto pt: src.points) {
-        if (pt.z < min_z_voi || pt.z > max_z_voi) {
-            pt.intensity = NOT_VOLUME_OF_INTEREST;
+    int N = src.points.size();
+    cloud_out.reserve(N);
+    cloud_out = src;
+
+    #pragma omp parallel for num_threads(num_omp_cores_)
+    for (int i = 0 ; i < N; ++i) {
+        if (cloud_out.points[i].z < min_z_voi || cloud_out.points[i].z > max_z_voi) {
+            cloud_out.points[i].intensity = NOT_VOLUME_OF_INTEREST;
         }
-        cloud_out.points.emplace_back(pt);
     }
 }
 

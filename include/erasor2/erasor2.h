@@ -39,6 +39,7 @@ public:
     bool                                    is_initial_ = true;
     Eigen::Matrix4f                         new_origin_ = Eigen::Matrix4f::Identity();
     vector<pcl::PointCloud<pcl::PointXYZI>> pcs_transformed_;
+    vector<pcl::PointCloud<pcl::PointXYZI>> complements_transformed_;
     vector<pcl::PointCloud<pcl::PointXYZI>> pcs_gt_transformed_;
     vector<Eigen::Matrix4f>                 poses_submap_;
 

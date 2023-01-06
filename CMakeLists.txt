@@ -107,5 +107,6 @@ set(erasor2_src
 )
 
 add_executable(run_erasor2 src/erasor2/main.cpp ${erasor2_src})
-target_link_libraries(run_erasor2 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} stdc++fs)
+target_link_libraries(run_erasor2 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} stdc++fs)
+target_compile_options(run_erasor2 PRIVATE ${OpenMP_CXX_FLAGS})
 add_dependencies(run_erasor2 erasor2_generate_messages_cpp)

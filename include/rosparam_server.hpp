@@ -65,6 +65,8 @@ public:
     int kernel_size_;
     int minimum_num_pts_;
 
+    int num_omp_cores_;
+
     float voxel_size_;
     float map_voxel_size_;
 
@@ -101,6 +103,7 @@ public:
 
     RosParamServer()
     {
+        nh_.param<int>("/num_omp_cores", num_omp_cores_, 4);
         nh_.param<int>("/start_frame", start_frame_, 0);
         nh_.param<int>("/end_frame", end_frame_, -1);
         nh_.param<int>("/viz_interval", viz_interval_, 10);

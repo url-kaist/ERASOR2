@@ -372,7 +372,7 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 10
           Selectable: true
-          Size (Pixels): 3
+          Size (Pixels): 5
           Size (m): 0.009999999776482582
           Style: Points
           Topic: /erasor2/dynamic
@@ -400,7 +400,7 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 10
           Selectable: true
-          Size (Pixels): 2
+          Size (Pixels): 3
           Size (m): 0.009999999776482582
           Style: Points
           Topic: /erasor2/static
@@ -438,7 +438,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 379.02862548828125
+      Distance: 48.40757751464844
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -446,17 +446,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -94.9117202758789
-        Y: -252.15057373046875
-        Z: 8.224041084758937e-05
+        X: -84.30451202392578
+        Y: 145.41940307617188
+        Z: 0.00010450271656736732
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.329796552658081
+      Pitch: 0.8847978115081787
       Target Frame: <Fixed Frame>
-      Yaw: 1.6553975343704224
+      Yaw: 0.06722550839185715
     Saved:
       - Class: rviz/Orbit
         Distance: 5.025652885437012
@@ -494,5 +494,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1853
-  X: 2059
-  Y: 97
+  X: 2285
+  Y: 216

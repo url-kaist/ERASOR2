@@ -29,6 +29,10 @@ erasor2:
         increment_gain: 1.0 # Should be larger than one
         increment: 0.3
     ground_likelihood_thr: 0.8
+    moving_obj_score:
+        soft_thr: 0.8
+        hard_thr: 30.0
+        adaptive_range: 12.0
     kernel_size: 1
 
     # For checking ground likelihood
@@ -39,7 +43,7 @@ erasor2:
         set_scan_and_pose: false
         set_submap: false
         update: false
-        detect: true
+        detect: false
 
 stop_for_each_frame: true
 

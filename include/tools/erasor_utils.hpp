@@ -12,7 +12,9 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
+#include<omp.h>
 #include <ros/ros.h>
 #include <pcl/common/common.h>
 #include <pcl/common/centroid.h>
@@ -48,10 +50,12 @@
 #include "nanoflann/nanoflann_utils.hpp"
 
 // Point-wise label
+#define NOT_INTEREST 0 // ground and noisy points in the estimated labels
 #define GROUND_LABEL -1
 #define NOISE_LABEL -2
 #define NOT_VOLUME_OF_INTEREST -3
-#define NOT_INTEREST 0 // ground and noisy points in the estimated labels
+#define VOLUME_OF_INTEREST -4
+
 // Gridmap characteristics
 // Just for visualization
 #define DIST_FROM_GROUND_TO_ORIGIN -2.3
