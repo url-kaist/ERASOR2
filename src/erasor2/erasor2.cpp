@@ -354,6 +354,13 @@ void ERASOR2::filterDynamicObjects() {
 //            RejectedDynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*rejected_dynamic_objs));
             OutlierCurrCloudPublisher.publish(erasor_utils::cloud2msg(potential_dynamic_points_transformed_[k]));
             NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(noisy_points_transformed_[k]));
+            if (dataset_name_ == "SemanticKITTI") {
+                pcl::PointCloud<pcl::PointXYZI>::Ptr static_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+                pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+                erasor_utils::parseStaticAndDynamic(static_points_transformed_[k], *dynamic_cloud, *static_cloud);
+                StaticCloudPublisher.publish(erasor_utils::cloud2msg(*static_cloud));
+                DynamicCloudPublisher.publish(erasor_utils::cloud2msg(*dynamic_cloud));
+            }
             publishObjScores(RejectedMovingObjScorePublisher, rejected_objs_set_[k],
                              {1.0, 1.0, 1.0}, num_prev_rejected_objs_);
             publishObjScores(AcceptedMovingObjScorePublisher, accepted_objs_set_[k],
@@ -427,16 +434,16 @@ void ERASOR2::windowBasedVolumetricOutlierRemoval(const int k, const int window_
     int upper_bound = k + (window_size + 1) / 2;
     pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_accum(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_voxel(new pcl::PointCloud<pcl::PointXYZI>);
-    cout  << lower_bound << " <-> " << k << " <-> " << upper_bound << endl;
+//    cout  << lower_bound << " <-> " << k << " <-> " << upper_bound << endl;
     for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
-        (*dyn_points_accum) += dynamic_points_transformed_[k];
+        (*dyn_points_accum) += dynamic_points_transformed_[i];
     }
-    cout << dyn_points_accum->points.size() << endl;
+    cout << "Query: " << dyn_points_accum->points.size() << endl;
 
-//    static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
-//    voxel_filter.setInputCloud(dyn_points_accum);
-//    voxel_filter.setLeafSize(voxel_size_, voxel_size_, voxel_size_);
-//    voxel_filter.filter(*dyn_points_voxel);
+    static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
+    voxel_filter.setInputCloud(dyn_points_accum);
+    voxel_filter.setLeafSize(voxel_size_, voxel_size_, voxel_size_);
+    voxel_filter.filter(*dyn_points_voxel);
     *dyn_points_voxel = *dyn_points_accum;
 
     volumetricOutlierRemoval(static_points_transformed_[k],
@@ -470,7 +477,7 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
 
             int num_matched = index.radiusSearch(
                     &query_pt[0], dist_thr_gain * voxel_size_, ret_matches);
-            if (int i = 0; i < num_matched) {
+            for (int i = 0; i < num_matched; ++i) {
                 static_mask[ret_matches[i].first] = IS_DYNAMIC;
 //                if (std::find(valid_outlier_idxes.begin(), valid_outlier_idxes.end(),
 //                              ret_matches[i].first) == valid_outlier_idxes.end()) {
