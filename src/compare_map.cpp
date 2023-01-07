@@ -9,7 +9,7 @@ void loadAndParse(const string &abs_pcd_path, sensor_msgs::PointCloud2 &dynamic_
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_static(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_dynamic(new pcl::PointCloud<pcl::PointXYZI>);
-    erasor_utils::parse_dynamic_obj(*cloud, *cloud_dynamic, *cloud_static);
+    erasor_utils::parseStaticAndDynamic(*cloud, *cloud_dynamic, *cloud_static);
 
     dynamic_cloud_msg = erasor_utils::cloud2msg(*cloud_dynamic);
     static_cloud_msg  = erasor_utils::cloud2msg(*cloud_static);

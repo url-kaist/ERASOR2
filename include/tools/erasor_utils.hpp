@@ -129,13 +129,19 @@ namespace erasor_utils {
 
     bool load_labels(const std::string& label_name, std::vector<uint32_t>& labels);
 
+    void findCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
+                     vector<int>& correspondences, const float margin=0.02);
+
+    void fillGTLabel(const pcl::PointCloud<pcl::PointXYZI> &gt_cloud, pcl::PointCloud<pcl::PointXYZI> &est_cloud,
+                     const float margin=0.02);
+
     geometry_msgs::Pose eigen2geoPose(Eigen::Matrix4f pose);
 
     Eigen::Matrix4f geoPose2eigen(geometry_msgs::Pose geoPose);
 
-    void parse_dynamic_obj(
-            const pcl::PointCloud<pcl::PointXYZI> &cloudIn, pcl::PointCloud<pcl::PointXYZI> &dynamicOut,
-            pcl::PointCloud<pcl::PointXYZI> &staticOut);
+    void parseStaticAndDynamic(
+            const pcl::PointCloud<pcl::PointXYZI> &cloud, pcl::PointCloud<pcl::PointXYZI> &dynamic_points,
+            pcl::PointCloud<pcl::PointXYZI> &static_points);
 
     void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size);
 

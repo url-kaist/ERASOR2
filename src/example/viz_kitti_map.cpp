@@ -24,7 +24,7 @@ sensor_msgs::PointCloud2 map_msg;
 sensor_msgs::PointCloud2 dyn_obj_msg;
 sensor_msgs::PointCloud2 target_msg;
 
-void parse_dynamic_obj(
+void parseStaticAndDynamic(
         const pcl::PointCloud<pcl::PointXYZI> &cloudIn, pcl::PointCloud<pcl::PointXYZI> &dynamicOut,
         pcl::PointCloud<pcl::PointXYZI> &staticOut) {
     dynamicOut.points.clear();
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     erasor_utils::load_pcd(map_name, ptr_map);
     cout << "Load map complete" << endl;
     pcl::PointCloud<pcl::PointXYZI> dynamic_objs, static_objs, target_obj;
-    parse_dynamic_obj(*ptr_map, dynamic_objs, static_objs);
+    parseStaticAndDynamic(*ptr_map, dynamic_objs, static_objs);
     fetch_specific_class(dynamic_objs, target_class_num, target_obj);
     cout<<"Total "<< target_obj.points.size()<<" Points exist"<<endl;
 

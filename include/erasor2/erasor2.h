@@ -102,7 +102,7 @@ public:
                          const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
                          std::vector<int> &static_mask);
 
-    void windowBasedvolumetricOutlierRemoval(const int window_size,
+    void windowBasedVolumetricOutlierRemoval(const int k, const int window_size,
                                            const float dist_thr_gain,
                                            pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
                                            pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);

@@ -152,7 +152,7 @@ void ERASOR2::resize() {
 
 void ERASOR2::updateSteppableRegion() {
     for (int k                   = 0; k < num_data_; ++k) {
-        std::cout << "\r[Update] " << k << " / " << num_data_ << std::endl;
+//        std::cout << "\r[Update] " << k << " / " << num_data_ << std::endl;
         gridmap_submap_["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
         grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));
         gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]);
@@ -338,10 +338,8 @@ void ERASOR2::filterDynamicObjects() {
     for (int k = 0; k < num_data_; ++k) {
 
         pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_static_points(new pcl::PointCloud<pcl::PointXYZI>);
-        volumetricOutlierRemoval(static_points_transformed_[k],
-                                dynamic_points_transformed_[k],
-                                dist_thr_gain_,
-                                *filtered_static_points, potential_dynamic_points_transformed_[k]);
+        windowBasedVolumetricOutlierRemoval(k, window_size_, dist_thr_gain_, *filtered_static_points,
+                                            potential_dynamic_points_transformed_[k]);
         static_points_transformed_[k] = *filtered_static_points;
 
         (*map_noise_) += noisy_points_transformed_[k];
@@ -354,6 +352,7 @@ void ERASOR2::filterDynamicObjects() {
             CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
             DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_points_transformed_[k]));
 //            RejectedDynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*rejected_dynamic_objs));
+            OutlierCurrCloudPublisher.publish(erasor_utils::cloud2msg(potential_dynamic_points_transformed_[k]));
             NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(noisy_points_transformed_[k]));
             publishObjScores(RejectedMovingObjScorePublisher, rejected_objs_set_[k],
                              {1.0, 1.0, 1.0}, num_prev_rejected_objs_);
@@ -419,6 +418,34 @@ void ERASOR2::updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
     }
 }
 
+void ERASOR2::windowBasedVolumetricOutlierRemoval(const int k, const int window_size,
+                                           const float dist_thr_gain,
+                                           pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+                                           pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points) {
+    // 1. Set volumetric dynamic points
+    int lower_bound = k - window_size / 2;
+    int upper_bound = k + (window_size + 1) / 2;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_accum(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_voxel(new pcl::PointCloud<pcl::PointXYZI>);
+    cout  << lower_bound << " <-> " << k << " <-> " << upper_bound << endl;
+    for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
+        (*dyn_points_accum) += dynamic_points_transformed_[k];
+    }
+    cout << dyn_points_accum->points.size() << endl;
+
+//    static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
+//    voxel_filter.setInputCloud(dyn_points_accum);
+//    voxel_filter.setLeafSize(voxel_size_, voxel_size_, voxel_size_);
+//    voxel_filter.filter(*dyn_points_voxel);
+    *dyn_points_voxel = *dyn_points_accum;
+
+    volumetricOutlierRemoval(static_points_transformed_[k],
+                             *dyn_points_voxel,
+                             dist_thr_gain,
+                             filtered_static_points, potential_dynamic_points);
+
+}
+
 void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &static_points,
                                        const pcl::PointCloud<pcl::PointXYZI> &dynamic_points,
                                        const float dist_thr_gain,
@@ -427,12 +454,15 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
     int N = static_points.size();
     vector<int> static_mask(N, IS_STATIC);
 
+    // Radius search
     PointCloud<num_t> cloud;
     erasor_utils::pcl2nanoflann(static_points, cloud);
 
     erasor_utils::my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
 
-    int count = 0;
+    // Only for debugging
+//    vector<int> valid_outlier_idxes;
+//    valid_outlier_idxes.reserve(1000);
     for (auto &query_pcl: dynamic_points.points) {
         const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
         {
@@ -440,15 +470,16 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
 
             int num_matched = index.radiusSearch(
                     &query_pt[0], dist_thr_gain * voxel_size_, ret_matches);
-
             if (int i = 0; i < num_matched) {
                 static_mask[ret_matches[i].first] = IS_DYNAMIC;
-                ++count;
+//                if (std::find(valid_outlier_idxes.begin(), valid_outlier_idxes.end(),
+//                              ret_matches[i].first) == valid_outlier_idxes.end()) {
+//                    valid_outlier_idxes.push_back(ret_matches[i].first);
+//                }
             }
         }
     }
-
-    cout << "\033[1;32mTotal " << count << " points are filtered\033[0m" << endl;
+//    cout << "\033[1;32mTotal " << valid_outlier_idxes.size() << " points are filtered\033[0m" << endl;
     filtered_static_points.clear();
     filtered_static_points.reserve(N);
     for (int j = 0; j < N; ++j) {
@@ -460,8 +491,7 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
             potential_dynamic_points.points.emplace_back(pt);
         } else { throw invalid_argument("A wrong mask status is set!"); }
     }
-
-
+    cout << "\033[1;32mTotal " << potential_dynamic_points.size() << " points are filtered\033[0m" << endl;
 }
 
 void ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud,

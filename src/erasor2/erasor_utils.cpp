@@ -6,7 +6,6 @@ namespace erasor_utils {
     geometry_msgs::Pose eigen2geoPose(Eigen::Matrix4f pose) {
         geometry_msgs::Pose geoPose;
 
-
         tf::Matrix3x3 m;
         m.setValue((double) pose(0, 0),
                    (double) pose(0, 1),
@@ -54,25 +53,22 @@ namespace erasor_utils {
         return result;
     }
 
-    void parse_dynamic_obj(
-            const pcl::PointCloud<pcl::PointXYZI> &cloudIn, pcl::PointCloud<pcl::PointXYZI> &dynamicOut,
-            pcl::PointCloud<pcl::PointXYZI> &staticOut) {
-        dynamicOut.points.clear();
-        staticOut.points.clear();
+    void parseStaticAndDynamic(
+            const pcl::PointCloud<pcl::PointXYZI> &cloud, pcl::PointCloud<pcl::PointXYZI> &dynamic_points,
+            pcl::PointCloud<pcl::PointXYZI> &static_points) {
+        dynamic_points.points.clear();
+        static_points.points.clear();
 
-        for (const auto &pt: cloudIn.points) {
+        for (const auto &pt: cloud.points) {
             uint32_t float2int      = static_cast<uint32_t>(pt.intensity);
             uint32_t semantic_label = float2int & 0xFFFF;
             uint32_t inst_label     = float2int >> 16;
-            bool     is_static      = true;
-            for (int class_num: DYNAMIC_CLASSES) {
-                if (semantic_label == class_num) { // 1. check it is in the moving object classes
-                    dynamicOut.points.push_back(pt);
-                    is_static = false;
-                }
-            }
-            if (is_static) {
-                staticOut.points.push_back(pt);
+
+            if (find(DYNAMIC_CLASSES.begin(), DYNAMIC_CLASSES.end(),
+                     semantic_label) == DYNAMIC_CLASSES.end()) {
+                static_points.points.push_back(pt);
+            } else {
+                dynamic_points.emplace_back(pt);
             }
         }
     }
@@ -101,6 +97,44 @@ namespace erasor_utils {
 
         label_input.close();
         return true;
+    }
+
+    void findCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud,
+                             const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
+                             vector<int>& correspondences, const float margin) {
+
+        PointCloud<num_t> cloud;
+        pcl2nanoflann(target_cloud, cloud);
+
+        my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+
+        correspondences.resize(query_cloud.size());
+        int count = 0;
+        for (auto &query_pcl: query_cloud.points) {
+            const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
+            size_t                num_results = 1;
+            std::vector<uint32_t> ret_index(num_results);
+            std::vector<num_t>    out_dist_sqr(num_results);
+
+            num_results = index.knnSearch(
+                    &query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
+
+            ret_index.resize(num_results);
+            out_dist_sqr.resize(num_results);
+
+            correspondences[count] = ret_index[0];
+            ++count;
+        }
+    }
+
+    void fillGTLabel(const pcl::PointCloud<pcl::PointXYZI> &gt_cloud, pcl::PointCloud<pcl::PointXYZI> &est_cloud,
+                     const float margin) {
+        vector<int> correspondences;
+        findCorrespondences(est_cloud, gt_cloud, correspondences);
+        for (int i = 0; i < correspondences.size(); ++i) {
+            int correspondence = correspondences[i];
+            est_cloud.points[i].intensity = gt_cloud.points[correspondence].intensity;
+        }
     }
 
     void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst,
@@ -181,32 +215,12 @@ namespace erasor_utils {
 //        cout << "\033[1;35m" << ptr_voxelized->points.size() << "\033[0m" << endl;
 
         // 2. Find nearest point to update intensity (index and id)
-        PointCloud<num_t> cloud;
-        pcl2nanoflann(*src, cloud);
+        vector<int> correspondences;
+        findCorrespondences(*ptr_voxelized, *src, correspondences);
 
-        // construct a kd-tree index:
-        using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
-                nanoflann::L2_Simple_Adaptor<num_t, PointCloud<num_t>>,
-                PointCloud<num_t>, 3 /* dim */
-        >;
-
-        my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
-
-
-        for (auto &query_pcl: ptr_voxelized->points) {
-            const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
-            {
-                size_t                num_results = 1;
-                std::vector<uint32_t> ret_index(num_results);
-                std::vector<num_t>    out_dist_sqr(num_results);
-
-                num_results = index.knnSearch(
-                        &query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
-
-                ret_index.resize(num_results);
-                out_dist_sqr.resize(num_results);
-                query_pcl.intensity = src->points[ret_index[0]].intensity;
-            }
+        for (int i = 0; i < correspondences.size(); ++i) {
+            int correspondence = correspondences[i];
+            ptr_voxelized->points[i].intensity = src->points[correspondence].intensity;
         }
         dst = *ptr_voxelized;
     }

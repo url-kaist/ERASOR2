@@ -20,7 +20,7 @@ using namespace unavlib;
 
 std::vector<int> dynamic_classes = {252, 253, 254, 255, 256, 257, 258, 259};
 
-void parse_dynamic_obj(const pcl::PointCloud<pcl::PointXYZI>& cloudIn, pcl::PointCloud<pcl::PointXYZI>& dynamicOut, pcl::PointCloud<pcl::PointXYZI>& staticOut){
+void parseStaticAndDynamic(const pcl::PointCloud<pcl::PointXYZI>& cloudIn, pcl::PointCloud<pcl::PointXYZI>& dynamicOut, pcl::PointCloud<pcl::PointXYZI>& staticOut){
   dynamicOut.points.clear();
   staticOut.points.clear();
 

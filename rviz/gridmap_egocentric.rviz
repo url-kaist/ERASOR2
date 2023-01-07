@@ -12,7 +12,7 @@ Panels:
         - /check_gridmap1/CurrScan1
         - /check_dyn_points1
         - /check_dyn_points1/NoisePoints1
-        - /PointCloud21
+        - /check_dyn_points1/OutlierPoints1
         - /GridMap1
       Splitter Ratio: 0.5285714268684387
     Tree Height: 857
@@ -200,6 +200,34 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 255; 155; 15
+          Color Transformer: FlatColor
+          Decay Time: 0
+          Enabled: true
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: OutlierPoints
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 10
+          Size (m): 0.009999999776482582
+          Style: Points
+          Topic: /erasor2/outlier_points
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: true
       Enabled: true
       Name: check_dyn_points
     - Alpha: 1
@@ -363,7 +391,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3253049088
+      Distance: 58.981422424316406
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -371,17 +399,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 9.359373092651367
+        Y: 5.670388698577881
+        Z: -3.6728391647338867
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7853981852531433
+      Pitch: 1.1953978538513184
       Target Frame: <Fixed Frame>
-      Yaw: 0.7853981852531433
+      Yaw: 3.2603907585144043
     Saved: ~
 Window Geometry:
   Displays:
@@ -399,5 +427,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1877
-  X: 2486
-  Y: 96
+  X: 2113
+  Y: 118

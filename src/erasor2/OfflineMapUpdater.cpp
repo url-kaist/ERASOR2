@@ -291,7 +291,7 @@ void OfflineMapUpdater::callback_node(const erasor::node::ConstPtr &msg) {
 //
 //        auto end = ros::Time::now().toSec();
 //
-//        erasor_utils::parse_dynamic_obj(*map_arranged_, *dynamic_objs_to_viz_, *static_objs_to_viz_);
+//        erasor_utils::parseStaticAndDynamic(*map_arranged_, *dynamic_objs_to_viz_, *static_objs_to_viz_);
 //
 //        /*** Just for debugging */
 //        *total_map_rejected_ += *map_rejected_;

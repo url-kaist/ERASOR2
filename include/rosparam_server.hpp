@@ -101,6 +101,7 @@ public:
     ros::Publisher CurrCloudPublisher;
     ros::Publisher DynCurrCloudPublisher;
     ros::Publisher RejectedDynCurrCloudPublisher;
+    ros::Publisher OutlierCurrCloudPublisher;
     ros::Publisher AcceptedMovingObjScorePublisher;
     ros::Publisher RejectedMovingObjScorePublisher;
     ros::Publisher NoiseCurrCloudPublisher;
@@ -194,6 +195,7 @@ public:
         CurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/curr_scan", 100, true);
         DynCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dyn_points", 100, true);
         RejectedDynCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/rejected_dyn_points", 100, true);
+        OutlierCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/outlier_points", 100, true);
         AcceptedMovingObjScorePublisher = nh_.advertise<visualization_msgs::MarkerArray>("/erasor2/accetped_moving_obj_scores", 100, true);
         RejectedMovingObjScorePublisher = nh_.advertise<visualization_msgs::MarkerArray>("/erasor2/rejected_moving_obj_scores", 100, true);
         NoiseCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/noise_points", 100, true);
