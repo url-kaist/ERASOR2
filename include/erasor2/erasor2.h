@@ -8,6 +8,7 @@ struct DynamicCluster {
     float moving_obj_score_;
     Eigen::Matrix<float, 4, 1> centroid_;
     bool is_dynamic_;
+    vector<grid_map::Index> occupied_regions_;
 };
 
 struct GridMapInfo {
@@ -144,7 +145,8 @@ public:
                                            const float grid_resolution,
                                            const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid);
 
-    float calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI>& dynamic_obj);
+    float calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
+                                      vector<grid_map::Index>& occupied_regions);
 
     void dilateAndErode(grid_map::GridMap &gridmap_submap);
 

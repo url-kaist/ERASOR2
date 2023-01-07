@@ -263,6 +263,7 @@ void ERASOR2::detectDynamicObjects() {
         }
     }
 }
+
 void ERASOR2::filterDynamicObjects() {
     for (int k = 0; k < num_data_; ++ k) {
 
@@ -287,7 +288,8 @@ void ERASOR2::filterDynamicObjects() {
 
         // Only available on C++ 17
         for (auto &[dyn_cand_id, dynamic_cluster]: ids_clusters) {
-            dynamic_cluster.moving_obj_score_ = calcMovingClusterScore(dynamic_cluster.cloud_);
+            dynamic_cluster.moving_obj_score_ = calcMovingClusterScore(dynamic_cluster.cloud_,
+                                                                       dynamic_cluster.occupied_regions_);
 //            if (k == 46 || k == 51) {
 //                DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*dynamic_obj));
 //                cout << "==> " << moving_obj_score << endl;
@@ -739,13 +741,26 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(float range,
     return gridmap;
 }
 
-float ERASOR2::calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster) {
+float ERASOR2::calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
+                                      vector<grid_map::Index>& occupied_regions) {
     float           total_score = 0;
     for (const auto &dyn_pt: dynamic_cluster.points) {
         grid_map::Position p_tmp(dyn_pt.x, dyn_pt.y);
         grid_map::Index    idx_tmp;
         gridmap_submap_.getIndex(p_tmp, idx_tmp);
         total_score += gridmap_submap_.at("steppable", idx_tmp);
+
+        bool is_first = true;
+        for (const auto& occupied_region: occupied_regions) {
+            // Means already idx_tmp is updated
+            if (idx_tmp(0) == occupied_region(0) && idx_tmp(1) == occupied_region(1)) {
+                is_first = false;
+                break;
+            }
+        }
+        if (is_first) {
+            occupied_regions.emplace_back(idx_tmp);
+        }
     }
 
     return total_score / dynamic_cluster.points.size();

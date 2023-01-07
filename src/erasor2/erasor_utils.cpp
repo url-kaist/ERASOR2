@@ -156,7 +156,7 @@ namespace erasor_utils {
         std::chrono::system_clock::time_point t_v_e = std::chrono::system_clock::now();
         cout << "Elapsed time in milliseconds: "
              << chrono::duration_cast<chrono::milliseconds>(t_v_e - t_v_s).count()
-             << " ms" << endl;
+             << " ms\033[0m" << endl;
         // Does not work...
 //        static HashVoxelGrid<pcl::PointXYZI> hash_voxel_filter;
 //        hash_voxel_filter.setInputCloud(src);
