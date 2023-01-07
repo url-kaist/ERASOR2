@@ -140,6 +140,17 @@ namespace erasor_utils {
         dst = *ptr_reassigned;
     }
 
+    void pcl2nanoflann(const pcl::PointCloud<pcl::PointXYZI>& src_cloud, PointCloud<num_t>& cloud) {
+        int N = src_cloud.points.size();
+
+        cloud.pts.resize(N);
+        for (size_t i = 0; i < N; i++) {
+            cloud.pts[i].x = src_cloud.points[i].x;
+            cloud.pts[i].y = src_cloud.points[i].y;
+            cloud.pts[i].z = src_cloud.points[i].z;
+        }
+    }
+
     void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
                                                  pcl::PointCloud<pcl::PointXYZI> &dst, const double leaf_size,
                                                  const int minimum_num_pts_per_voxel) {
@@ -170,14 +181,8 @@ namespace erasor_utils {
 //        cout << "\033[1;35m" << ptr_voxelized->points.size() << "\033[0m" << endl;
 
         // 2. Find nearest point to update intensity (index and id)
-        int               N = src->points.size();
         PointCloud<num_t> cloud;
-        cloud.pts.resize(N);
-        for (size_t i = 0; i < N; i++) {
-            cloud.pts[i].x = src->points[i].x;
-            cloud.pts[i].y = src->points[i].y;
-            cloud.pts[i].z = src->points[i].z;
-        }
+        pcl2nanoflann(*src, cloud);
 
         // construct a kd-tree index:
         using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<

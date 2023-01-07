@@ -39,6 +39,8 @@ public:
     // Outputs
     vector<pcl::PointCloud<pcl::PointXYZI>> noisy_points_transformed_;
     vector<pcl::PointCloud<pcl::PointXYZI>> static_points_transformed_;
+    vector<pcl::PointCloud<pcl::PointXYZI>> dynamic_points_transformed_;
+    vector<pcl::PointCloud<pcl::PointXYZI>> potential_dynamic_points_transformed_;
 
     vector<vector<pcl::PointCloud<pcl::PointXYZI>>>          xygrids_;
     vector<grid_map::Index>                                  idxes_approx_;
@@ -99,6 +101,17 @@ public:
     void updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
                          const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
                          std::vector<int> &static_mask);
+
+    void windowBasedvolumetricOutlierRemoval(const int window_size,
+                                           const float dist_thr_gain,
+                                           pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+                                           pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
+
+    void volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &static_points,
+                                       const pcl::PointCloud<pcl::PointXYZI> &dynamic_points,
+                                       const float dist_thr_gain,
+                                       pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+                                       pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
 
     void
     discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<int> &static_mask,

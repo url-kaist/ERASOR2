@@ -69,6 +69,10 @@ public:
     int kernel_size_;
     int minimum_num_pts_;
 
+    int window_size_;
+    int num_closest_;
+    float dist_thr_gain_;
+
     int num_omp_cores_;
 
     float voxel_size_;
@@ -143,6 +147,10 @@ public:
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_soft_thr", obj_score_soft_thr_, 0.8);
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_hard_thr", obj_score_hard_thr_, 20.0);
         nh_.param<float>("/erasor2/moving_object_detection/adaptive_range", adaptive_range_, 12.0);
+
+        nh_.param<int>("/erasor2/volumetric_outlier_removal/window_size", window_size_, 1);
+        nh_.param<int>("/erasor2/volumetric_outlier_removal/num_closest", num_closest_, 3);
+        nh_.param<float>("/erasor2/volumetric_outlier_removal/dist_thr_gain", dist_thr_gain_, 1.0);
 
         nh_.param<float>("/erasor2/grid_resolution", grid_resolution_, 0.4);
         nh_.param<float>("/erasor2/egocentric_grid_resolution", egocentric_grid_resolution_, 0.2);

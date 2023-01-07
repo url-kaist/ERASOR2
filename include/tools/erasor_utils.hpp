@@ -71,8 +71,14 @@
 using namespace std;
 
 using num_t = float;
+// construct a kd-tree index:
 
 namespace erasor_utils {
+    using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
+        nanoflann::L2_Simple_Adaptor<num_t, PointCloud<num_t>>,
+        PointCloud<num_t>, 3 /* dim */
+    >;
+
     template<typename T>
     sensor_msgs::PointCloud2 cloud2msg(pcl::PointCloud<T> cloud, std::string frame_id = "map")
     {
@@ -132,6 +138,8 @@ namespace erasor_utils {
             pcl::PointCloud<pcl::PointXYZI> &staticOut);
 
     void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size);
+
+    void pcl2nanoflann(const pcl::PointCloud<pcl::PointXYZI>& src_cloud, PointCloud<num_t>& cloud);
 
     void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
                                                  pcl::PointCloud<pcl::PointXYZI> &dst, const double leaf_size,

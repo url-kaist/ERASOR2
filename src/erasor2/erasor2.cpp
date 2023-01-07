@@ -143,6 +143,8 @@ void ERASOR2::resize() {
     accepted_objs_set_.resize(num_data_);
     noisy_points_transformed_.resize(num_data_);
     static_points_transformed_.resize(num_data_);
+    dynamic_points_transformed_.resize(num_data_);
+    potential_dynamic_points_transformed_.resize(num_data_);
 
     dynamic_ids_set_.resize(num_data_);
     dynamic_ids_clusters_set_.resize(num_data_);
@@ -188,9 +190,9 @@ void ERASOR2::updateSteppableRegion() {
                                                 th_bin_max_h_, verbose_)) {
                     // For debugging
                     gridmap_submap_.at("elevation", idx) = 1.0;
-                    cout << "(" << w << ", " << h << "): " << scan_ratio_ << " | " << ratio_num_ << " // ";
-                    cout << xygrids_[k][count].size() << " <-> "
-                         << erasor_utils::getNumGroundPoints(xygrids_[k][count]) << endl;
+//                    cout << "(" << w << ", " << h << "): " << scan_ratio_ << " | " << ratio_num_ << " // ";
+//                    cout << xygrids_[k][count].size() << " <-> "
+//                         << erasor_utils::getNumGroundPoints(xygrids_[k][count]) << endl;
                     updatePrior(idx, informative_prior_);
                     updatePosterior(idx, increment_ * increment_gain_);
 //                    } else if (isLikelyToBeGround(xygrids_[k][count])) {
@@ -312,12 +314,11 @@ void ERASOR2::filterDynamicObjects() {
         }
     }
 
-    // Finally assign the static points
+    // Naively assign the static points
     for (int k = 0; k < num_data_; ++k) {
-        pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_points_each_scan(new pcl::PointCloud<pcl::PointXYZI>);
 
-        const auto &each_pc = pcs_transformed_[k];
-        const auto &ids_clusters= dynamic_ids_clusters_set_[k];
+        const auto &each_pc      = pcs_transformed_[k];
+        const auto &ids_clusters = dynamic_ids_clusters_set_[k];
 
         static_points_transformed_[k].clear();
         vector<int> static_mask;
@@ -327,20 +328,31 @@ void ERASOR2::filterDynamicObjects() {
         if (dataset_name_ == "SemanticKITTI") {
             // To preserve the original SemanticKITTI labels
             discernStaticAndDynamicPoints(pcs_gt_transformed_[k], static_mask, static_points_transformed_[k],
-                                          *dynamic_points_each_scan);
+                                          dynamic_points_transformed_[k]);
         } else {
             discernStaticAndDynamicPoints(each_pc, static_mask, static_points_transformed_[k],
-                                          *dynamic_points_each_scan);
+                                          dynamic_points_transformed_[k]);
         }
+    }
+
+    for (int k = 0; k < num_data_; ++k) {
+
+        pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_static_points(new pcl::PointCloud<pcl::PointXYZI>);
+        volumetricOutlierRemoval(static_points_transformed_[k],
+                                dynamic_points_transformed_[k],
+                                dist_thr_gain_,
+                                *filtered_static_points, potential_dynamic_points_transformed_[k]);
+        static_points_transformed_[k] = *filtered_static_points;
 
         (*map_noise_) += noisy_points_transformed_[k];
-        (*map_dynamic_) += (*dynamic_points_each_scan);
+        (*map_dynamic_) += dynamic_points_transformed_[k] + potential_dynamic_points_transformed_[k];
 
         if (viz_detect_) {
-            cout << each_pc.size() << " => " << static_points_transformed_[k].points.size() << " / ";
-            cout << dynamic_points_each_scan->points.size() << " / " << noisy_points_transformed_[k].size() << endl;
-            CurrCloudPublisher.publish(erasor_utils::cloud2msg(each_pc));
-            DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*dynamic_points_each_scan));
+            cout << pcs_transformed_[k].points.size() << " => " << static_points_transformed_[k].points.size() << " / ";
+            cout << dynamic_points_transformed_[k].points.size() << " / " << noisy_points_transformed_[k].size() << " / ";
+            cout << potential_dynamic_points_transformed_[k].points.size() << endl;
+            CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
+            DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_points_transformed_[k]));
 //            RejectedDynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*rejected_dynamic_objs));
             NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(noisy_points_transformed_[k]));
             publishObjScores(RejectedMovingObjScorePublisher, rejected_objs_set_[k],
@@ -386,22 +398,9 @@ void ERASOR2::estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
 void ERASOR2::updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
                               const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
                               std::vector<int> &static_mask) {
-    // construct a kd-tree index:
-    using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
-            nanoflann::L2_Simple_Adaptor<num_t, PointCloud<num_t>>,
-            PointCloud<num_t>, 3 /* dim */
-    >;
-
-    int               N = src_cloud.points.size();
     PointCloud<num_t> cloud;
-    cloud.pts.resize(N);
-    for (size_t i = 0; i < N; i++) {
-        cloud.pts[i].x = src_cloud.points[i].x;
-        cloud.pts[i].y = src_cloud.points[i].y;
-        cloud.pts[i].z = src_cloud.points[i].z;
-    }
-
-    my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+    erasor_utils::pcl2nanoflann(src_cloud, cloud);
+    erasor_utils::my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
 
     for (auto &query_pcl: noisy_points.points) {
         const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
@@ -420,6 +419,51 @@ void ERASOR2::updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
     }
 }
 
+void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &static_points,
+                                       const pcl::PointCloud<pcl::PointXYZI> &dynamic_points,
+                                       const float dist_thr_gain,
+                                       pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+                                       pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points) {
+    int N = static_points.size();
+    vector<int> static_mask(N, IS_STATIC);
+
+    PointCloud<num_t> cloud;
+    erasor_utils::pcl2nanoflann(static_points, cloud);
+
+    erasor_utils::my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+
+    int count = 0;
+    for (auto &query_pcl: dynamic_points.points) {
+        const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
+        {
+            std::vector<nanoflann::ResultItem<uint32_t, num_t>> ret_matches;
+
+            int num_matched = index.radiusSearch(
+                    &query_pt[0], dist_thr_gain * voxel_size_, ret_matches);
+
+            if (int i = 0; i < num_matched) {
+                static_mask[ret_matches[i].first] = IS_DYNAMIC;
+                ++count;
+            }
+        }
+    }
+
+    cout << "\033[1;32mTotal " << count << " points are filtered\033[0m" << endl;
+    filtered_static_points.clear();
+    filtered_static_points.reserve(N);
+    for (int j = 0; j < N; ++j) {
+        const auto& status = static_mask[j];
+        const auto& pt = static_points[j];
+        if (status == IS_STATIC) {
+            filtered_static_points.points.emplace_back(pt);
+        } else if (status == IS_DYNAMIC) {
+            potential_dynamic_points.points.emplace_back(pt);
+        } else { throw invalid_argument("A wrong mask status is set!"); }
+    }
+
+
+}
+
 void ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud,
                                             const std::vector<int> &static_mask,
                                             pcl::PointCloud<pcl::PointXYZI> &static_points,
@@ -434,10 +478,11 @@ void ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI
     for (const auto &pt: cloud) {
         if (static_mask[count] == IS_STATIC) {
             static_points.points.emplace_back(pt);
-        } else {
-            // Noisy points can be included
+        } else if (static_mask[count] == IS_DYNAMIC) {
+            // Note that noisy points are not included
             dynamic_points.points.emplace_back(pt);
         }
+
         ++count;
     }
 }
