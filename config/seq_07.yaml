@@ -29,15 +29,17 @@ erasor2:
         increment_gain: 1.0 # Should be larger than one
         increment: 0.3
     ground_likelihood_thr: 0.8
-    moving_obj_score:
-        soft_thr: 0.8
-        hard_thr: 30.0
-        adaptive_range: 12.0
     kernel_size: 1
 
     # For checking ground likelihood
     ratio_num_pts: 0.95 # Percentage
     minimum_num_pts: 5
+
+    # For detection moving objects
+    moving_object_detection:
+        obj_score_soft_thr: 0.8
+        obj_score_hard_thr: 20.0
+        adaptive_range: 20.0
 
     viz_flag:
         set_scan_and_pose: false

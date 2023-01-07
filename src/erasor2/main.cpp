@@ -75,6 +75,7 @@ int main(int argc, char **argv) {
     erasor2->updateSteppableRegion();
 //    erasor2->dilateAndErode();
     erasor2->detectDynamicObjects();
+    erasor2->filterDynamicObjects();
     erasor2->saveStaticMap(map_path);
     erasor2->publishStaticMapResults();
 

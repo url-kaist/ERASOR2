@@ -28,6 +28,9 @@
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/search/search.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/segmentation/region_growing.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/approximate_voxel_grid.h>
 #include <pcl/PCLPointCloud2.h>
@@ -48,6 +51,7 @@
 #include "signal.h"
 #include "nanoflann/nanoflann.hpp"
 #include "nanoflann/nanoflann_utils.hpp"
+#include "tools/hash_voxel_grid.hpp"
 
 // Point-wise label
 #define NOT_INTEREST 0 // ground and noisy points in the estimated labels
@@ -129,7 +133,9 @@ namespace erasor_utils {
 
     void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size);
 
-    void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size);
+    void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
+                                                 pcl::PointCloud<pcl::PointXYZI> &dst, const double leaf_size,
+                                                 const int minimum_num_pts_per_voxel=0);
 
     void count_stat_dyn(const pcl::PointCloud<pcl::PointXYZI> &cloudIn, int &num_static, int &num_dynamic);
 
@@ -137,8 +143,19 @@ namespace erasor_utils {
 
     visualization_msgs::Marker setVisualMarker(const float voxel_size, const float pos_x, const float pos_y);
 
-    void calcMinMaxXY(const vector<pcl::PointCloud<pcl::PointXYZI>>& pcs, float& min_x, float& min_y, float& max_x, float& max_y);
+    void calcMinMaxXY(const vector<pcl::PointCloud<pcl::PointXYZI>> &pcs, float &min_x, float &min_y, float &max_x,
+                      float &max_y);
 
-    void calcMinMaxZWithoutGround(const pcl::PointCloud<pcl::PointXYZI>& pcs, float& min_z, float& max_z);
+    void calcMinMaxZ(const pcl::PointCloud<pcl::PointXYZI> &pcs, float &min_z, float &max_z);
+
+    void calcMinMaxZWithoutGround(const pcl::PointCloud<pcl::PointXYZI> &pcs, float &min_z, float &max_z);
+
+    float calcMeanZOfGround(const pcl::PointCloud<pcl::PointXYZI>& pcs);
+
+//    void calcMinMaxZ(const pcl::PointCloud<pcl::PointXYZI>& pcs, float& min_z, float& max_z);
+
+    int getNumGroundPoints(const pcl::PointCloud<pcl::PointXYZI>& pc);
+
+
 }
 #endif // ERASOR_UTILS_H

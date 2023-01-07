@@ -46,6 +46,10 @@ public:
     float increment_;
     float ratio_num_pts_;
 
+    float obj_score_soft_thr_;
+    float obj_score_hard_thr_;
+    float adaptive_range_;
+
     bool verbose_;
     bool is_large_scale_;
     bool stop_for_each_frame_;
@@ -99,11 +103,11 @@ public:
 
     ros::Publisher EgocentricGridPublisher;
     ros::Publisher GridPublisher;
-    ros::Publisher VizMarkerPublisher;
+    ros::Publisher AdaptiveRangePublisher;
 
     RosParamServer()
     {
-        nh_.param<int>("/num_omp_cores", num_omp_cores_, 4);
+        nh_.param<int>("/num_omp_cores", num_omp_cores_, 8);
         nh_.param<int>("/start_frame", start_frame_, 0);
         nh_.param<int>("/end_frame", end_frame_, -1);
         nh_.param<int>("/viz_interval", viz_interval_, 10);
@@ -135,6 +139,10 @@ public:
 
         nh_.param<float>("/erasor2/ratio_num_pts", ratio_num_pts_, 0.95);
         nh_.param<int>("/erasor2/minimum_num_pts", minimum_num_pts_, 3);
+
+        nh_.param<float>("/erasor2/moving_object_detection/obj_score_soft_thr", obj_score_soft_thr_, 0.8);
+        nh_.param<float>("/erasor2/moving_object_detection/obj_score_hard_thr", obj_score_hard_thr_, 20.0);
+        nh_.param<float>("/erasor2/moving_object_detection/adaptive_range", adaptive_range_, 12.0);
 
         nh_.param<float>("/erasor2/grid_resolution", grid_resolution_, 0.4);
         nh_.param<float>("/erasor2/egocentric_grid_resolution", egocentric_grid_resolution_, 0.2);
@@ -174,6 +182,7 @@ public:
         MapCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/map", 100, true);
         DynMapPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dyn_points_all", 100, true);
         NoiseMapPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/noise_points_all", 100, true);
+
         CurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/curr_scan", 100, true);
         DynCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dyn_points", 100, true);
         RejectedDynCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/rejected_dyn_points", 100, true);
@@ -183,7 +192,7 @@ public:
 
         EgocentricGridPublisher = nh_.advertise<grid_map_msgs::GridMap>("/erasor2/gridmap_egocentric", 100, true);
         GridPublisher = nh_.advertise<grid_map_msgs::GridMap>("/erasor2/gridmap", 100, true);
-        VizMarkerPublisher = nh_.advertise<visualization_msgs::Marker>("/erasor2/target_grid_loc", 100, true);
+        AdaptiveRangePublisher = nh_.advertise<visualization_msgs::Marker>("/erasor2/adaptive_range", 100, true);
 
 //        pub_map_rejected  = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/map_rejected", 100);
 //        pub_curr_rejected = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/curr_rejected", 100);

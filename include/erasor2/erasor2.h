@@ -1,22 +1,14 @@
 #include "tools/erasor_utils.hpp"
 #include "rosparam_server.hpp"
 
-#define INF 10000000000000.0
-#define ENOUGH_NUM 8000
-
-// COLORS:
-// 0 -> BLUE
-#define MAP_IS_HIGHER 0.5
-#define CURR_IS_HIGHER 1.0
-#define LITTLE_NUM 0.0       // For viz: blue - not activated
-#define BLOCKED 0.8         // For viz
-
-#define MERGE_BINS 0.25
-#define NOT_ASSIGNED 0.0
-// ground params
-
-
 using namespace std;
+
+struct DynamicCluster {
+    pcl::PointCloud<pcl::PointXYZI> cloud_;
+    float moving_obj_score_;
+    Eigen::Matrix<float, 4, 1> centroid_;
+    bool is_dynamic_;
+};
 
 struct GridMapInfo {
     float center_x;
@@ -49,8 +41,11 @@ public:
 
     vector<vector<pcl::PointCloud<pcl::PointXYZI>>>          xygrids_;
     vector<grid_map::Index>                                  idxes_approx_;
-    vector<vector<float>>                                    dyn_ids_set_;
+//    vector<vector<float>>                                    dyn_ids_set_;
+    vector<vector<float>>                        dynamic_ids_set_;
+    vector<unordered_map<float, DynamicCluster>> dynamic_ids_clusters_set_;
 
+    // For visualize the moving object score
     vector<vector<pair<Eigen::Matrix<float, 4, 1>, float> >> rejected_objs_set_;
     vector<vector<pair<Eigen::Matrix<float, 4, 1>, float> >> accepted_objs_set_;
 
@@ -61,6 +56,9 @@ public:
     int               num_data_ = 0;
     GridMapInfo       grid_map_info_;
     grid_map::GridMap gridmap_submap_;
+
+    float scan_ratio_;
+    float ratio_num_;
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_noise_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_dynamic_;
@@ -90,6 +88,8 @@ public:
     void updateSteppableRegion();
 
     void detectDynamicObjects();
+
+    void filterDynamicObjects();
 
     void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<float> &dyn_ids,
                             std::vector<int> &static_mask);
@@ -125,7 +125,8 @@ public:
     void xygrid2cloud(const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid,
                       pcl::PointCloud<pcl::PointXYZI> &cloud);
 
-    bool isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI> pc, const float ratio_num = 0.95,
+
+    bool isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI>& pc, const float ratio_num = 0.95,
                             const int num_min_pts = 3);
 
     bool isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
@@ -143,12 +144,19 @@ public:
                                            const float grid_resolution,
                                            const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid);
 
+    float calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI>& dynamic_obj);
+
     void dilateAndErode(grid_map::GridMap &gridmap_submap);
 
     void erodeGridMap(grid_map::GridMap &gridmap_submap);
 
     void publishObjScores(const ros::Publisher& publisher, const vector<pair<Eigen::Matrix<float, 4, 1>, float> >& objs,
                                const vector<float> color, int& num_prev_objs);
+
+    float getAdaptiveThreshold(const float obj_x, const float obj_y,
+                             const float pos_x, const float pos_y, const float adaptive_range);
+
+    void visualizeAdaptiveRange(const Eigen::Matrix4f& pose);
 
 private:
     std::vector<int> DYNAMIC_CLASSES = {252, 253, 254, 255, 256, 257, 258, 259};

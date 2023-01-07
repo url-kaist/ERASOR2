@@ -141,15 +141,33 @@ namespace erasor_utils {
     }
 
     void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
-                                                 pcl::PointCloud<pcl::PointXYZI> &dst, double leaf_size) {
+                                                 pcl::PointCloud<pcl::PointXYZI> &dst, const double leaf_size,
+                                                 const int minimum_num_pts_per_voxel) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_voxelized(new pcl::PointCloud<pcl::PointXYZI>);
 
         // 1. Voxelization
+        std::chrono::system_clock::time_point t_v_s = std::chrono::system_clock::now();
         static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
         voxel_filter.setInputCloud(src);
-//        voxel_filter.setMinimumPointsNumberPerVoxel(3);
+        voxel_filter.setMinimumPointsNumberPerVoxel(minimum_num_pts_per_voxel);
         voxel_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
         voxel_filter.filter(*ptr_voxelized);
+        cout << "\033[1;35m" << ptr_voxelized->points.size() << endl;
+        std::chrono::system_clock::time_point t_v_e = std::chrono::system_clock::now();
+        cout << "Elapsed time in milliseconds: "
+             << chrono::duration_cast<chrono::milliseconds>(t_v_e - t_v_s).count()
+             << " ms" << endl;
+        // Does not work...
+//        static HashVoxelGrid<pcl::PointXYZI> hash_voxel_filter;
+//        hash_voxel_filter.setInputCloud(src);
+//        hash_voxel_filter.setMinimumPointsNumberPerVoxel(minimum_num_pts_per_voxel);
+//        hash_voxel_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
+//        hash_voxel_filter.filter(*ptr_voxelized);
+//        std::chrono::system_clock::time_point t_h_e = std::chrono::system_clock::now();
+//        cout << "Elapsed time in milliseconds: "
+//             << chrono::duration_cast<chrono::milliseconds>(t_h_e - t_v_e).count()
+//             << " ms" << endl;
+//        cout << "\033[1;35m" << ptr_voxelized->points.size() << "\033[0m" << endl;
 
         // 2. Find nearest point to update intensity (index and id)
         int               N = src->points.size();
@@ -234,6 +252,20 @@ namespace erasor_utils {
         }
     }
 
+    void calcMinMaxZ(const pcl::PointCloud<pcl::PointXYZI> &pcs, float &min_z, float &max_z) {
+        min_z       = numeric_limits<float>::max();
+        max_z       = numeric_limits<float>::lowest();
+
+        int num_pts = pcs.points.size();
+        for (size_t i = 0; i < num_pts; i++) {
+            const auto &pt = pcs.points.at(i);
+            if (pt.intensity != NOT_VOLUME_OF_INTEREST) {
+                min_z = min(min_z, pt.z);
+                max_z = max(max_z, pt.z);
+            }
+        }
+    }
+
     void calcMinMaxZWithoutGround(const pcl::PointCloud<pcl::PointXYZI> &pcs, float &min_z, float &max_z) {
         min_z       = numeric_limits<float>::max();
         max_z       = numeric_limits<float>::lowest();
@@ -246,5 +278,27 @@ namespace erasor_utils {
                 max_z = max(max_z, pt.z);
             }
         }
+    }
+
+    float calcMeanZOfGround(const pcl::PointCloud<pcl::PointXYZI>& pcs) {
+        float sum_z = 0;
+        int num_pts = pcs.points.size();
+        for (size_t i = 0; i < num_pts; i++) {
+            const auto &pt = pcs.points.at(i);
+            if (pt.intensity == GROUND_LABEL) {
+                sum_z += pt.z;
+            }
+        }
+        return sum_z / num_pts;
+    }
+
+    int getNumGroundPoints(const pcl::PointCloud<pcl::PointXYZI>& pc) {
+        int             num_ground_pts = 0;
+        for (const auto &pt: pc) {
+            if (pt.intensity == GROUND_LABEL) {
+                ++num_ground_pts;
+            }
+        }
+        return num_ground_pts;
     }
 }

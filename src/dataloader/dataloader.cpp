@@ -64,9 +64,10 @@ SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir, const strin
     gt_label_dir_     = abs_data_dir + "/" + seq + "/labels";
 //    pose_path_        = abs_data_dir + "/" + seq + "/poses.txt";
     pose_path_        = abs_data_dir + "/" + seq + "/suma_pose.txt";
-//    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork";
+    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork";
     ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork_filtered";
     est_label_dir_    = abs_data_dir + "/" + seq + "/cais";
+//    est_label_dir_    = abs_data_dir + "/" + seq + "/hdbscan";
 
     cloud_format_     = "bin";
 
