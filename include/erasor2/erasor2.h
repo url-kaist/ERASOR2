@@ -92,7 +92,8 @@ public:
 
     void filterDynamicObjects();
 
-    void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<float> &dyn_ids,
+    void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
+                            const unordered_map<float, DynamicCluster> &ids_clusters,
                             std::vector<int> &static_mask);
 
     void updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,

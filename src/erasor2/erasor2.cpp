@@ -315,19 +315,13 @@ void ERASOR2::filterDynamicObjects() {
     // Finally assign the static points
     for (int k = 0; k < num_data_; ++k) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_points_each_scan(new pcl::PointCloud<pcl::PointXYZI>);
-        auto                                 &each_pc = pcs_transformed_[k];
-        auto                                 &ids_clusters     = dynamic_ids_clusters_set_[k];
 
-        vector<float> dynamic_ids;
-        for (auto &[dynamic_id, dynamic_cluster]: ids_clusters) {
-            if (dynamic_cluster.is_dynamic_) {
-                dynamic_ids.push_back(dynamic_id);
-            }
-        }
+        const auto &each_pc = pcs_transformed_[k];
+        const auto &ids_clusters= dynamic_ids_clusters_set_[k];
 
         static_points_transformed_[k].clear();
         vector<int> static_mask;
-        estimateStaticMask(each_pc, dynamic_ids, static_mask);
+        estimateStaticMask(each_pc, ids_clusters, static_mask);
         // Noisy points are added by the following function:
         updateNoisyMask(each_pc, noisy_points_transformed_[k], static_mask);
         if (dataset_name_ == "SemanticKITTI") {
@@ -369,11 +363,13 @@ void ERASOR2::filterDynamicObjects() {
 }
 
 void ERASOR2::estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
-                                 const std::vector<float> &dyn_ids, std::vector<int> &static_mask) {
+                                 const unordered_map<float, DynamicCluster> &ids_clusters, std::vector<int> &static_mask) {
     static_mask.resize(cloud.points.size());
     int             count = 0;
     for (const auto &pt: cloud) {
-        if (std::find(dyn_ids.begin(), dyn_ids.end(), pt.intensity) != dyn_ids.end()) {
+        auto iter = ids_clusters.find(pt.intensity);
+        if (iter !=  ids_clusters.end() && iter->second.is_dynamic_) {
+//        if (std::find(dyn_ids.begin(), dyn_ids.end(), pt.intensity) != dyn_ids.end()) {
             if (pt.intensity == NOT_VOLUME_OF_INTEREST) {
                 // ToDo Improve
                 static_mask[count] = IS_STATIC;
