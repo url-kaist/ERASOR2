@@ -53,7 +53,7 @@ erasor2:
         set_scan_and_pose: false
         set_submap: false
         update: false
-        detect: true
+        detect: false
 
 stop_for_each_frame: true
 

@@ -102,6 +102,18 @@ public:
                          const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
                          std::vector<int> &static_mask);
 
+    void updateNeighboringDynamicMask(const erasor_utils::my_kd_tree_t& kdtree,
+                                        const pcl::PointCloud<pcl::PointXYZI> &query_points,
+                                        std::vector<int> &static_mask);
+
+    void setAccumDynamicPoints(const int k, const int window_size,
+                               pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization=true);
+
+    void instanceAwareOutlierRemoval(const int k, const int window_size,
+                                           const float dist_thr_gain,
+                                           pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+                                           pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
+
     void windowBasedVolumetricOutlierRemoval(const int k, const int window_size,
                                            const float dist_thr_gain,
                                            pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
@@ -175,13 +187,18 @@ public:
     void visualizeAdaptiveRange(const Eigen::Matrix4f& pose);
 
 private:
-    std::vector<int> DYNAMIC_CLASSES = {252, 253, 254, 255, 256, 257, 258, 259};
-
     double xy2theta(const double &x, const double &y);
 
     double xy2radius(const double &x, const double &y);
 
-    geometry_msgs::PolygonStamped set_polygons(int r_idx, int theta_idx, int num_split = 3);
+    grid_map::Position idx2position(const grid_map::Index& idx);
+
+    int globalIdx2LocalIdx(const grid_map::Index& global_idx,
+                           const grid_map::Index& center_idx);
+
+    bool isEqual(const grid_map::Index& idx0, const grid_map::Index& idx1);
+
+    bool isInsideTheDynamicClusters(const pcl::PointXYZI& query, const pcl::PointXYZI& target);
 };
 
 

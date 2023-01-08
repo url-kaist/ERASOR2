@@ -28,6 +28,41 @@ double ERASOR2::xy2radius(const double &x, const double &y) {
     return sqrt(pow(x, 2) + pow(y, 2));
 }
 
+grid_map::Position ERASOR2::idx2position(const grid_map::Index& idx) {
+    int w_pc = idx(0);
+    int h_pc = idx(1);
+
+    grid_map::Position pos;
+    pos(0) = grid_map_info_.x_length / 2 + grid_map_info_.center_x - w_pc * grid_map_info_.resolution;
+    pos(1) = grid_map_info_.y_length / 2 + grid_map_info_.center_y - h_pc * grid_map_info_.resolution;
+    return pos;
+}
+
+bool ERASOR2::isEqual(const grid_map::Index& idx0, const grid_map::Index& idx1) {
+    if (idx0(0) == idx1(0) && idx0(1) == idx1(1)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool ERASOR2::isInsideTheDynamicClusters(const pcl::PointXYZI& query, const pcl::PointXYZI& target) {
+    float dist = sqrt((query.x - target.x) * (query.x - target.x) + (query.y - target.y) * (query.y - target.y)
+            + (query.z - target.z) * (query.z - target.z));
+    float xy_dist = sqrt((query.x - target.x) * (query.x - target.x) + (query.y - target.y) * (query.y - target.y));
+    if  (dist < dist_thr_gain_ * voxel_size_ || xy_dist < dist_thr_gain_ * voxel_size_) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+int ERASOR2::globalIdx2LocalIdx(const grid_map::Index& global_idx, const grid_map::Index& center_idx) {
+    int w_diff = global_idx(0) - (center_idx(0) - neighboring_width_ / 2);
+    int h_diff = global_idx(1) - (center_idx(1) - neighboring_height_ / 2);
+    return w_diff + h_diff * neighboring_width_;
+}
+
 void ERASOR2::initializePointClouds() {
     int num_pts_for_reserve = 2000000;
     map_noise_.reset(new pcl::PointCloud<pcl::PointXYZI>);
@@ -159,12 +194,7 @@ void ERASOR2::updateSteppableRegion() {
 
         int w_pc = idxes_approx_[k](0);
         int h_pc = idxes_approx_[k](1);
-
-        grid_map::Position pos_approx;
-        pos_approx(0) = grid_map_info_.x_length / 2 + grid_map_info_.center_x - w_pc * grid_map_info_.resolution;
-        pos_approx(1) = grid_map_info_.y_length / 2 + grid_map_info_.center_y - h_pc * grid_map_info_.resolution;
-//        std::cout << "[Before] " << poses_submap[k](0, 3) << ", " << poses_submap[k](1, 3) << std::endl;
-//        std::cout << "[After] " << pos_approx(0) << ", " << pos_approx(1) << std::endl;
+        grid_map::Position pos_approx = idx2position(idxes_approx_[k]);
 
         pcl::PointCloud<pcl::PointXYZI> complement;
 //        std::cout << poses_submap[k] << std::endl;
@@ -340,6 +370,8 @@ void ERASOR2::filterDynamicObjects() {
         pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_static_points(new pcl::PointCloud<pcl::PointXYZI>);
         windowBasedVolumetricOutlierRemoval(k, window_size_, dist_thr_gain_, *filtered_static_points,
                                             potential_dynamic_points_transformed_[k]);
+//        instanceAwareOutlierRemoval(k, window_size_, dist_thr_gain_, *filtered_static_points,
+//                                            potential_dynamic_points_transformed_[k]);
         static_points_transformed_[k] = *filtered_static_points;
 
         (*map_noise_) += noisy_points_transformed_[k];
@@ -404,23 +436,128 @@ void ERASOR2::estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
 void ERASOR2::updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
                               const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
                               std::vector<int> &static_mask) {
-    PointCloud<num_t> cloud;
-    erasor_utils::pcl2nanoflann(src_cloud, cloud);
-    erasor_utils::my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+    vector<int> correspondences;
+    erasor_utils::findCorrespondences(noisy_points, src_cloud, correspondences);
+    for (const int correspondence: correspondences) {
+        static_mask[correspondence] = IS_NOISE_YET_POTENTIAL_DYNAMIC;
+    }
+}
 
-    for (auto &query_pcl: noisy_points.points) {
+void ERASOR2::updateNeighboringDynamicMask(const erasor_utils::my_kd_tree_t& kdtree,
+                                        const pcl::PointCloud<pcl::PointXYZI> &query_points,
+                                        std::vector<int> &static_mask) {
+    for (auto &query_pcl: query_points.points) {
         const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
         {
-            size_t                num_results = 1;
-            std::vector<uint32_t> ret_index(num_results);
-            std::vector<num_t>    out_dist_sqr(num_results);
+            std::vector<nanoflann::ResultItem<uint32_t, num_t>> ret_matches;
 
-            num_results = index.knnSearch(
-                    &query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
+            int num_matched = kdtree.radiusSearch(
+                    &query_pt[0], dist_thr_gain_ * voxel_size_, ret_matches);
+            for (int i = 0; i < num_matched; ++i) {
+                static_mask[ret_matches[i].first] = IS_DYNAMIC;
+            }
+        }
+    }
+}
 
-            ret_index.resize(num_results);
-            out_dist_sqr.resize(num_results);
-            static_mask[ret_index[0]] = IS_NOISE_YET_POTENTIAL_DYNAMIC;
+void ERASOR2::setAccumDynamicPoints(const int k, const int window_size,
+                               pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization) {
+    int lower_bound = k - window_size / 2;
+    int upper_bound = k + (window_size + 1) / 2;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_accum(new pcl::PointCloud<pcl::PointXYZI>);
+
+    for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
+        (*dyn_points_accum) += dynamic_points_transformed_[i];
+    }
+
+    if (use_voxelization) {
+        static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
+        voxel_filter.setInputCloud(dyn_points_accum);
+        voxel_filter.setLeafSize(voxel_size_, voxel_size_, voxel_size_);
+        voxel_filter.filter(cloud_accum);
+    } else {
+        cloud_accum = *dyn_points_accum;
+    }
+}
+
+void ERASOR2::instanceAwareOutlierRemoval(const int k, const int window_size,
+                                           const float dist_thr_gain,
+                                           pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+                                           pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points) {
+    filtered_static_points.clear();
+    potential_dynamic_points.clear();
+
+    // 1. Set volumetric dynamic points
+    pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_voxel(new pcl::PointCloud<pcl::PointXYZI>);
+    setAccumDynamicPoints(k, window_size, *dyn_points_voxel);
+
+    // 2. Set region of interest
+    int lower_bound = k - window_size / 2;
+    int upper_bound = k + (window_size + 1) / 2;
+    vector<grid_map::Index> regions_of_interest;
+
+    regions_of_interest.reserve(64); // heuristic
+    for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
+        auto &ids_clusters  = dynamic_ids_clusters_set_[i];
+        for (const auto &[dyn_cand_id, dynamic_cluster]: ids_clusters) {
+            if (dynamic_cluster.is_dynamic_) {
+                for (const auto &occupied_region: dynamic_cluster.occupied_regions_) {
+                    bool is_first = true;
+                    for (const auto& roi: regions_of_interest) {
+                        if (isEqual(roi, occupied_region)) {
+                            // `occupied_region` is already in the `regions_of_interest`
+                           is_first = false;
+                           break;
+                        }
+                    }
+                    if (is_first) {
+                        regions_of_interest.emplace_back(occupied_region);
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Set the static points that potentially contain dynamic points
+    int w_pc = idxes_approx_[k](0);
+    int h_pc = idxes_approx_[k](1);
+    grid_map::Position pos_approx = idx2position(idxes_approx_[k]);
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr complement(new pcl::PointCloud<pcl::PointXYZI>);
+    vector<pcl::PointCloud<pcl::PointXYZI>> xygrid;
+    voi2xygrid(static_points_transformed_[k], pos_approx(0), pos_approx(1), poses_submap_[k](2, 3),
+               range_of_interest_, grid_resolution_, xygrid, *complement);
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr static_points_of_interest(new pcl::PointCloud<pcl::PointXYZI>);
+    vector<bool> is_roi(xygrid.size(), false);
+    // global_idx: idx w.r.t. sudmap's grid map
+    for (const auto& global_idx: regions_of_interest) {
+        if (global_idx(0) >= w_pc - neighboring_width_ / 2 && global_idx(0) < w_pc + neighboring_width_ / 2 &&
+            global_idx(1) >= h_pc - neighboring_height_ / 2 && global_idx(1) < w_pc + neighboring_height_ / 2) {
+            int voi_idx = globalIdx2LocalIdx(global_idx, idxes_approx_[k]);
+            (*static_points_of_interest) += xygrid[voi_idx];
+            is_roi[voi_idx] = true;
+        }
+    }
+
+    vector<int> correspondences;
+    erasor_utils::findCorrespondences(*static_points_of_interest, *dyn_points_voxel, correspondences);
+
+    // 4. Set filtered_static points and potential dynamic points
+    filtered_static_points += (*complement);
+    for (int j = 0; j < is_roi.size(); ++j) {
+        if (!is_roi[j]) {
+            filtered_static_points += xygrid[j];
+        }
+    }
+
+    for (int j = 0; j < correspondences.size(); ++j) {
+        const auto& query = static_points_of_interest->points[j];
+        const auto& target = dyn_points_voxel->points[correspondences[j]];
+        if (isInsideTheDynamicClusters(query, target)) {
+            potential_dynamic_points.points.emplace_back(query);
+        } else {
+            filtered_static_points.emplace_back(query);
         }
     }
 }
@@ -430,22 +567,9 @@ void ERASOR2::windowBasedVolumetricOutlierRemoval(const int k, const int window_
                                            pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
                                            pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points) {
     // 1. Set volumetric dynamic points
-    int lower_bound = k - window_size / 2;
-    int upper_bound = k + (window_size + 1) / 2;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_accum(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_voxel(new pcl::PointCloud<pcl::PointXYZI>);
-//    cout  << lower_bound << " <-> " << k << " <-> " << upper_bound << endl;
-    for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
-        (*dyn_points_accum) += dynamic_points_transformed_[i];
-    }
-    cout << "Query: " << dyn_points_accum->points.size() << endl;
-
-    static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
-    voxel_filter.setInputCloud(dyn_points_accum);
-    voxel_filter.setLeafSize(voxel_size_, voxel_size_, voxel_size_);
-    voxel_filter.filter(*dyn_points_voxel);
-    *dyn_points_voxel = *dyn_points_accum;
-
+    setAccumDynamicPoints(k, window_size, *dyn_points_voxel);
+    // 2. Dynamic removal
     volumetricOutlierRemoval(static_points_transformed_[k],
                              *dyn_points_voxel,
                              dist_thr_gain,
@@ -466,26 +590,15 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
     erasor_utils::pcl2nanoflann(static_points, cloud);
 
     erasor_utils::my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+    updateNeighboringDynamicMask(index, dynamic_points, static_mask);
+//    for (int j = 0; j < N; ++j) {
+//        const auto& status = static_mask[j];
+//        const auto& pt = static_points[j];
+//        if (status == IS_DYNAMIC) {
+//            potential_dynamic_points.points.emplace_back(pt);
+//        }
+//    }
 
-    // Only for debugging
-//    vector<int> valid_outlier_idxes;
-//    valid_outlier_idxes.reserve(1000);
-    for (auto &query_pcl: dynamic_points.points) {
-        const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
-        {
-            std::vector<nanoflann::ResultItem<uint32_t, num_t>> ret_matches;
-
-            int num_matched = index.radiusSearch(
-                    &query_pt[0], dist_thr_gain * voxel_size_, ret_matches);
-            for (int i = 0; i < num_matched; ++i) {
-                static_mask[ret_matches[i].first] = IS_DYNAMIC;
-//                if (std::find(valid_outlier_idxes.begin(), valid_outlier_idxes.end(),
-//                              ret_matches[i].first) == valid_outlier_idxes.end()) {
-//                    valid_outlier_idxes.push_back(ret_matches[i].first);
-//                }
-            }
-        }
-    }
 //    cout << "\033[1;32mTotal " << valid_outlier_idxes.size() << " points are filtered\033[0m" << endl;
     filtered_static_points.clear();
     filtered_static_points.reserve(N);
