@@ -396,7 +396,7 @@ void dilateAndErode(grid_map::GridMap& gridmap_submap) {
 float grid_resolution;
 float range_of_interest;
 float egocentric_grid_resolution;
-float ground_likelihood_thr;
+float ground_log_odds_thr;
 float min_z_voi, max_z_voi;
 float scan_ratio_threshold;
 float th_bin_max_h;
@@ -416,7 +416,7 @@ int main(int argc, char **argv)
     nh.param<float>("/grid_resolution", grid_resolution, 0.4);
     nh.param<float>("/egocentric_grid_resolution", egocentric_grid_resolution, 0.2);
     nh.param<float>("/range_of_interest", range_of_interest, 10.0);
-    nh.param<float>("/ground_likelihood_thr", ground_likelihood_thr, 0.5);
+    nh.param<float>("/ground_log_odds_thr", ground_log_odds_thr, 0.5);
     nh.param<int>("/interval", INTERVAL, 2);
     nh.param<bool>("/stop_for_each_frame", STOP_FOR_EACH_FRAME, false);
     nh.param<bool>("/verbose", verbose, false);
@@ -608,7 +608,7 @@ int main(int argc, char **argv)
             for (int w = w_pc - width / 2; w < w_pc + width / 2; ++w) {
                 idx(0) = w;
                 idx(1) = h;
-                if (gridmap_submap.at("steppable", idx) > ground_likelihood_thr) {
+                if (gridmap_submap.at("steppable", idx) > ground_log_odds_thr) {
                     // Extract indices
                     for (const auto pt: xygrids[k][count].points) {
                         if ((pt.intensity != GROUND_LABEL) && (pt.intensity != NOT_INTEREST) &&
@@ -639,7 +639,7 @@ int main(int argc, char **argv)
                 gridmap_submap.getIndex(p_tmp, idx_tmp);
                 total_score += gridmap_submap.at("steppable", idx_tmp);
             }
-            if (total_score / dynamic_points->points.size() > ground_likelihood_thr) {
+            if (total_score / dynamic_points->points.size() > ground_log_odds_thr) {
                 ids.push_back(dyn_cand_id);
             }
         }

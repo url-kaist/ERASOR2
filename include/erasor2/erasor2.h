@@ -184,6 +184,9 @@ public:
     float getAdaptiveThreshold(const float obj_x, const float obj_y,
                              const float pos_x, const float pos_y, const float adaptive_range);
 
+    bool isSizeSufficientlySmall(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
+                                 const float size_thr=30.0);
+
     void visualizeAdaptiveRange(const Eigen::Matrix4f& pose);
 
 private:

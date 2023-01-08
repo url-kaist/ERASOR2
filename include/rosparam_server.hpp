@@ -34,11 +34,11 @@ public:
     float grid_resolution_;
     float range_of_interest_;
     float egocentric_grid_resolution_;
-    float ground_likelihood_thr_;
+    float ground_log_odds_thr_;
     float min_z_voi_;
     float max_z_voi_;
     float scan_ratio_threshold_;
-    float th_bin_max_h_;
+    float min_z_diff_thr_;
     float unknown_prior_;
     float informative_prior_;
     float initial_prior_;
@@ -49,6 +49,7 @@ public:
     float obj_score_soft_thr_;
     float obj_score_hard_thr_;
     float adaptive_range_;
+    float xy_size_thr_;
 
     bool verbose_;
     bool is_large_scale_;
@@ -135,13 +136,13 @@ public:
         nh_.param<float>("/erasor2/min_z_voi", min_z_voi_, -1.6);
         nh_.param<float>("/erasor2/max_z_voi", max_z_voi_, 1.3);
         nh_.param<float>("/erasor2/scan_ratio_threshold", scan_ratio_threshold_, 0.3);
-        nh_.param<float>("/erasor2/th_bin_max_h", th_bin_max_h_, 0.3);
-        nh_.param<float>("/erasor2/ground_likelihood/unknown_prior", unknown_prior_, -2.0);
-        nh_.param<float>("/erasor2/ground_likelihood/informative_prior", informative_prior_, 2.0);
-        nh_.param<float>("/erasor2/ground_likelihood/initial_prior", initial_prior_, 0.5);
-        nh_.param<float>("/erasor2/ground_likelihood/increment_gain", increment_gain_, 0.3);
-        nh_.param<float>("/erasor2/ground_likelihood/increment", increment_, 0.3);
-        nh_.param<float>("/erasor2/ground_likelihood_thr", ground_likelihood_thr_, 0.5);
+        nh_.param<float>("/erasor2/min_z_diff_thr", min_z_diff_thr_, 0.3);
+        nh_.param<float>("/erasor2/log_odds/unknown_prior", unknown_prior_, -2.0);
+        nh_.param<float>("/erasor2/log_odds/informative_prior", informative_prior_, 2.0);
+        nh_.param<float>("/erasor2/log_odds/initial_prior", initial_prior_, 0.5);
+        nh_.param<float>("/erasor2/log_odds/increment_gain", increment_gain_, 0.3);
+        nh_.param<float>("/erasor2/log_odds/increment", increment_, 0.3);
+        nh_.param<float>("/erasor2/ground_log_odds_thr", ground_log_odds_thr_, 0.5);
         nh_.param<int>("/erasor2/kernel_size", kernel_size_, 3);
 
         nh_.param<float>("/erasor2/ratio_num_pts", ratio_num_pts_, 0.95);
@@ -150,6 +151,7 @@ public:
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_soft_thr", obj_score_soft_thr_, 0.8);
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_hard_thr", obj_score_hard_thr_, 20.0);
         nh_.param<float>("/erasor2/moving_object_detection/adaptive_range", adaptive_range_, 12.0);
+        nh_.param<float>("/erasor2/moving_object_detection/xy_size_thr", xy_size_thr_, 30.0);
 
         nh_.param<int>("/erasor2/volumetric_outlier_removal/window_size", window_size_, 1);
         nh_.param<int>("/erasor2/volumetric_outlier_removal/num_closest", num_closest_, 3);

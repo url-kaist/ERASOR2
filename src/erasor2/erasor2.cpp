@@ -217,7 +217,7 @@ void ERASOR2::updateSteppableRegion() {
 //                    cout << "(" << w << ", " << h << ") - ";
                 if (isLikelyToBeSteppableRegion(xygrids_[k][count], map_grid[count],
                                                 scan_ratio_threshold_,
-                                                th_bin_max_h_, verbose_)) {
+                                                min_z_diff_thr_, verbose_)) {
                     // For debugging
                     gridmap_submap_.at("elevation", idx) = 1.0;
 //                    cout << "(" << w << ", " << h << "): " << scan_ratio_ << " | " << ratio_num_ << " // ";
@@ -225,11 +225,11 @@ void ERASOR2::updateSteppableRegion() {
 //                         << erasor_utils::getNumGroundPoints(xygrids_[k][count]) << endl;
                     updatePrior(idx, informative_prior_);
                     updatePosterior(idx, increment_ * increment_gain_);
-//                    } else if (isLikelyToBeGround(xygrids_[k][count])) {
-//                        updatePrior(idx, initial_prior_);
-//                        updatePosterior(idx, increment_);
-//                    }
+                } else if (isLikelyToBeGround(xygrids_[k][count])) {
+                    updatePrior(idx, initial_prior_);
+                    updatePosterior(idx, increment_);
                 }
+
                 ++count;
             }
         }
@@ -266,6 +266,7 @@ void ERASOR2::detectDynamicObjects() {
     GridPublisher.publish(grid_msg);
     for (int k = 0; k < num_data_; ++k) {
         vector<float> &dyn_cand_ids = dynamic_ids_set_[k]; // temp. variable
+//        unordered_map<float, DynamicCluster> &ids_clusters  = dynamic_ids_clusters_set_[k];
         noisy_points_transformed_[k].reserve(100);
 
         int w_pc = idxes_approx_[k](0);
@@ -278,13 +279,27 @@ void ERASOR2::detectDynamicObjects() {
             for (int w = w_pc - neighboring_width_ / 2; w < w_pc + neighboring_width_ / 2; ++w) {
                 idx(0) = w;
                 idx(1) = h;
-                if (gridmap_submap_.at("steppable", idx) > ground_likelihood_thr_) {
+                if (gridmap_submap_.at("steppable", idx) > ground_log_odds_thr_) {
                     // Extract indices
                     // Note that `xygrids_[k][count]` does not contain non-VoI points
                     for (const auto &pt: xygrids_[k][count].points) {
+
                         if ((pt.intensity != GROUND_LABEL) && (pt.intensity != NOT_INTEREST) &&
                             std::find(dyn_cand_ids.begin(), dyn_cand_ids.end(), pt.intensity) == dyn_cand_ids.end()) {
                             dyn_cand_ids.push_back(pt.intensity);
+//                        if ((pt.intensity != GROUND_LABEL) && (pt.intensity != NOT_INTEREST)) {
+//                            if (ids_clusters.find(pt.intensity) != ids_clusters.end()) {
+//                               ids_clusters[pt.intensity].cloud_.emplace_back(pt);
+//                            } else {
+//                                DynamicCluster dynamic_cluster;
+//                                dynamic_cluster.cloud_.reserve(200);
+//                                ids_clusters[pt.intensity] = dynamic_cluster;
+//                                ids_clusters[pt.intensity].cloud_.emplace_back()
+//
+//                            }
+//                            &&
+//                            std::find(dyn_cand_ids.begin(), dyn_cand_ids.end(), pt.intensity) == dyn_cand_ids.end()) {
+
                         } else if (pt.intensity == NOT_INTEREST) {
                             noisy_points_transformed_[k].points.emplace_back(pt);
                         }
@@ -300,7 +315,7 @@ void ERASOR2::filterDynamicObjects() {
     for (int k = 0; k < num_data_; ++ k) {
 
         // Filtering
-        auto & dyn_cand_ids = dynamic_ids_set_[k];
+        auto &dyn_cand_ids  = dynamic_ids_set_[k];
         auto &ids_clusters  = dynamic_ids_clusters_set_[k];
         auto &rejected_objs = rejected_objs_set_[k];
         auto &accepted_objs = accepted_objs_set_[k];
@@ -820,7 +835,7 @@ bool ERASOR2::isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI> &pc, cons
 
 bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
                                           const pcl::PointCloud<pcl::PointXYZI> &map_pc,
-                                          const float scan_ratio_threshold, const float th_bin_max_h,
+                                          const float scan_ratio_threshold, const float min_z_diff_thr,
                                           const bool verbose) {
     if (curr_pc.points.size() < minimum_num_pts_ || map_pc.points.size() < minimum_num_pts_) {
         return false;
@@ -845,7 +860,7 @@ bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> 
                       curr_h_diff / map_h_diff);
 
     // To reduce false positives
-    if (map_h_diff < th_bin_max_h || curr_mean_ground_z - map_min_z > th_bin_max_h * 1.5) {
+    if (map_h_diff < min_z_diff_thr || curr_mean_ground_z - map_min_z > min_z_diff_thr * 1.5) {
         return false;
     }
 
@@ -1048,6 +1063,17 @@ float ERASOR2::getAdaptiveThreshold(const float obj_x, const float obj_y,
         return obj_score_soft_thr_;
     } else {
         return obj_score_hard_thr_;
+    }
+}
+
+bool ERASOR2::isSizeSufficientlySmall(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
+                                 const float xy_size_thr) {
+    pcl::PointXYZI min_pt, max_pt;
+    pcl::getMinMax3D(dynamic_cluster, min_pt, max_pt);
+    if (abs(min_pt.x - max_pt.x) < xy_size_thr &&  abs(min_pt.x - max_pt.x) < xy_size_thr) {
+        return true;
+    } else {
+        return false;
     }
 }
 

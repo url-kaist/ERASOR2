@@ -20,11 +20,11 @@ erasor2:
     min_z_voi: -4.0
     max_z_voi: 1.3
     scan_ratio_threshold: 0.1 # The Larger, the more aggressive!!
-    th_bin_max_h: -1.0 # [m]
+    min_z_diff_thr: -1.0 # [m]
     ground_likelihood:
         increment: 0.3
         decrement: 0.1
-    ground_likelihood_thr: 0.5
+    ground_log_odds_thr: 0.5
 
     minimum_num_pts: 5
     rejection_ratio: 0

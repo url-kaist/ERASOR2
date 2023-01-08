@@ -308,7 +308,8 @@ namespace erasor_utils {
                 sum_z += pt.z;
             }
         }
-        return sum_z / num_pts;
+        int num_ground_pts = getNumGroundPoints(pcs);
+        return sum_z / num_ground_pts;
     }
 
     int getNumGroundPoints(const pcl::PointCloud<pcl::PointXYZI>& pc) {

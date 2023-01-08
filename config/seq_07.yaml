@@ -23,15 +23,15 @@ erasor2:
     # min_z_voi 와 max_z_voi 는 raw cloud 기준 (ERASOR 1.0과 다름!!!)
     min_z_voi: -3.0
     max_z_voi: 1.4
-    th_bin_max_h: 0.4 # [m] 바닥이 0 m라고 가정 (ERASOR 1.0과 같음!!!!)
+    min_z_diff_thr: 0.4 # 물체가 존재한다고 가정 할 수있는 최소한의 z 차이
     scan_ratio_threshold: 0.2 # The Larger, the more aggressive!!
-    ground_likelihood:
+    log_odds:
         unknown_prior: -2.0
         informative_prior: 0.5
-        initial_prior: 0.3
+        initial_prior: 0.0
         increment_gain: 1.0 # Should be larger than one
         increment: 0.3
-    ground_likelihood_thr: 0.8
+    ground_log_odds_thr: 0.8
     kernel_size: 1
 
     # For checking ground likelihood

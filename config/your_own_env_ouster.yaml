@@ -4,7 +4,7 @@ erasor:
     num_sectors: 60
     min_h: -2.0 # [m] Note that it depends on the distance between body frame and ground contact point of mobile robots
     max_h: 1.3 # [m] Note that it depends on the distance between body frame and ground contact point of mobile robots
-    th_bin_max_h: -1.0 # [m]
+    min_z_diff_thr: -1.0 # [m]
     scan_ratio_threshold: 0.2 # The Larger, the more aggressive!!
     minimum_num_pts: 5
     rejection_ratio: 0
