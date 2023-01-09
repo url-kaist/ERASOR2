@@ -62,6 +62,7 @@ public:
     bool viz_set_submap_ = false;
     bool viz_update_ = false;
     bool viz_detect_ = false;
+    bool viz_over_seg_ = false;
 
     int start_frame_;
     int end_frame_;
@@ -174,6 +175,7 @@ public:
         nh_.param<bool>("/erasor2/viz_flag/set_submap", viz_set_submap_, false);
         nh_.param<bool>("/erasor2/viz_flag/update", viz_update_, false);
         nh_.param<bool>("/erasor2/viz_flag/detect", viz_detect_, false);
+        nh_.param<bool>("/erasor2/viz_flag/over_seg", viz_over_seg_, false);
 
         neighboring_width_ = static_cast<int>(2.0 * range_of_interest_ / grid_resolution_);
         neighboring_height_ = static_cast<int>(2.0 * range_of_interest_ / grid_resolution_);

@@ -46,7 +46,7 @@ erasor2:
 
     # To revert over-segmented parts
     over_segmentation:
-        minimum_area_thr: 0.5 # [m^2]
+        minimum_area_thr: 56 # [m^2]
         ratio_of_unknown_prior: 0.25
 
     volumetric_outlier_removal:
@@ -59,6 +59,7 @@ erasor2:
         set_submap: false
         update: false
         detect: false
+        over_seg: true
 
 stop_for_each_frame: true
 

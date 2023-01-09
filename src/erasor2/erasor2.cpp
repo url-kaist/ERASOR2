@@ -8,10 +8,13 @@ ERASOR2::ERASOR2() {
     cout << "[ERASOR2] Informative prior: " << informative_prior_ << endl;
     cout << "[ERASOR2] Increment gain: " << increment_gain_ << endl;
     cout << "[ERASOR2] Increment: " << increment_ << endl;
-    if (initial_prior_ > informative_prior_ || increment_gain_ < 1.0) {
+    if (initial_prior_ > informative_prior_ || increment_gain_ < 1.0 || initial_prior_ == informative_prior_) {
         throw invalid_argument("Parameters are wrongly set!");
     }
+
     initializePointClouds();
+    // `area_per_grid_` is used to check over-segmentation
+    area_per_grid_ = grid_resolution_ * grid_resolution_;
 }
 
 ERASOR2::~ERASOR2() {}
@@ -55,7 +58,7 @@ bool ERASOR2::isEqual(const grid_map::Index& idx0, const grid_map::Index& idx1) 
     }
 }
 
-bool ERASOR2::isInsideTheDynamicClusters(const pcl::PointXYZI& query, const pcl::PointXYZI& target) {
+bool ERASOR2::isInsideTheDynamicInstances(const pcl::PointXYZI& query, const pcl::PointXYZI& target) {
     float dist = sqrt((query.x - target.x) * (query.x - target.x) + (query.y - target.y) * (query.y - target.y)
             + (query.z - target.z) * (query.z - target.z));
     float xy_dist = sqrt((query.x - target.x) * (query.x - target.x) + (query.y - target.y) * (query.y - target.y));
@@ -125,6 +128,9 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_non_voi(new pcl::PointCloud<pcl::PointXYZI>);
     pcs_transformed_.emplace_back(*transformed);
 
+    float max_id = getMaxInstanceId(*transformed);
+    max_ids_.push_back(max_id);
+
     if (viz_set_scan_and_pose_) {
         ros::Rate                               sleep_rate(30);
         vector<pcl::PointCloud<pcl::PointXYZI>> xygrid;
@@ -190,7 +196,7 @@ void ERASOR2::resize() {
     dynamic_points_transformed_.resize(num_data_);
     potential_dynamic_points_transformed_.resize(num_data_);
 
-    dynamic_ids_clusters_set_.resize(num_data_);
+    ids_instances_set_.resize(num_data_);
 }
 
 void ERASOR2::updateSteppableRegion() {
@@ -268,13 +274,12 @@ void ERASOR2::updateSteppableRegion() {
 
 // Re-project ground likelihood to each scan
 void ERASOR2::detectMovingObjects() {
-    dilateAndErode(gridmap_submap_);
     grid_map_msgs::GridMap grid_msg;
     grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
     GridPublisher.publish(grid_msg);
     for (int k = 0; k < num_data_; ++k) {
         vector<float> dyn_cand_ids; // temp. variable
-//        unordered_map<float, DynamicCluster> &ids_clusters  = dynamic_ids_clusters_set_[k];
+//        unordered_map<float, DynamicInstance> &ids_clusters  = ids_instances_set_[k];
         noisy_points_transformed_[k].reserve(100);
 
         int w_pc = idxes_approx_[k](0);
@@ -298,7 +303,7 @@ void ERASOR2::detectMovingObjects() {
 //                            if (ids_clusters.find(pt.intensity) != ids_clusters.end()) {
 //                               ids_clusters[pt.intensity].cloud_.emplace_back(pt);
 //                            } else {
-//                                DynamicCluster dynamic_cluster;
+//                                DynamicInstance dynamic_cluster;
 //                                dynamic_cluster.cloud_.reserve(200);
 //                                ids_clusters[pt.intensity] = dynamic_cluster;
 //                                ids_clusters[pt.intensity].cloud_.emplace_back()
@@ -316,10 +321,10 @@ void ERASOR2::detectMovingObjects() {
             }
         }
 
-        // 2. Set Dynamic cluster
-        auto &ids_clusters  = dynamic_ids_clusters_set_[k];
+        // 2. Set Dynamic instance
+        auto &ids_clusters  = ids_instances_set_[k];
         ids_clusters.clear();
-        DynamicCluster dyn_cluster;
+        DynamicInstance dyn_cluster;
         dyn_cluster.cloud_.reserve(200); // heuristic
         for (const int dyn_cand_id: dyn_cand_ids) {
             ids_clusters[dyn_cand_id] = dyn_cluster;
@@ -335,31 +340,55 @@ void ERASOR2::detectMovingObjects() {
 
 void ERASOR2::filterDynamicObjects() {
     for (int k = 0; k < num_data_; ++ k) {
-        auto &ids_clusters  = dynamic_ids_clusters_set_[k];
+        auto &ids_clusters  = ids_instances_set_[k];
         auto &rejected_objs = rejected_objs_set_[k];
         auto &accepted_objs = accepted_objs_set_[k];
+        float max_id_for_register = max_ids_[k] + 10.0; // 10.0 is just a margin.
+
+        // For managing over-segmentation
+        vector<OverSegmentedInstance> instances_to_be_updated;
 
         // Only available on C++ 17
-        for (auto &[dyn_cand_id, dynamic_cluster]: ids_clusters) {
-            dynamic_cluster.moving_obj_score_ = calcMovingClusterScore(dynamic_cluster.cloud_,
-                                                                       dynamic_cluster.occupied_map_idxes_);
-
-            pcl::compute3DCentroid(dynamic_cluster.cloud_, dynamic_cluster.centroid_);
-            dynamic_cluster.is_close_to_body_frame_ = isCloseToSensorFrame(dynamic_cluster,
-                                                                             poses_submap_[k](0, 3),
-                                                                             poses_submap_[k](1, 3),
-                                                                             hard_thr_radius_);
-            float adaptive_thr = dynamic_cluster.is_close_to_body_frame_? obj_score_hard_thr_: obj_score_soft_thr_;
-            if (dynamic_cluster.moving_obj_score_ > adaptive_thr) {
-                dynamic_cluster.is_dynamic_ = true;
+        for (auto &[dyn_cand_id, dynamic_instance]: ids_clusters) {
+            setDynamicInstance(dynamic_instance, poses_submap_[k](0, 3), poses_submap_[k](1, 3));
+            float adaptive_thr = dynamic_instance.is_close_to_body_frame_? obj_score_hard_thr_: obj_score_soft_thr_;
+            if (dynamic_instance.moving_obj_score_ > adaptive_thr) {
+                dynamic_instance.is_dynamic_ = true;
                 // For visualization
-                accepted_objs.push_back({dynamic_cluster.centroid_, dynamic_cluster.moving_obj_score_});
+                accepted_objs.push_back({dynamic_instance.centroid_, dynamic_instance.moving_obj_score_});
             } else { // it means that most parts are not in the region of interests
-                if (isOverSegmented(dynamic_cluster)) {
+                if (isOverSegmented(dynamic_instance)) {
+                    // To debug over-clustering
+                    cout << "\033[1;35mOver-segmentation detected: " << dynamic_instance.cloud_.size() << " => ";
+                    DynamicInstance static_inst, partial_dynamic_inst;
+                    parseOverSegmentation(dynamic_instance, static_inst, partial_dynamic_inst,
+                                          poses_submap_[k](0, 3), poses_submap_[k](1, 3));
+                    cout << static_inst.cloud_.size() << "<-> " << partial_dynamic_inst.cloud_.size() << "\033[0m" << endl;
 
+                    if (viz_over_seg_) {
+                        CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
+                        DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_instance.cloud_));
+                        NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(partial_dynamic_inst.cloud_));
+                        cin.ignore();
+                    }
+
+                    OverSegmentedInstance inst_to_be_updated;
+                    inst_to_be_updated.original_id = dyn_cand_id;
+                    inst_to_be_updated.new_id_for_stat_inst = ++max_id_for_register;
+                    inst_to_be_updated.new_id_for_dyn_inst = ++max_id_for_register;
+                    inst_to_be_updated.static_inst = static_inst;
+                    inst_to_be_updated.dynamic_inst = partial_dynamic_inst;
+                    instances_to_be_updated.emplace_back(inst_to_be_updated);
+
+                    if (k == 15) {
+                        ID_FOR_DEBUG = max_id_for_register;
+                        cout << "\033[1;31mFFFFFF!!!!!11" << ID_FOR_DEBUG << "\033[0m" << endl;
+                    }
+                    accepted_objs.push_back({partial_dynamic_inst.centroid_, partial_dynamic_inst.moving_obj_score_});
+                    rejected_objs.push_back({static_inst.centroid_, static_inst.moving_obj_score_});
                 } else {
-                    dynamic_cluster.is_dynamic_ = false;
-                    rejected_objs.push_back({dynamic_cluster.centroid_, dynamic_cluster.moving_obj_score_});
+                    dynamic_instance.is_dynamic_ = false;
+                    rejected_objs.push_back({dynamic_instance.centroid_, dynamic_instance.moving_obj_score_});
                 }
             }
 
@@ -368,21 +397,27 @@ void ERASOR2::filterDynamicObjects() {
 //            if (k == 15 || k == 32 ||k == 85 || k == 86 || k == 87) { // seq 0.5
 //            if (k == 15 || k == 32 ||k == 85 || k == 86 || k == 87) { // seq 0.5
 //                CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
-//                DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_cluster.cloud_));
+//                DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_instance.cloud_));
 //
-//                const float obj_x = dynamic_cluster.centroid_(0);
-//                const float obj_y = dynamic_cluster.centroid_(1);
+//                const float obj_x = dynamic_instance.centroid_(0);
+//                const float obj_y = dynamic_instance.centroid_(1);
 //                const float pos_x = poses_submap_[k](0, 3);
 //                const float pos_y = poses_submap_[k](1, 3);
 //                float dist = sqrt((obj_x - pos_x) * (obj_x - pos_x) + (obj_y - pos_y) * (obj_y - pos_y));
 //                cout << "Dist: " << dist << endl;
-//                cout << "Score: " << dynamic_cluster.moving_obj_score_ << endl;
-//                cout << "Is close? " << dynamic_cluster.is_close_to_body_frame_ << endl;
-//                cout << "Is dyn? " << dynamic_cluster.is_dynamic_ << endl;
-//                printClusterInfo(dynamic_cluster);
+//                cout << "Score: " << dynamic_instance.moving_obj_score_ << endl;
+//                cout << "Is close? " << dynamic_instance.is_close_to_body_frame_ << endl;
+//                cout << "Is dyn? " << dynamic_instance.is_dynamic_ << endl;
+//                printClusterInfo(dynamic_instance);
 //
 //                cin.ignore();
 //            }
+        }
+
+        updateNewParsedInstances(instances_to_be_updated, ids_clusters);
+
+        if (rejected_objs.size() + accepted_objs.size() != ids_clusters.size()) {
+            throw invalid_argument("Some objects are lost!");
         }
     }
 
@@ -390,8 +425,14 @@ void ERASOR2::filterDynamicObjects() {
     for (int k = 0; k < num_data_; ++k) {
 
         const auto &each_pc      = pcs_transformed_[k];
-        const auto &ids_clusters = dynamic_ids_clusters_set_[k];
+        const auto &ids_clusters = ids_instances_set_[k];
 
+        if (k == 15) {
+            if (ids_clusters.find(ID_FOR_DEBUG) != ids_clusters.end()) {
+                cout << "!!!!!!!!!!!!?!?!?!?!?It's in there!" << endl;
+                cin.ignore();
+            }
+        }
         static_points_transformed_[k].clear();
         vector<int> static_mask;
         estimateStaticMask(each_pc, ids_clusters, static_mask);
@@ -455,7 +496,7 @@ void ERASOR2::filterDynamicObjects() {
 }
 
 void ERASOR2::estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
-                                 const unordered_map<float, DynamicCluster> &ids_clusters, std::vector<int> &static_mask) {
+                                 const unordered_map<float, DynamicInstance> &ids_clusters, std::vector<int> &static_mask) {
     static_mask.resize(cloud.points.size());
     int             count = 0;
     for (const auto &pt: cloud) {
@@ -540,7 +581,7 @@ void ERASOR2::instanceAwareOutlierRemoval(const int k, const int window_size,
 
     regions_of_interest.reserve(64); // heuristic
     for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
-        auto &ids_clusters  = dynamic_ids_clusters_set_[i];
+        auto &ids_clusters  = ids_instances_set_[i];
         for (const auto &[dyn_cand_id, dynamic_cluster]: ids_clusters) {
             if (dynamic_cluster.is_dynamic_) {
                 for (const auto &occupied_region: dynamic_cluster.occupied_map_idxes_) {
@@ -608,11 +649,97 @@ void ERASOR2::instanceAwareOutlierRemoval(const int k, const int window_size,
     for (int j = 0; j < correspondences.size(); ++j) {
         const auto& query = static_points_of_interest->points[j];
         const auto& target = dyn_points_voxel->points[correspondences[j]];
-        if (isInsideTheDynamicClusters(query, target)) {
+        if (isInsideTheDynamicInstances(query, target)) {
             potential_dynamic_points.points.emplace_back(query);
         } else {
             filtered_static_points.emplace_back(query);
         }
+    }
+}
+
+void ERASOR2::setDynamicInstance(DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y) {
+    dynamic_cluster.moving_obj_score_ = calcMovingClusterScore(dynamic_cluster.cloud_,
+                                                                       dynamic_cluster.occupied_map_idxes_);
+
+    pcl::compute3DCentroid(dynamic_cluster.cloud_, dynamic_cluster.centroid_);
+    dynamic_cluster.is_close_to_body_frame_ = isCloseToSensorFrame(dynamic_cluster,
+                                                                     pos_x,
+                                                                     pos_y,
+                                                                     hard_thr_radius_);
+
+}
+
+bool ERASOR2::isOverSegmented(const DynamicInstance& dynamic_cluster) {
+    int num_unknown_grids = 0;
+    int num_dynamic_grids = 0;
+    for (const auto& idx: dynamic_cluster.occupied_map_idxes_) {
+        if (gridmap_submap_.at("prior", idx) == unknown_prior_) {
+            ++num_unknown_grids;
+        }
+        if (gridmap_submap_.at("prior", idx) == informative_prior_ &&
+        logOdds2prob(gridmap_submap_.at("steppable", idx)) > PROB_FOR_DEFINITELY_MOVING_OBJ) {
+            ++num_dynamic_grids;
+        }
+    }
+
+    int minimum_num_grid = static_cast<int>(minimum_area_thr_ / area_per_grid_);
+    float  ratio_of_unknown_prior = static_cast<float>(num_unknown_grids) / dynamic_cluster.occupied_map_idxes_.size();
+    if (dynamic_cluster.occupied_map_idxes_.size() > minimum_num_grid && ratio_of_unknown_prior > ratio_of_unknown_prior_
+        && num_dynamic_grids > 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void ERASOR2::parseOverSegmentation(const DynamicInstance& over_segmented, DynamicInstance& static_inst,
+                                    DynamicInstance& partial_dynamic_inst, const float pos_x, const float pos_y) {
+    static_inst.cloud_.clear();
+    static_inst.cloud_.reserve(200);
+    partial_dynamic_inst.cloud_.clear();
+    partial_dynamic_inst.cloud_.reserve(200);
+
+
+    for (const auto& pt: over_segmented.cloud_) {
+        grid_map::Position p_tmp(pt.x, pt.y);
+        grid_map::Index    idx_tmp;
+        gridmap_submap_.getIndex(p_tmp, idx_tmp);
+        if (logOdds2prob(gridmap_submap_.at("steppable", idx_tmp)) > PROB_FOR_DEFINITELY_MOVING_OBJ) {
+            partial_dynamic_inst.cloud_.emplace_back(pt);
+        } else {
+            static_inst.cloud_.emplace_back(pt);
+        }
+    }
+
+    setDynamicInstance(static_inst, pos_x, pos_y);
+    static_inst.is_dynamic_ = false;
+    setDynamicInstance(partial_dynamic_inst, pos_x, pos_y);
+    partial_dynamic_inst.is_dynamic_ = true;
+}
+
+void ERASOR2::updateNewParsedInstances(const vector<OverSegmentedInstance>& instances_to_be_updated,
+                                       unordered_map<float, DynamicInstance>& ids_clusters) {
+    /***
+     * It has two rules:
+     * a) update original point cloud
+     *     Because the id is used when estimating `static_mask`,
+     *     so the ids of the original point cloud are also updated
+     * b) append new instances into ids_clusters
+     */
+
+    for (const auto& inst: instances_to_be_updated) {
+
+    }
+    for (const float& id: ids_to_be_removed) {
+            ids_clusters.erase(id);
+        }
+
+    for (auto &[id_new, dynamic_instance]: ids_instances_to_be_added_) {
+        float id_unique = id_new;
+        while (ids_clusters.find(id_unique) != ids_clusters.end()) {
+            ++id_unique;
+        }
+        ids_clusters[id_unique] = dynamic_instance;
     }
 }
 
@@ -765,6 +892,14 @@ void ERASOR2::maskNonVoI(const pcl::PointCloud<pcl::PointXYZI> &src, pcl::PointC
             cloud_out.points[i].intensity = NOT_VOLUME_OF_INTEREST;
         }
     }
+}
+
+float ERASOR2::getMaxInstanceId(const pcl::PointCloud<pcl::PointXYZI> &src) {
+    float max_id = -1;
+    for (const auto& pt: src.points) {
+        max_id = max(max_id, pt.intensity);
+    }
+    return max_id;
 }
 
 GridMapInfo ERASOR2::setGridMapParams(const float min_x, const float min_y,
@@ -1094,7 +1229,7 @@ ERASOR2::publishObjScores(const ros::Publisher &publisher, const vector<pair<Eig
     num_prev_objs = num_curr_objs;
 }
 
-bool ERASOR2::isCloseToSensorFrame(const DynamicCluster& dynamic_cluster, const float pos_x, const float pos_y,
+bool ERASOR2::isCloseToSensorFrame(const DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y,
                               const float range_thr) {
     const float obj_x = dynamic_cluster.centroid_(0);
     const float obj_y = dynamic_cluster.centroid_(1);
@@ -1144,7 +1279,7 @@ void ERASOR2::visualizeHardThrRadius(const Eigen::Matrix4f &pose) {
     AdaptiveRangePublisher.publish(marker);
 }
 
-void ERASOR2::printClusterInfo(const DynamicCluster& dynamic_cluster) {
+void ERASOR2::printClusterInfo(const DynamicInstance& dynamic_cluster) {
     vector<grid_map::Index> occupied_map_idxes_ = dynamic_cluster.occupied_map_idxes_;
     int min_x = numeric_limits<int>::max();
     int max_x = 0;

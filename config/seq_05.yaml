@@ -42,7 +42,7 @@ erasor2:
     moving_object_detection:
         obj_score_soft_thr: 0.8
         obj_score_hard_thr: 20.0
-        hard_thr_radius: 20.0
+        hard_thr_radius: 15.0
 
     volumetric_outlier_removal:
         window_size: 1
@@ -54,6 +54,7 @@ erasor2:
         set_submap: false
         update: false
         detect: true
+        over_seg: false
 
 stop_for_each_frame: true
 
