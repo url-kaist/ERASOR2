@@ -7,9 +7,9 @@ from pathlib import Path
 if __name__ == "__main__":
     abs_src_dir = "/media/shapelim/Elements/3DUIS"
     abs_save_dir = "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
-    seq = "07"
-    start_frame = 630
-    end_frame = 820 + 1
+    seq = "00"
+    start_frame = 4520
+    end_frame = 4530 + 1
 
     output_dir = abs_save_dir + "/" + seq + "/cais"
     Path(output_dir).mkdir(parents=True, exist_ok=True)

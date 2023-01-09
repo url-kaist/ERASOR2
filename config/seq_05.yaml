@@ -40,9 +40,9 @@ erasor2:
 
     # For detection moving objects
     moving_object_detection:
-        obj_score_soft_thr: 1.8
+        obj_score_soft_thr: 0.8
         obj_score_hard_thr: 20.0
-        adaptive_range: 20.0
+        hard_thr_radius: 20.0
 
     volumetric_outlier_removal:
         window_size: 1

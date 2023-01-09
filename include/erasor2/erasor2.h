@@ -1,14 +1,17 @@
 #include "tools/erasor_utils.hpp"
 #include "rosparam_server.hpp"
 
+#define IS_DEFINITELY_MOVING_OBJ 0.999999 // <-> 14 in log-odds
+
 using namespace std;
 
 struct DynamicCluster {
     pcl::PointCloud<pcl::PointXYZI> cloud_;
     float moving_obj_score_;
     Eigen::Matrix<float, 4, 1> centroid_;
+    bool is_close_to_body_frame_ = false;
     bool is_dynamic_;
-    vector<grid_map::Index> occupied_regions_;
+    vector<grid_map::Index> occupied_map_idxes_;
 };
 
 struct GridMapInfo {
@@ -44,8 +47,6 @@ public:
 
     vector<vector<pcl::PointCloud<pcl::PointXYZI>>>          xygrids_;
     vector<grid_map::Index>                                  idxes_approx_;
-//    vector<vector<float>>                                    dyn_ids_set_;
-    vector<vector<float>>                        dynamic_ids_set_;
     vector<unordered_map<float, DynamicCluster>> dynamic_ids_clusters_set_;
 
     // For visualize the moving object score
@@ -90,7 +91,7 @@ public:
 
     void updateSteppableRegion();
 
-    void detectDynamicObjects();
+    void detectMovingObjects();
 
     void filterDynamicObjects();
 
@@ -172,7 +173,7 @@ public:
                                            const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid);
 
     float calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
-                                      vector<grid_map::Index>& occupied_regions);
+                                      vector<grid_map::Index>& occupied_map_idxes);
 
     void dilateAndErode(grid_map::GridMap &gridmap_submap);
 
@@ -181,18 +182,22 @@ public:
     void publishObjScores(const ros::Publisher& publisher, const vector<pair<Eigen::Matrix<float, 4, 1>, float> >& objs,
                                const vector<float> color, int& num_prev_objs);
 
-    float getAdaptiveThreshold(const float obj_x, const float obj_y,
-                             const float pos_x, const float pos_y, const float adaptive_range);
+    bool isCloseToSensorFrame(const DynamicCluster& dynamic_cluster, const float pos_x, const float pos_y,
+                              const float range_thr);
 
     bool isSizeSufficientlySmall(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
                                  const float size_thr=30.0);
 
-    void visualizeAdaptiveRange(const Eigen::Matrix4f& pose);
+    void visualizeHardThrRadius(const Eigen::Matrix4f& pose);
 
 private:
     double xy2theta(const double &x, const double &y);
 
     double xy2radius(const double &x, const double &y);
+
+    double prob2logOdds(double prob);
+
+    double logOdds2prob(double log_odds);
 
     grid_map::Position idx2position(const grid_map::Index& idx);
 
@@ -202,6 +207,8 @@ private:
     bool isEqual(const grid_map::Index& idx0, const grid_map::Index& idx1);
 
     bool isInsideTheDynamicClusters(const pcl::PointXYZI& query, const pcl::PointXYZI& target);
+
+    void printClusterInfo(const DynamicCluster& dynamic_cluster);
 };
 
 

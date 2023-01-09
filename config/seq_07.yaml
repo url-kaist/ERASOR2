@@ -24,14 +24,14 @@ erasor2:
     min_z_voi: -3.0
     max_z_voi: 1.4
     min_z_diff_thr: 0.4 # 물체가 존재한다고 가정 할 수있는 최소한의 z 차이
-    scan_ratio_threshold: 0.2 # The Larger, the more aggressive!!
+    scan_ratio_threshold: 0.2 # The Larger, the more objects could be candidates
     log_odds:
-        unknown_prior: -2.0
-        informative_prior: 0.5
+        unknown_prior: -3.0
+        informative_prior: 1.0
         initial_prior: 0.0
-        increment_gain: 1.0 # Should be larger than one
-        increment: 0.3
-    ground_log_odds_thr: 0.8
+        increment_gain: 3.0 # Should be larger than one
+        increment: 0.15
+    ground_log_odds_thr: 2.2
     kernel_size: 1
 
     # For checking ground likelihood
@@ -42,7 +42,12 @@ erasor2:
     moving_object_detection:
         obj_score_soft_thr: 0.8
         obj_score_hard_thr: 20.0
-        adaptive_range: 20.0
+        hard_thr_radius: 20.0
+
+    # To revert over-segmented parts
+    over_segmentation:
+        minimum_area_thr: 0.5 # [m^2]
+        ratio_of_unknown_prior: 0.25
 
     volumetric_outlier_removal:
         window_size: 1

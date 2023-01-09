@@ -42,7 +42,7 @@ erasor2:
     moving_object_detection:
         obj_score_soft_thr: 0.8
         obj_score_hard_thr: 0.8
-        adaptive_range: 20.0
+        hard_thr_radius: 20.0
         xy_size_thr: 20.0 # Set as large as possible! To filter definite static clusters
 
     volumetric_outlier_removal:

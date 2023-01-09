@@ -1,33 +1,67 @@
-idx: 450
-erasor: 
-    max_range: 80.0
-    num_rings: 20
-    num_sectors: 108
-    min_h: -1.3 # [m] Note that it depends on the distance between body frame and ground contact point of mobile robots
-    max_h: 3.0 # [m] Note that it depends on the distance between body frame and ground contact point of mobile robots
-    min_z_diff_thr: 0.2 # [m]
+start_frame: 4390
+end_frame: 4530
+viz_interval: 10
+is_large_scale: true
+
+dataloader:
+    dataset_name: "SemanticKITTI"
+    abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
+    cloud_dir: ""
+    cloud_format: ""
+    pose_path: ""
+    sequence: "00"
+    abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+
+    accum_interval: 1
+    voxel_size: 0.2
+    map_voxel_size: 0.2
+
+erasor2:
+    grid_resolution: 1.0
+    egocentric_grid_resolution: 0.6
+    range_of_interest: 80.0
+    # min_z_voi 와 max_z_voi 는 raw cloud 기준 (ERASOR 1.0과 다름!!!)
+    min_z_voi: -4.5
+    max_z_voi: 1.5
+    min_z_diff_thr: 0.4 # 물체가 존재한다고 가정 할 수있는 최소한의 z 차이
     scan_ratio_threshold: 0.2 # The Larger, the more aggressive!!
-    minimum_num_pts: 6
-    rejection_ratio: 0
-    gf_dist_thr: 0.15
-    gf_iter: 3
-    gf_num_lpr: 20
-    gf_th_seeds_height: 0.5
-    version: 3 # 2: R-GPF / 3: R-GPF w/ blocking (not in paper)
+    log_odds:
+        unknown_prior: -2.0
+        informative_prior: 0.5
+        initial_prior: 0.3
+        increment_gain: 1.0 # Should be larger than one
+        increment: 0.3
+    ground_log_odds_thr: 0.8
+    kernel_size: 1
 
+    # For checking ground likelihood
+    ratio_num_pts: 0.95 # Percentage
+    minimum_num_pts: 5
 
-MapUpdater:
-    data_name: "00"
-    initial_map_path: "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/src_0_2/00_4390_to_4530_w_interval2_voxel_0.200000.pcd"
-    env: "outdoor"
-    save_path: "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/erasor_v2"
-    query_voxel_size: 0.2
-    map_voxel_size: 0.2  
-    voxelization_interval: 2
-    removal_interval: 4
+    # For detection moving objects
+    moving_object_detection:
+        obj_score_soft_thr: 0.8
+        obj_score_hard_thr: 20.0
+        hard_thr_radius: 20.0
+        xy_size_thr: 20.0 # Set as large as possible! To filter definite static clusters
 
-tf:
-     lidar2body: [0.0, 0.0, 1.73, 0, 0.0, 0.0, 1.0] # xyz q_x, q_y, q_z, q_w in order
+    volumetric_outlier_removal:
+        window_size: 1
+        num_closest: 3 # Deprecated
+        dist_thr_gain: 1.732 # The larger, the more aggressive
 
-verbose: true
+    viz_flag:
+        set_scan_and_pose: false
+        set_submap: false
+        update: false
+        detect: true
 
+stop_for_each_frame: true
+
+extrinsic:
+    robot_body_size: 2.7
+    sensor_height: 1.73
+    rotation: [ 1, 0, 0,
+                0, 1, 0,
+                0, 0, 1 ]
+    translation: [ 0.0, 0.0, 0.0 ]

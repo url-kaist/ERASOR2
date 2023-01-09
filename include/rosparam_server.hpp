@@ -48,8 +48,11 @@ public:
 
     float obj_score_soft_thr_;
     float obj_score_hard_thr_;
-    float adaptive_range_;
+    float hard_thr_radius_;
     float xy_size_thr_;
+
+    float minimum_area_thr_;
+    float ratio_of_unknown_prior_;
 
     bool verbose_;
     bool is_large_scale_;
@@ -150,8 +153,11 @@ public:
 
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_soft_thr", obj_score_soft_thr_, 0.8);
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_hard_thr", obj_score_hard_thr_, 20.0);
-        nh_.param<float>("/erasor2/moving_object_detection/adaptive_range", adaptive_range_, 12.0);
+        nh_.param<float>("/erasor2/moving_object_detection/hard_thr_radius", hard_thr_radius_, 12.0);
         nh_.param<float>("/erasor2/moving_object_detection/xy_size_thr", xy_size_thr_, 30.0);
+
+        nh_.param<float>("/erasor2/over_segmentation/minimum_area_thr", minimum_area_thr_, 0.5);
+        nh_.param<float>("/erasor2/over_segmentation/ratio_of_unknown_prior", ratio_of_unknown_prior_, 0.25);
 
         nh_.param<int>("/erasor2/volumetric_outlier_removal/window_size", window_size_, 1);
         nh_.param<int>("/erasor2/volumetric_outlier_removal/num_closest", num_closest_, 3);
