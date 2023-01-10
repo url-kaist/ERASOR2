@@ -133,7 +133,7 @@ namespace erasor_utils {
                      vector<int>& correspondences, const float margin=0.02);
 
     void radiusSearch(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
-                     const float radius, vector<int>& correspondences);
+                     const float radius, vector<pair<int, vector<int>>>& correspondences);
 
     void radiusSearch(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
                      const float radius, vector<int>& target_idxes);

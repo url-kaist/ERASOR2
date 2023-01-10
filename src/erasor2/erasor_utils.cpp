@@ -174,7 +174,7 @@ namespace erasor_utils {
 
         target_idxes.clear();
         for (int j = 0; j < N; ++j) {
-            if (target_idxes[j]) {
+            if (is_neighboring[j]) {
                 target_idxes.push_back(j);
             }
         }

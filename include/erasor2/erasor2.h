@@ -117,10 +117,6 @@ public:
                          const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
                          std::vector<int> &static_mask);
 
-    void updateNeighboringDynamicMask(const erasor_utils::my_kd_tree_t& kdtree,
-                                        const pcl::PointCloud<pcl::PointXYZI> &query_points,
-                                        std::vector<int> &static_mask);
-
     void setDynamicInstance(DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y);
 
     /*** Functions to tackle the over-segmentation ***/

@@ -439,10 +439,10 @@ void ERASOR2::filterDynamicObjects() {
     }
 
     for (int k = 0; k < num_data_; ++k) {
-
         pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_static_points(new pcl::PointCloud<pcl::PointXYZI>);
         windowBasedVolumetricOutlierRemoval(k, window_size_, dist_thr_gain_, *filtered_static_points,
                                             potential_dynamic_points_transformed_[k]);
+        // It shows rather poor performance
 //        instanceAwareOutlierRemoval(k, window_size_, dist_thr_gain_, *filtered_static_points,
 //                                            potential_dynamic_points_transformed_[k]);
         static_points_transformed_[k] = *filtered_static_points;
@@ -513,23 +513,6 @@ void ERASOR2::updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
     erasor_utils::findCorrespondences(noisy_points, src_cloud, correspondences);
     for (const int correspondence: correspondences) {
         static_mask[correspondence] = IS_NOISE_YET_POTENTIAL_DYNAMIC;
-    }
-}
-
-void ERASOR2::updateNeighboringDynamicMask(const erasor_utils::my_kd_tree_t& kdtree,
-                                        const pcl::PointCloud<pcl::PointXYZI> &query_points,
-                                        std::vector<int> &static_mask) {
-    for (auto &query_pcl: query_points.points) {
-        const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
-        {
-            std::vector<nanoflann::ResultItem<uint32_t, num_t>> ret_matches;
-
-            int num_matched = kdtree.radiusSearch(
-                    &query_pt[0], dist_thr_gain_ * voxel_size_, ret_matches);
-            for (int i = 0; i < num_matched; ++i) {
-                static_mask[ret_matches[i].first] = IS_DYNAMIC;
-            }
-        }
     }
 }
 
@@ -783,7 +766,9 @@ void ERASOR2::windowBasedVolumetricOutlierRemoval(const int k, const int window_
                                            pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points) {
     // 1. Set volumetric dynamic points
     pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_voxel(new pcl::PointCloud<pcl::PointXYZI>);
-    accumDynamicCloud(k, window_size, *dyn_points_voxel);
+//    accumDynamicCloud(k, window_size, *dyn_points_voxel);
+    accumInstanceWiseDynamicCloud(k, window_size, *dyn_points_voxel);
+
     // 2. Dynamic removal
     volumetricOutlierRemoval(static_points_transformed_[k],
                              *dyn_points_voxel,
@@ -800,19 +785,13 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
     int N = static_points.size();
     vector<int> static_mask(N, IS_STATIC);
 
-    // Radius search
-    PointCloud<num_t> cloud;
-    erasor_utils::pcl2nanoflann(static_points, cloud);
+    vector<int> target_idxes;
+    erasor_utils::radiusSearch(dynamic_points, static_points,
+                               dist_thr_gain_ * voxel_size_, target_idxes);
 
-    erasor_utils::my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
-    updateNeighboringDynamicMask(index, dynamic_points, static_mask);
-//    for (int j = 0; j < N; ++j) {
-//        const auto& status = static_mask[j];
-//        const auto& pt = static_points[j];
-//        if (status == IS_DYNAMIC) {
-//            potential_dynamic_points.points.emplace_back(pt);
-//        }
-//    }
+    for (const int idx: target_idxes) {
+        static_mask[idx] = IS_DYNAMIC;
+    }
 
 //    cout << "\033[1;32mTotal " << valid_outlier_idxes.size() << " points are filtered\033[0m" << endl;
     filtered_static_points.clear();
