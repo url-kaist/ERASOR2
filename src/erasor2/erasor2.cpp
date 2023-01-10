@@ -568,17 +568,14 @@ void ERASOR2::accumInstanceWiseDynamicCloud(const int k, const int window_size,
             if (dynamic_instance.is_dynamic_ && dynamic_instance.moving_obj_score_ > dynamic_score_thr_) {
                 *dyn_points_accum += dynamic_instance.cloud_;
 
-                erasor_utils::my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
-
-                vector<int> correspondences;
-                erasor_utils::findCorrespondences(dynamic_instance.cloud_, noisy_points, correspondences);
-                for (const int corr: correspondences) {
-                    dyn_points_accum->points.emplace_back(noisy_points.points[corr]);
+                vector<int> target_idxes;
+                erasor_utils::radiusSearch(dynamic_instance.cloud_, noisy_points,
+                                          dist_thr_gain_ * voxel_size_, target_idxes);
+                for (const int target_idx: target_idxes) {
+                    dyn_points_accum->points.emplace_back(noisy_points[target_idx]);
                 }
             }
-
         }
-
     }
 
     if (use_voxelization) {
