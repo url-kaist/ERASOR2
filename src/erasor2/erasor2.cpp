@@ -533,7 +533,7 @@ void ERASOR2::updateNeighboringDynamicMask(const erasor_utils::my_kd_tree_t& kdt
     }
 }
 
-void ERASOR2::setAccumDynamicPoints(const int k, const int window_size,
+void ERASOR2::accumDynamicCloud(const int k, const int window_size,
                                pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization) {
     int lower_bound = k - window_size / 2;
     int upper_bound = k + (window_size + 1) / 2;
@@ -541,6 +541,44 @@ void ERASOR2::setAccumDynamicPoints(const int k, const int window_size,
 
     for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
         (*dyn_points_accum) += dynamic_points_transformed_[i];
+    }
+
+    if (use_voxelization) {
+        static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
+        voxel_filter.setInputCloud(dyn_points_accum);
+        voxel_filter.setLeafSize(voxel_size_, voxel_size_, voxel_size_);
+        voxel_filter.filter(cloud_accum);
+    } else {
+        cloud_accum = *dyn_points_accum;
+    }
+}
+
+void ERASOR2::accumInstanceWiseDynamicCloud(const int k, const int window_size,
+                               pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization) {
+    float dynamic_score_thr_ = 14.0;
+
+    int lower_bound = k - window_size / 2;
+    int upper_bound = k + (window_size + 1) / 2;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_accum(new pcl::PointCloud<pcl::PointXYZI>);
+
+    for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
+        const auto& noisy_points = noisy_points_transformed_[i];
+        const auto& ids_clusters = ids_instances_set_[i];
+        for (auto &[dyn_cand_id, dynamic_instance]: ids_clusters) {
+            if (dynamic_instance.is_dynamic_ && dynamic_instance.moving_obj_score_ > dynamic_score_thr_) {
+                *dyn_points_accum += dynamic_instance.cloud_;
+
+                erasor_utils::my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+
+                vector<int> correspondences;
+                erasor_utils::findCorrespondences(dynamic_instance.cloud_, noisy_points, correspondences);
+                for (const int corr: correspondences) {
+                    dyn_points_accum->points.emplace_back(noisy_points.points[corr]);
+                }
+            }
+
+        }
+
     }
 
     if (use_voxelization) {
@@ -562,7 +600,7 @@ void ERASOR2::instanceAwareOutlierRemoval(const int k, const int window_size,
 
     // 1. Set volumetric dynamic points
     pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_voxel(new pcl::PointCloud<pcl::PointXYZI>);
-    setAccumDynamicPoints(k, window_size, *dyn_points_voxel);
+    accumDynamicCloud(k, window_size, *dyn_points_voxel);
 
     // 2. Set region of interest
     int lower_bound = k - window_size / 2;
@@ -748,7 +786,7 @@ void ERASOR2::windowBasedVolumetricOutlierRemoval(const int k, const int window_
                                            pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points) {
     // 1. Set volumetric dynamic points
     pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_voxel(new pcl::PointCloud<pcl::PointXYZI>);
-    setAccumDynamicPoints(k, window_size, *dyn_points_voxel);
+    accumDynamicCloud(k, window_size, *dyn_points_voxel);
     // 2. Dynamic removal
     volumetricOutlierRemoval(static_points_transformed_[k],
                              *dyn_points_voxel,

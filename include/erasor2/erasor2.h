@@ -132,10 +132,14 @@ public:
     void updateNewParsedInstances(const vector<OverSegmentedInstance>& instances_to_be_updated,
                                        pcl::PointCloud<pcl::PointXYZI> &cloud,
                                        unordered_map<float, DynamicInstance>& ids_clusters);
-    /*************************************************/
 
-    void setAccumDynamicPoints(const int k, const int window_size,
-                               pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization=true);
+    /*** Functions to tackle the under-segmentation ***/
+    void accumDynamicCloud(const int k, const int window_size,
+                           pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization=true);
+
+    void accumInstanceWiseDynamicCloud(const int k, const int window_size,
+                           pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization=true);
+
 
     void instanceAwareOutlierRemoval(const int k, const int window_size,
                                            const float dist_thr_gain,
@@ -152,6 +156,7 @@ public:
                                        const float dist_thr_gain,
                                        pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
                                        pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
+    /*************************************************/
 
     void
     discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<int> &static_mask,

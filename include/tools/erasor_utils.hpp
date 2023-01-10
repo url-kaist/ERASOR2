@@ -132,6 +132,9 @@ namespace erasor_utils {
     void findCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
                      vector<int>& correspondences, const float margin=0.02);
 
+    void radiusSearch(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
+                     const float radius, vector<int>& correspondences);
+
     void fillGTLabel(const pcl::PointCloud<pcl::PointXYZI> &gt_cloud, pcl::PointCloud<pcl::PointXYZI> &est_cloud,
                      const float margin=0.02);
 
