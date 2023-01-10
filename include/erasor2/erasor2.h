@@ -130,6 +130,7 @@ public:
                                     DynamicInstance& partial_dynamic_inst, const float pos_x, const float pos_y);
 
     void updateNewParsedInstances(const vector<OverSegmentedInstance>& instances_to_be_updated,
+                                       pcl::PointCloud<pcl::PointXYZI> &cloud,
                                        unordered_map<float, DynamicInstance>& ids_clusters);
     /*************************************************/
 

@@ -380,10 +380,6 @@ void ERASOR2::filterDynamicObjects() {
                     inst_to_be_updated.dynamic_inst = partial_dynamic_inst;
                     instances_to_be_updated.emplace_back(inst_to_be_updated);
 
-                    if (k == 15) {
-                        ID_FOR_DEBUG = max_id_for_register;
-                        cout << "\033[1;31mFFFFFF!!!!!11" << ID_FOR_DEBUG << "\033[0m" << endl;
-                    }
                     accepted_objs.push_back({partial_dynamic_inst.centroid_, partial_dynamic_inst.moving_obj_score_});
                     rejected_objs.push_back({static_inst.centroid_, static_inst.moving_obj_score_});
                 } else {
@@ -414,7 +410,7 @@ void ERASOR2::filterDynamicObjects() {
 //            }
         }
 
-        updateNewParsedInstances(instances_to_be_updated, ids_clusters);
+        updateNewParsedInstances(instances_to_be_updated, pcs_transformed_[k], ids_clusters);
 
         if (rejected_objs.size() + accepted_objs.size() != ids_clusters.size()) {
             throw invalid_argument("Some objects are lost!");
@@ -427,12 +423,6 @@ void ERASOR2::filterDynamicObjects() {
         const auto &each_pc      = pcs_transformed_[k];
         const auto &ids_clusters = ids_instances_set_[k];
 
-        if (k == 15) {
-            if (ids_clusters.find(ID_FOR_DEBUG) != ids_clusters.end()) {
-                cout << "!!!!!!!!!!!!?!?!?!?!?It's in there!" << endl;
-                cin.ignore();
-            }
-        }
         static_points_transformed_[k].clear();
         vector<int> static_mask;
         estimateStaticMask(each_pc, ids_clusters, static_mask);
@@ -718,6 +708,7 @@ void ERASOR2::parseOverSegmentation(const DynamicInstance& over_segmented, Dynam
 }
 
 void ERASOR2::updateNewParsedInstances(const vector<OverSegmentedInstance>& instances_to_be_updated,
+                                       pcl::PointCloud<pcl::PointXYZI> &cloud,
                                        unordered_map<float, DynamicInstance>& ids_clusters) {
     /***
      * It has two rules:
@@ -726,20 +717,28 @@ void ERASOR2::updateNewParsedInstances(const vector<OverSegmentedInstance>& inst
      *     so the ids of the original point cloud are also updated
      * b) append new instances into ids_clusters
      */
-
     for (const auto& inst: instances_to_be_updated) {
+        vector<int> corr_dyn, corr_stat;
+        erasor_utils::findCorrespondences(inst.dynamic_inst.cloud_, cloud, corr_dyn);
+        erasor_utils::findCorrespondences(inst.static_inst.cloud_, cloud, corr_stat);
 
-    }
-    for (const float& id: ids_to_be_removed) {
-            ids_clusters.erase(id);
+        int N = inst.dynamic_inst.cloud_.size();
+        int M = inst.static_inst.cloud_.size();
+
+        // 1. Update ids in raw point cloud
+        for (int n = 0; n < N; ++n) {
+            cloud.points[corr_dyn[n]].intensity = inst.new_id_for_dyn_inst;
+        }
+        for (int m = 0; m < M; ++m) {
+            cloud.points[corr_stat[m]].intensity = inst.new_id_for_stat_inst;
         }
 
-    for (auto &[id_new, dynamic_instance]: ids_instances_to_be_added_) {
-        float id_unique = id_new;
-        while (ids_clusters.find(id_unique) != ids_clusters.end()) {
-            ++id_unique;
-        }
-        ids_clusters[id_unique] = dynamic_instance;
+        // 2. Remove old one;
+        ids_clusters.erase(inst.original_id);
+
+        // 3. Update ids in raw point cloud
+        ids_clusters[inst.new_id_for_dyn_inst] = inst.dynamic_inst;
+        ids_clusters[inst.new_id_for_stat_inst] = inst.static_inst;
     }
 }
 
