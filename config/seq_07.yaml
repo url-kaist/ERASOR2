@@ -44,7 +44,7 @@ erasor2:
         obj_score_hard_thr: 20.0
         hard_thr_radius: 20.0
 
-    # To revert over-segmented parts
+    # To manage over-segmented parts
     over_segmentation:
         minimum_area_thr: 56 # [m^2]
         ratio_of_unknown_prior: 0.25
