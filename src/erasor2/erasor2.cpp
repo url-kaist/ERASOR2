@@ -152,7 +152,6 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
             std::cout << "[Set scan and pose] Waiting for pressing a key" << std::endl;
             cin.ignore();
         }
-        std::cout << "publish2" << std::endl;
     }
 }
 
@@ -168,7 +167,7 @@ void ERASOR2::setSubmap() {
     // Estimated labels are preserved!
     erasor_utils::voxelize_preserving_labels_by_nanoflann(map_partial_src, *map_accum_, map_voxel_size_);
 
-    cout << "[ERASOR2] Calculating  min-max x, y values..." << endl;
+    cout << "[ERASOR2] Calculating  min-max x, y values given " << pcs_transformed_.size() << " scan-pose pairs..." << endl;
     float min_x, min_y, max_x, max_y;
     erasor_utils::calcMinMaxXY(pcs_transformed_, min_x, min_y, max_x, max_y);
     cout << "[ERASOR2] Min-max x: " << min_x << " <-> " << max_x << endl;

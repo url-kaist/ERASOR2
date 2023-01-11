@@ -1,3 +1,4 @@
+import time
 import argparse
 import open3d as o3d
 import numpy as np
@@ -59,10 +60,13 @@ if __name__ == "__main__":
         #     ground_labels[ground_inliers] = GROUND_LABEL
         #     ground_labels.astype(np.uint32).tofile(output_fname)
         ##################
-
+        start_time = time.time()
         pcd_ = pcd.select_by_index(ground_inliers, invert=True)
         labels_ = np.expand_dims(clusters_hdbscan(np.asarray(pcd_.points)), axis=-1)
-
+        print("--- %s seconds ---" % (time.time() - start_time))
+        f = open("/home/shapelim/hdbscan_time.txt", 'a')
+        f.write("%f\n"% (time.time() - start_time))
+        f.close()
         labels = np.ones((num_pts, 1)) * -1
         mask = np.ones(num_pts, dtype=bool)
         mask[ground_inliers] = False

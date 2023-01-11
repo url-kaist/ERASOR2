@@ -1,5 +1,5 @@
-start_frame: 2350
-end_frame: 2670
+start_frame: 0
+end_frame: 200
 viz_interval: 10
 is_large_scale: true
 
@@ -9,7 +9,7 @@ dataloader:
     cloud_dir: ""
     cloud_format: ""
     pose_path: ""
-    sequence: "05"
+    sequence: "19"
     abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
 
     accum_interval: 2
@@ -17,21 +17,21 @@ dataloader:
     map_voxel_size: 0.2
 
 erasor2:
-    grid_resolution: 2.0
-    egocentric_grid_resolution: 0.6
+    grid_resolution: 1.0
+    egocentric_grid_resolution: 1.0
     range_of_interest: 60.0
     # min_z_voi 와 max_z_voi 는 raw cloud 기준 (ERASOR 1.0과 다름!!!)
     min_z_voi: -3.0
-    max_z_voi: 1.5
-    min_z_diff_thr: 0.4 # 물체가 존재한다고 가정할 수 있는 최소한의 z 차이
-    scan_ratio_threshold: 0.2 # The Larger, the more aggressive!!
+    max_z_voi: 1.4
+    min_z_diff_thr: 0.4 # 물체가 존재한다고 가정 할 수있는 최소한의 z 차이
+    scan_ratio_threshold: 0.2 # The Larger, the more objects could be candidates
     log_odds:
-        unknown_prior: -2.0
-        informative_prior: 0.0001 # -1.95 # 0.5
-        initial_prior: 0.000001 # -1.9999 # 0.3
+        unknown_prior: -3.0
+        informative_prior: 1.0
+        initial_prior: 0.0
         increment_gain: 3.0 # Should be larger than one
-        increment: 0.2
-    ground_log_odds_thr: 0.8
+        increment: 0.5
+    ground_log_odds_thr: 2.2
     kernel_size: 1
 
     # For checking ground likelihood
@@ -42,16 +42,15 @@ erasor2:
     moving_object_detection:
         obj_score_soft_thr: 0.8
         obj_score_hard_thr: 14.0
-        hard_thr_radius: 20.0
+        hard_thr_radius: 10.0
 
     # To manage over-segmented parts
     over_segmentation:
         minimum_area_thr: 56 # [m^2]
         ratio_of_unknown_prior: 0.25
 
-    # To manage under-segmented parts
     volumetric_outlier_removal:
-        window_size: 1
+        window_size: 5
         num_closest: 3 # Deprecated
         dist_thr_gain: 1.732 # The larger, the more aggressive
 
@@ -71,4 +70,3 @@ extrinsic:
                 0, 1, 0,
                 0, 0, 1 ]
     translation: [ 0.0, 0.0, 0.0 ]
-

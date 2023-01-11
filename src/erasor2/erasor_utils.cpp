@@ -321,6 +321,8 @@ namespace erasor_utils {
             min_y = min(min_pt.y, min_y);
             max_x = max(max_pt.x, max_x);
             max_y = max(max_pt.y, max_y);
+//            cout << min_x << " <-> " << max_x << endl;
+//            cout << min_y << " <-> " << max_y << endl;
         }
     }
 

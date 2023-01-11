@@ -83,6 +83,7 @@ public:
     virtual void testInheritance() { cout << "Test inheritance" << endl; }
 
     int                     num_frames_;
+    string                  seq_;
     string                  cloud_dir_;
     string                  cloud_format_;
     string                  pose_path_;

@@ -60,16 +60,27 @@ inline void DataLoader::getPose(const size_t i, Eigen::Matrix4f& pose) {
 
 SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir, const string &seq) {
     // Follow the KITTI format
+    seq_              = seq;
     cloud_dir_        = abs_data_dir + "/" + seq + "/velodyne";
     gt_label_dir_     = abs_data_dir + "/" + seq + "/labels";
 //    pose_path_        = abs_data_dir + "/" + seq + "/poses.txt";
-    pose_path_        = abs_data_dir + "/" + seq + "/suma_pose.txt";
+    if (seq_ == "19") {
+        pose_path_ = abs_data_dir + "/" + seq + "/kiss_icp_poses.txt";
+    } else {
+        pose_path_ = abs_data_dir + "/" + seq + "/suma_pose.txt";
+    }
     ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork";
-    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork_filtered";
+//    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork_filtered";
     est_label_dir_    = abs_data_dir + "/" + seq + "/cais";
 //    est_label_dir_    = abs_data_dir + "/" + seq + "/hdbscan";
 
     cloud_format_     = "bin";
+    cout << "\033[1;32m[ERASOR2] Data directories are as follows:" << endl;
+    cout << cloud_dir_ << endl;
+    cout << gt_label_dir_ << endl;
+    cout << pose_path_ << endl;
+    cout << ground_label_dir_ << endl;
+    cout << est_label_dir_ << "\033[0m" << endl;
 
     countNumFrames(cloud_dir_, cloud_format_);
     loadAllPoses(pose_path_, poses_gt_);
@@ -77,18 +88,30 @@ SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir, const strin
 
 void SemanticKITTILoader::loadAllPoses(string pose_path, vector<Eigen::Matrix4f> &poses) {
     // Pose is transformed into lidar pose!
-    Eigen::Matrix4f KITTI_CAM2LIDAR;
+    // https://github.com/ZuoJiaxing/Kitti_Lidarmap_fromGt/blob/master/constructLaserMap.cpp
+
+    Eigen::Matrix4f KITTI_CAM2LIDAR = Eigen::Matrix4f::Identity();
+    Eigen::Matrix4f tf_origin = Eigen::Matrix4f::Identity();
+    // Note that coordinates of KITTI odometry and tracking datasets are different!
     KITTI_CAM2LIDAR << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
             -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
             9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
             0, 0, 0, 1;
 
-    Eigen::Matrix4f tf_origin;
     tf_origin << 0, 0, 1, 0,
             -1, 0, 0, 0,
             0, -1, 0, 0,
             0, 0, 0, 1;
+    // Tr?
+//    KITTI_CAM2LIDAR << 4.276802385584e-04, -9.999672484946e-01, -8.084491683471e-03, -1.198459927713e-02,
+//                       -7.210626507497e-03, 8.081198471645e-03, -9.999413164504e-01, -5.403984729748e-02,
+//                       9.999738645903e-01, 4.859485810390e-04, -7.206933692422e-03, -2.921968648686e-01,
+//                       0, 0, 0, 1;
 
+//    KITTI_CAM2LIDAR << 7.755449000000e-03, -9.999694000000e-01, -1.014303000000e-03, -7.275538000000e-03,
+//                       2.294056000000e-03, 1.032122000000e-03, -9.999968000000e-01, -6.324057000000e-02,
+//                       9.999673000000e-01, 7.753097000000e-03, 2.301990000000e-03, -2.670414000000e-01,
+//                       0, 0, 0, 1;
     poses.clear();
     poses.reserve(2000);
     std::ifstream in(pose_path);
@@ -100,11 +123,16 @@ void SemanticKITTILoader::loadAllPoses(string pose_path, vector<Eigen::Matrix4f>
         Eigen::Matrix4f tf4x4_cam = Eigen::Matrix4f::Identity(); // Crucial!
         vec2tf4x4(pose, tf4x4_cam);
         Eigen::Matrix4f tf4x4_lidar = tf_origin * tf4x4_cam * KITTI_CAM2LIDAR;
+//        Eigen::Matrix4f tf4x4_lidar = KITTI_CAM2LIDAR.inverse() * tf4x4_cam * KITTI_CAM2LIDAR;
         poses.emplace_back(tf4x4_lidar);
         count++;
     }
     in.close();
     std::cout << "Total " << count << " poses are loaded" << std::endl;
+
+    if (count == 0) {
+        throw invalid_argument("Fail to load poses. Please check the `pose_path_`");
+    }
 }
 
 //inline Eigen::Matrix4f SemanticKITTILoader::getPose(size_t i) {
