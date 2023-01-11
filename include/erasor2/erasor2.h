@@ -193,9 +193,7 @@ public:
                                      const float scan_ratio_threshold, const float th_bin_max_h,
                                      const bool verbose = false);
 
-    void updatePrior(const grid_map::Index& idx, const float prior);
-
-    void updatePosterior(const grid_map::Index& idx, const float increment, const int kernel_size=3);
+    void updateLogOdds(const grid_map::Index& idx, const float increment, const int kernel_size=3);
 
     grid_map::GridMap setMapcentricGridMap(const GridMapInfo &grid_map_info);
 
@@ -205,6 +203,8 @@ public:
 
     float calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
                                       vector<grid_map::Index>& occupied_map_idxes);
+
+    void logOddsGrid2probGrid();
 
     void dilateAndErode(grid_map::GridMap &gridmap_submap);
 

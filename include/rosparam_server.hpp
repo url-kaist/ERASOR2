@@ -39,13 +39,12 @@ public:
     float max_z_voi_;
     float scan_ratio_threshold_;
     float min_z_diff_thr_;
-    float unknown_prior_;
-    float informative_prior_;
-    float initial_prior_;
+
     float increment_gain_; // Should be larger than one
     float increment_;
     float ratio_num_pts_;
 
+    float negative_log_odds_;
     float obj_score_soft_thr_;
     float obj_score_hard_thr_;
     float hard_thr_radius_;
@@ -141,9 +140,7 @@ public:
         nh_.param<float>("/erasor2/max_z_voi", max_z_voi_, 1.3);
         nh_.param<float>("/erasor2/scan_ratio_threshold", scan_ratio_threshold_, 0.3);
         nh_.param<float>("/erasor2/min_z_diff_thr", min_z_diff_thr_, 0.3);
-        nh_.param<float>("/erasor2/log_odds/unknown_prior", unknown_prior_, -2.0);
-        nh_.param<float>("/erasor2/log_odds/informative_prior", informative_prior_, 2.0);
-        nh_.param<float>("/erasor2/log_odds/initial_prior", initial_prior_, 0.5);
+
         nh_.param<float>("/erasor2/log_odds/increment_gain", increment_gain_, 0.3);
         nh_.param<float>("/erasor2/log_odds/increment", increment_, 0.3);
         nh_.param<float>("/erasor2/ground_log_odds_thr", ground_log_odds_thr_, 0.5);
@@ -152,6 +149,7 @@ public:
         nh_.param<float>("/erasor2/ratio_num_pts", ratio_num_pts_, 0.95);
         nh_.param<int>("/erasor2/minimum_num_pts", minimum_num_pts_, 3);
 
+        nh_.param<float>("/erasor2/moving_object_detection/negative_log_odds", negative_log_odds_, -2.0);
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_soft_thr", obj_score_soft_thr_, 0.8);
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_hard_thr", obj_score_hard_thr_, 20.0);
         nh_.param<float>("/erasor2/moving_object_detection/hard_thr_radius", hard_thr_radius_, 12.0);

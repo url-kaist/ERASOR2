@@ -3,14 +3,8 @@
 using namespace std;
 
 ERASOR2::ERASOR2() {
-    cout << "[ERASOR2] Unknown prior: " << unknown_prior_ << endl;
-    cout << "[ERASOR2] Initial prior: " << initial_prior_ << endl;
-    cout << "[ERASOR2] Informative prior: " << informative_prior_ << endl;
     cout << "[ERASOR2] Increment gain: " << increment_gain_ << endl;
     cout << "[ERASOR2] Increment: " << increment_ << endl;
-    if (initial_prior_ > informative_prior_ || increment_gain_ < 1.0 || initial_prior_ == informative_prior_) {
-        throw invalid_argument("Parameters are wrongly set!");
-    }
 
     initializePointClouds();
     // `area_per_grid_` is used to check over-segmentation
@@ -236,11 +230,13 @@ void ERASOR2::updateSteppableRegion() {
 //                    cout << "(" << w << ", " << h << "): " << scan_ratio_ << " | " << ratio_num_ << " // ";
 //                    cout << xygrids_[k][count].size() << " <-> "
 //                         << erasor_utils::getNumGroundPoints(xygrids_[k][count]) << endl;
-                    updatePrior(idx, informative_prior_);
-                    updatePosterior(idx, increment_ * increment_gain_);
+                    gridmap_submap_.at("status", idx) = TEMPORARILY_OCCUPIED;
+                    updateLogOdds(idx, increment_ * increment_gain_);
                 } else if (isLikelyToBeGround(xygrids_[k][count])) {
-                    updatePrior(idx, initial_prior_);
-                    updatePosterior(idx, increment_);
+                    if (gridmap_submap_.at("status", idx) == NOT_OBSERVED) {
+                        gridmap_submap_.at("status", idx) = GROUND_EXISTS;
+                    }
+                    updateLogOdds(idx, increment_);
                 }
 
                 ++count;
@@ -257,8 +253,8 @@ void ERASOR2::updateSteppableRegion() {
             CurrVoIPublisher.publish(erasor_utils::cloud2msg(*curr_voi));
             MapVoIPublisher.publish(erasor_utils::cloud2msg(*map_voi));
 
+            logOddsGrid2probGrid();
             grid_map_msgs::GridMap grid_msg;
-            gridmap_submap_["posterior"] = gridmap_submap_["prior"] + gridmap_submap_["likelihood"];
             grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
             GridPublisher.publish(grid_msg);
             ros::spinOnce();
@@ -268,7 +264,7 @@ void ERASOR2::updateSteppableRegion() {
             }
         }
     }
-    gridmap_submap_["posterior"] = gridmap_submap_["prior"] + gridmap_submap_["likelihood"];
+    logOddsGrid2probGrid();
 }
 
 // Re-project ground likelihood to each scan
@@ -291,7 +287,7 @@ void ERASOR2::detectMovingObjects() {
             for (int w = w_pc - neighboring_width_ / 2; w < w_pc + neighboring_width_ / 2; ++w) {
                 idx(0) = w;
                 idx(1) = h;
-                if (gridmap_submap_.at("posterior", idx) > ground_log_odds_thr_) {
+                if (gridmap_submap_.at("log_odds", idx) > ground_log_odds_thr_) {
                     // Extract indices
                     // Note that `xygrids_[k][count]` does not contain non-VoI points
                     for (const auto &pt: xygrids_[k][count].points) {
@@ -311,7 +307,7 @@ void ERASOR2::detectMovingObjects() {
 //                            &&
 //                            std::find(dyn_cand_ids.begin(), dyn_cand_ids.end(), pt.intensity) == dyn_cand_ids.end()) {
 
-                        } else if (pt.intensity == NOT_INTEREST && gridmap_submap_.at("prior", idx) == informative_prior_) {
+                        } else if (pt.intensity == NOT_INTEREST) { // && gridmap_submap_.at("status", idx) == TEMPORARILY_OCCUPIED) {
                             noisy_points_transformed_[k].points.emplace_back(pt);
                         }
                     }
@@ -680,11 +676,11 @@ bool ERASOR2::isOverSegmented(const DynamicInstance& dynamic_cluster) {
     int num_unknown_grids = 0;
     int num_dynamic_grids = 0;
     for (const auto& idx: dynamic_cluster.occupied_map_idxes_) {
-        if (gridmap_submap_.at("prior", idx) == unknown_prior_) {
+        if (gridmap_submap_.at("status", idx) == NOT_OBSERVED) {
             ++num_unknown_grids;
         }
-        if (gridmap_submap_.at("prior", idx) == informative_prior_ &&
-        logOdds2prob(gridmap_submap_.at("posterior", idx)) > PROB_FOR_DEFINITELY_MOVING_OBJ) {
+        if (gridmap_submap_.at("status", idx) == TEMPORARILY_OCCUPIED &&
+        logOdds2prob(gridmap_submap_.at("log_odds", idx)) > PROB_FOR_DEFINITELY_MOVING_OBJ) {
             ++num_dynamic_grids;
         }
     }
@@ -711,7 +707,7 @@ void ERASOR2::parseOverSegmentation(const DynamicInstance& over_segmented, Dynam
         grid_map::Position p_tmp(pt.x, pt.y);
         grid_map::Index    idx_tmp;
         gridmap_submap_.getIndex(p_tmp, idx_tmp);
-        if (logOdds2prob(gridmap_submap_.at("posterior", idx_tmp)) > PROB_FOR_DEFINITELY_MOVING_OBJ) {
+        if (logOdds2prob(gridmap_submap_.at("log_odds", idx_tmp)) > PROB_FOR_DEFINITELY_MOVING_OBJ) {
             partial_dynamic_inst.cloud_.emplace_back(pt);
         } else {
             static_inst.cloud_.emplace_back(pt);
@@ -936,14 +932,14 @@ grid_map::GridMap ERASOR2::setMapcentricGridMap(const GridMapInfo &grid_map_info
     cout << grid_map_info.x_length << endl;
     cout << grid_map_info.y_length << endl;
     cout << grid_map_info.resolution << endl;
-    grid_map::GridMap gridmap({"elevation", "prior", "likelihood", "posterior", "erosion"});
+    grid_map::GridMap gridmap({"elevation", "status", "prob", "log_odds", "erosion"});
     gridmap.setFrameId("map");
     gridmap.setGeometry(grid_map::Length(grid_map_info.x_length, grid_map_info.y_length),
                         grid_map_info.resolution);
     gridmap["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
-    gridmap["prior"].setConstant(unknown_prior_);
-    gridmap["likelihood"].setConstant(0);
-    gridmap["posterior"].setConstant(0);
+    gridmap["status"].setConstant(NOT_OBSERVED);
+    gridmap["prob"].setConstant(0);
+    gridmap["log_odds"].setConstant(0);
     gridmap["erosion"].setConstant(0);
     gridmap.setPosition(grid_map::Position(grid_map_info.center_x, grid_map_info.center_y));
     return gridmap;
@@ -1059,20 +1055,8 @@ bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> 
     }
 }
 
-void ERASOR2::updatePrior(const grid_map::Index &idx, const float prior) {
-    // Initialization
-    if (gridmap_submap_.at("prior", idx) == unknown_prior_) {
-        gridmap_submap_.at("prior", idx) = prior;
-    }
-
-    // If a given prior is more reliable, update
-    if (gridmap_submap_.at("prior", idx) < prior) {
-        gridmap_submap_.at("prior", idx) = prior;
-    }
-}
-
-void ERASOR2::updatePosterior(const grid_map::Index &idx, const float increment, const int kernel_size) {
-    gridmap_submap_.at("likelihood", idx) += increment;
+void ERASOR2::updateLogOdds(const grid_map::Index &idx, const float increment, const int kernel_size) {
+    gridmap_submap_.at("log_odds", idx) += increment;
 
     auto idx_for_neighboring = idx;
     int  w                   = idx(0);
@@ -1087,7 +1071,7 @@ void ERASOR2::updatePosterior(const grid_map::Index &idx, const float increment,
         for (const auto             &sign: plus_minus_for_adjacent) {
             idx_for_neighboring(0) = w + sign.first;
             idx_for_neighboring(1) = h + sign.second;
-            gridmap_submap_.at("likelihood", idx) += increment / 2.0;
+            gridmap_submap_.at("log_odds", idx) += increment / 2.0;
         }
 
         vector<pair<float, float> > plus_minus_for_diagonal = {{1,  1},
@@ -1097,7 +1081,7 @@ void ERASOR2::updatePosterior(const grid_map::Index &idx, const float increment,
         for (const auto             &sign: plus_minus_for_diagonal) {
             idx_for_neighboring(0) = w + sign.first;
             idx_for_neighboring(1) = h + sign.second;
-            gridmap_submap_.at("likelihood", idx) += increment / 4.0;
+            gridmap_submap_.at("log_odds", idx) += increment / 4.0;
         }
     } else if (kernel_size == 1) {
         return;
@@ -1110,11 +1094,11 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(float range,
                                                 const float grid_resolution,
                                                 const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid) {
 
-    grid_map::GridMap gridmap({"elevation", "posterior"});
+    grid_map::GridMap gridmap({"elevation", "log_odds"});
     gridmap.setFrameId("map");
     gridmap.setGeometry(grid_map::Length(2 * range, 2 * range), grid_resolution);
     gridmap["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
-    gridmap["posterior"].setConstant(unknown_prior_);
+    gridmap["log_odds"].setConstant(NOT_OBSERVED);
 
     const int width  = static_cast<int>(2.00000001 * range / grid_resolution);
     const int height = static_cast<int>(2.00000001 * range / grid_resolution);
@@ -1123,10 +1107,10 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(float range,
     for (int        u = 0; u < width; ++u) {
         for (int v = 0; v < height; ++v) {
             int i = u + width * v;
-            if (!xygrid[i].points.empty() && isLikelyToBeGround(xygrid[i], ratio_num_pts_, minimum_num_pts_)) {
+            if (isLikelyToBeGround(xygrid[i], ratio_num_pts_, minimum_num_pts_)) {
                 idx(0)                       = u;
                 idx(1)                       = v;
-                gridmap.at("posterior", idx) = initial_prior_;
+                gridmap.at("log_odds", idx) = GROUND_EXISTS;
             }
         }
     }
@@ -1140,7 +1124,11 @@ float ERASOR2::calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dyn
         grid_map::Position p_tmp(dyn_pt.x, dyn_pt.y);
         grid_map::Index    idx_tmp;
         gridmap_submap_.getIndex(p_tmp, idx_tmp);
-        total_score += gridmap_submap_.at("posterior", idx_tmp);
+        if (gridmap_submap_.at("status", idx_tmp) == NOT_OBSERVED) {
+            total_score += negative_log_odds_;
+        } else {
+            total_score += gridmap_submap_.at("log_odds", idx_tmp);
+        }
 
         bool is_first = true;
         for (const auto& occupied_region: occupied_map_idxes) {
@@ -1158,10 +1146,21 @@ float ERASOR2::calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dyn
     return total_score / dynamic_cluster.points.size();
 }
 
+void ERASOR2::logOddsGrid2probGrid() {
+    grid_map::Index idx;
+    for (int h = 0; h < grid_map_info_.height; ++h) {
+        for (int w = 0; w < grid_map_info_.width; ++w) {
+            idx(0) = w;
+            idx(1) = h;
+            gridmap_submap_.at("prob", idx) = logOdds2prob(gridmap_submap_.at("log_odds", idx));
+        }
+    }
+}
+
 void ERASOR2::dilateAndErode(grid_map::GridMap &gridmap_submap) {
     // Noise filtering?
     cv::Mat img, img_eroded, img_dilated;
-    gridmap_submap["erosion"] = gridmap_submap["posterior"];
+    gridmap_submap["erosion"] = gridmap_submap["log_odds"];
     const float min_coefficient = gridmap_submap.get("erosion").minCoeff();
     const float max_coefficient = gridmap_submap.get("erosion").maxCoeff();
     std::cout << min_coefficient << ", " << max_coefficient << std::endl;
@@ -1183,10 +1182,10 @@ void ERASOR2::dilateAndErode(grid_map::GridMap &gridmap_submap) {
 void ERASOR2::erodeGridMap(grid_map::GridMap &gridmap_submap) {
     // Noise filtering?
     cv::Mat     img, img_eroded, img_dilated;
-    const float min_coefficient = gridmap_submap.get("posterior").minCoeff();
-    const float max_coefficient = gridmap_submap.get("posterior").maxCoeff();
+    const float min_coefficient = gridmap_submap.get("log_odds").minCoeff();
+    const float max_coefficient = gridmap_submap.get("log_odds").maxCoeff();
     std::cout << "\033[1;34m" << min_coefficient << ", " << max_coefficient << std::endl;
-    grid_map::GridMapCvConverter::toImage<unsigned char, 1>(gridmap_submap, "posterior", CV_8UC1,
+    grid_map::GridMapCvConverter::toImage<unsigned char, 1>(gridmap_submap, "log_odds", CV_8UC1,
                                                             min_coefficient, max_coefficient, img);
 
     erode(img, img_eroded, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 2);
@@ -1316,16 +1315,16 @@ void ERASOR2::printClusterInfo(const DynamicInstance& dynamic_cluster) {
         int x_new = idx(1) - min_y;
         int y_new = max_x - idx(0);
 //        cout << " = > " << x_new << ", " << y_new << endl;
-        if (gridmap_submap_.at("prior", idx) == informative_prior_) {
+        if (gridmap_submap_.at("status", idx) == TEMPORARILY_OCCUPIED) {
             map[x_new][y_new] = 'O';
-        } else if (gridmap_submap_.at("prior", idx) == initial_prior_) {
+        } else if (gridmap_submap_.at("status", idx) == GROUND_EXISTS) {
             map[x_new][y_new] = 'H';
-        } else if (gridmap_submap_.at("prior", idx) == unknown_prior_) {
+        } else if (gridmap_submap_.at("status", idx) == NOT_OBSERVED) {
             map[x_new][y_new] = 'X';
 
         }
-        cout << idx.transpose() << " -> " << x_new << ", " << y_new << " (" <<gridmap_submap_.at("prior", idx) << " | "
-                   << gridmap_submap_.at("posterior", idx) << ")" << endl;
+        cout << idx.transpose() << " -> " << x_new << ", " << y_new << " (" <<gridmap_submap_.at("status", idx) << " | "
+                   << gridmap_submap_.at("log_odds", idx) << ")" << endl;
     }
 
     for (auto const& line_to_viz: map) {

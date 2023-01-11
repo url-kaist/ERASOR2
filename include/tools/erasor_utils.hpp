@@ -61,6 +61,10 @@
 #define VOLUME_OF_INTEREST -4
 
 // Gridmap characteristics
+#define NOT_OBSERVED 100.0
+#define GROUND_EXISTS 101.0 // Must be larger than `NOT_OBSERVED`
+#define TEMPORARILY_OCCUPIED 102.0 // Must be larger than `GROUND_EXISTS`
+
 // Just for visualization
 #define DIST_FROM_GROUND_TO_ORIGIN -2.3
 

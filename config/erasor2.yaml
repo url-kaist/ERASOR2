@@ -1,34 +1,19 @@
-start_frame: 860
-end_frame: 950
-viz_interval: 10
-is_large_scale: true
-
-dataloader:
-    dataset_name: "SemanticKITTI"
-    abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
-    cloud_dir: ""
-    cloud_format: ""
-    pose_path: ""
-    sequence: "02"
-    abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
-    
-    accum_interval: 2
-    voxel_size: 0.2
-    map_voxel_size: 0.2
-
 erasor2:
     grid_resolution: 2.0
     egocentric_grid_resolution: 0.6
     range_of_interest: 60.0
     # min_z_voi 와 max_z_voi 는 raw cloud 기준 (ERASOR 1.0과 다름!!!)
     min_z_voi: -4.0
-    max_z_voi: 1.3
+    max_z_voi: 1.5
     min_z_diff_thr: 0.4 # 물체가 존재한다고 가정 할 수있는 최소한의 z 차이
     scan_ratio_threshold: 0.2 # The Larger, the more aggressive!!
     log_odds:
+        unknown_prior: -2.0
+        informative_prior: 0.5
+        initial_prior: 0.3
         increment_gain: 1.0 # Should be larger than one
         increment: 0.3
-    ground_log_odds_thr: 0.8
+    prob_region_proposal_thr: 0.8
     kernel_size: 1
 
     # For checking ground likelihood
@@ -37,15 +22,9 @@ erasor2:
 
     # For detection moving objects
     moving_object_detection:
-        negative_log_odds: -2.0
         obj_score_soft_thr: 0.8
         obj_score_hard_thr: 20.0
         hard_thr_radius: 20.0
-
-    # To manage over-segmented parts
-    over_segmentation:
-        minimum_area_thr: 56 # [m^2]
-        ratio_of_unknown_prior: 0.25
 
     volumetric_outlier_removal:
         window_size: 1
@@ -56,15 +35,5 @@ erasor2:
         set_scan_and_pose: false
         set_submap: false
         update: false
-        detect: false
-
-stop_for_each_frame: true
-
-extrinsic:
-    robot_body_size: 2.7
-    sensor_height: 1.73
-    rotation: [ 1, 0, 0,
-                0, 1, 0,
-                0, 0, 1 ]
-    translation: [ 0.0, 0.0, 0.0 ]
+        detect: true
 
