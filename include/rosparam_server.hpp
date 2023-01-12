@@ -34,7 +34,7 @@ public:
     float grid_resolution_;
     float range_of_interest_;
     float egocentric_grid_resolution_;
-    float ground_log_odds_thr_;
+    float region_proposal_thr_;
     float min_z_voi_;
     float max_z_voi_;
     float scan_ratio_threshold_;
@@ -143,7 +143,7 @@ public:
 
         nh_.param<float>("/erasor2/log_odds/increment_gain", increment_gain_, 0.3);
         nh_.param<float>("/erasor2/log_odds/increment", increment_, 0.3);
-        nh_.param<float>("/erasor2/ground_log_odds_thr", ground_log_odds_thr_, 0.5);
+        nh_.param<float>("/erasor2/region_proposal_thr", region_proposal_thr_, 0.5);
         nh_.param<int>("/erasor2/kernel_size", kernel_size_, 3);
 
         nh_.param<float>("/erasor2/ratio_num_pts", ratio_num_pts_, 0.95);

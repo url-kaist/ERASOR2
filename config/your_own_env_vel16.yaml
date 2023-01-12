@@ -22,7 +22,7 @@ end_idx: 270
 grid_resolution: 1.0
 egocentric_grid_resolution: 0.2
 range_of_interest: 12.0
-ground_log_odds_thr: 0.8
+region_proposal_thr: 0.8
 stop_for_each_frame: false
 tf:
      lidar2body: [0.0, 0.0, 0.0, 0, 0.0, 0.0, 1.0] # xyz q_x, q_y, q_z, q_w in order

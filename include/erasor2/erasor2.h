@@ -6,9 +6,12 @@
 using namespace std;
 
 struct DynamicInstance {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     pcl::PointCloud<pcl::PointXYZI> cloud_;
     float moving_obj_score_;
     vector<grid_map::Index> occupied_map_idxes_;
+    vector<float> log_odds_for_each_point_;
     Eigen::Matrix<float, 4, 1> centroid_;
 
     bool is_close_to_body_frame_ = false;
@@ -37,6 +40,8 @@ struct GridMapInfo {
 
 class ERASOR2 : public RosParamServer {
 public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     ERASOR2();
 
     ~ERASOR2();
@@ -117,6 +122,7 @@ public:
                          const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
                          std::vector<int> &static_mask);
 
+    // HT: I don't know why call-by reference causes runtime error...
     void setDynamicInstance(DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y);
 
     /*** Functions to tackle the over-segmentation ***/
@@ -201,8 +207,9 @@ public:
                                            const float grid_resolution,
                                            const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid);
 
-    float calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
-                                      vector<grid_map::Index>& occupied_map_idxes);
+    void setOccupiedMapIdxes(DynamicInstance& dynamic_cluster);
+
+    void setMovingInstanceScore(DynamicInstance& dynamic_cluster);
 
     void logOddsGrid2probGrid();
 
@@ -213,7 +220,7 @@ public:
     void publishObjScores(const ros::Publisher& publisher, const vector<pair<Eigen::Matrix<float, 4, 1>, float> >& objs,
                                const vector<float> color, int& num_prev_objs);
 
-    bool isCloseToSensorFrame(const DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y,
+    bool isCloseToBodyFrame(const DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y,
                               const float range_thr);
 
     bool isSizeSufficientlySmall(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,

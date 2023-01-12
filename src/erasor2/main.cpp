@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     erasor2->detectMovingObjects();
     erasor2->filterDynamicObjects();
     erasor2->saveStaticMap(map_path);
-    erasor2->publishStaticMapResults();
+//    erasor2->publishStaticMapResults();
 
     return 0;
 }

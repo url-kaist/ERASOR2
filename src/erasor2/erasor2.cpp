@@ -6,6 +6,18 @@ ERASOR2::ERASOR2() {
     cout << "[ERASOR2] Increment gain: " << increment_gain_ << endl;
     cout << "[ERASOR2] Increment: " << increment_ << endl;
 
+    if (increment_gain_ < 1.0) {
+        throw invalid_argument("[ERASOR2] `increment_gain_` should be larger than 1.0!");
+    }
+
+    if (region_proposal_thr_ > 1.0 || region_proposal_thr_ < 0.0) {
+        throw invalid_argument("[ERASOR2] `region_proposal_thr_` should be betwwen 0.0 to 1.0!");
+    }
+
+    if (negative_log_odds_ > 0) {
+        throw invalid_argument("[ERASOR2] `negative_log_odds_` should be negative!");
+    }
+
     initializePointClouds();
     // `area_per_grid_` is used to check over-segmentation
     area_per_grid_ = grid_resolution_ * grid_resolution_;
@@ -194,7 +206,7 @@ void ERASOR2::resize() {
 
 void ERASOR2::updateSteppableRegion() {
     for (int k                   = 0; k < num_data_; ++k) {
-//        std::cout << "\r[Update] " << k << " / " << num_data_ << std::endl;
+        std::cout << "\r[ERASOR2] Updating " << k << " / " << num_data_ << std::flush;
         gridmap_submap_["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
         grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));
         gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]);
@@ -226,7 +238,7 @@ void ERASOR2::updateSteppableRegion() {
                                                 scan_ratio_threshold_,
                                                 min_z_diff_thr_, verbose_)) {
                     // For debugging
-                    gridmap_submap_.at("elevation", idx) = 1.0;
+                    gridmap_submap_.at("elevation", idx) = erasor_utils::calcMeanZOfGround(map_grid[count]);
 //                    cout << "(" << w << ", " << h << "): " << scan_ratio_ << " | " << ratio_num_ << " // ";
 //                    cout << xygrids_[k][count].size() << " <-> "
 //                         << erasor_utils::getNumGroundPoints(xygrids_[k][count]) << endl;
@@ -265,6 +277,7 @@ void ERASOR2::updateSteppableRegion() {
         }
     }
     logOddsGrid2probGrid();
+    cout << endl;
 }
 
 // Re-project ground likelihood to each scan
@@ -273,6 +286,7 @@ void ERASOR2::detectMovingObjects() {
     grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
     GridPublisher.publish(grid_msg);
     for (int k = 0; k < num_data_; ++k) {
+        std::cout << "\r[ERASOR2] Detecting moving instances " << k << " / " << num_data_ << std::flush;
         vector<float> dyn_cand_ids; // temp. variable
 //        unordered_map<float, DynamicInstance> &ids_clusters  = ids_instances_set_[k];
         noisy_points_transformed_[k].reserve(100);
@@ -287,27 +301,14 @@ void ERASOR2::detectMovingObjects() {
             for (int w = w_pc - neighboring_width_ / 2; w < w_pc + neighboring_width_ / 2; ++w) {
                 idx(0) = w;
                 idx(1) = h;
-                if (gridmap_submap_.at("log_odds", idx) > ground_log_odds_thr_) {
+                if (gridmap_submap_.at("prob", idx) > region_proposal_thr_) {
                     // Extract indices
                     // Note that `xygrids_[k][count]` does not contain non-VoI points
                     for (const auto &pt: xygrids_[k][count].points) {
                         if ((pt.intensity != GROUND_LABEL) && (pt.intensity != NOT_INTEREST) &&
                             std::find(dyn_cand_ids.begin(), dyn_cand_ids.end(), pt.intensity) == dyn_cand_ids.end()) {
                             dyn_cand_ids.push_back(pt.intensity);
-//                        if ((pt.intensity != GROUND_LABEL) && (pt.intensity != NOT_INTEREST)) {
-//                            if (ids_clusters.find(pt.intensity) != ids_clusters.end()) {
-//                               ids_clusters[pt.intensity].cloud_.emplace_back(pt);
-//                            } else {
-//                                DynamicInstance dynamic_cluster;
-//                                dynamic_cluster.cloud_.reserve(200);
-//                                ids_clusters[pt.intensity] = dynamic_cluster;
-//                                ids_clusters[pt.intensity].cloud_.emplace_back()
-//
-//                            }
-//                            &&
-//                            std::find(dyn_cand_ids.begin(), dyn_cand_ids.end(), pt.intensity) == dyn_cand_ids.end()) {
-
-                        } else if (pt.intensity == NOT_INTEREST) { // && gridmap_submap_.at("status", idx) == TEMPORARILY_OCCUPIED) {
+                        } else if (pt.intensity == NOT_INTEREST && gridmap_submap_.at("status", idx) == TEMPORARILY_OCCUPIED) {
                             noisy_points_transformed_[k].points.emplace_back(pt);
                         }
                     }
@@ -315,6 +316,7 @@ void ERASOR2::detectMovingObjects() {
                 ++count;
             }
         }
+        std::cout << std::endl;
 
         // 2. Set Dynamic instance
         auto &ids_clusters  = ids_instances_set_[k];
@@ -346,11 +348,13 @@ void ERASOR2::filterDynamicObjects() {
         // Only available on C++ 17
         for (auto &[dyn_cand_id, dynamic_instance]: ids_clusters) {
             setDynamicInstance(dynamic_instance, poses_submap_[k](0, 3), poses_submap_[k](1, 3));
+
             float adaptive_thr = dynamic_instance.is_close_to_body_frame_? obj_score_hard_thr_: obj_score_soft_thr_;
             if (dynamic_instance.moving_obj_score_ > adaptive_thr) {
                 dynamic_instance.is_dynamic_ = true;
                 // For visualization
                 accepted_objs.push_back({dynamic_instance.centroid_, dynamic_instance.moving_obj_score_});
+
             } else { // it means that most parts are not in the region of interests
                 if (isOverSegmented(dynamic_instance)) {
                     // To debug over-clustering
@@ -661,15 +665,13 @@ void ERASOR2::instanceAwareOutlierRemoval(const int k, const int window_size,
 }
 
 void ERASOR2::setDynamicInstance(DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y) {
-    dynamic_cluster.moving_obj_score_ = calcMovingClusterScore(dynamic_cluster.cloud_,
-                                                                       dynamic_cluster.occupied_map_idxes_);
-
+    setOccupiedMapIdxes(dynamic_cluster);
+    setMovingInstanceScore(dynamic_cluster);
     pcl::compute3DCentroid(dynamic_cluster.cloud_, dynamic_cluster.centroid_);
-    dynamic_cluster.is_close_to_body_frame_ = isCloseToSensorFrame(dynamic_cluster,
+    dynamic_cluster.is_close_to_body_frame_ = isCloseToBodyFrame(dynamic_cluster,
                                                                      pos_x,
                                                                      pos_y,
                                                                      hard_thr_radius_);
-
 }
 
 bool ERASOR2::isOverSegmented(const DynamicInstance& dynamic_cluster) {
@@ -919,19 +921,23 @@ GridMapInfo ERASOR2::setGridMapParams(const float min_x, const float min_y,
     grid_map_info.resolution = grid_resolution;
 
     grid_map_info.width  = static_cast<int>(ceil((max_x - min_x) / grid_resolution));
-    grid_map_info.height = static_cast<int>(ceil((max_x - min_x) / grid_resolution));
+    grid_map_info.height = static_cast<int>(ceil((max_y - min_y) / grid_resolution));
 
     // Remainders of x_length / grid_resolution and
     // y_length / grid_resolution should be zeros, respectively.
     grid_map_info.x_length = ceil((max_x - min_x) / grid_resolution) * grid_resolution;
     grid_map_info.y_length = ceil((max_y - min_y) / grid_resolution) * grid_resolution;
+
+    cout << "x length: " << grid_map_info.x_length << endl;
+    cout << "y length: " << grid_map_info.y_length << endl;
+    cout << "width: " << grid_map_info.width << endl;
+    cout << "height: " << grid_map_info.height << endl;
+    cout << "resolution: " << grid_map_info.resolution << endl;
+
     return grid_map_info;
 }
 
 grid_map::GridMap ERASOR2::setMapcentricGridMap(const GridMapInfo &grid_map_info) {
-    cout << grid_map_info.x_length << endl;
-    cout << grid_map_info.y_length << endl;
-    cout << grid_map_info.resolution << endl;
     grid_map::GridMap gridmap({"elevation", "status", "prob", "log_odds", "erosion"});
     gridmap.setFrameId("map");
     gridmap.setGeometry(grid_map::Length(grid_map_info.x_length, grid_map_info.y_length),
@@ -1117,33 +1123,55 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(float range,
     return gridmap;
 }
 
-float ERASOR2::calcMovingClusterScore(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
-                                      vector<grid_map::Index>& occupied_map_idxes) {
-    float           total_score = 0;
-    for (const auto &dyn_pt: dynamic_cluster.points) {
+void ERASOR2::setOccupiedMapIdxes(DynamicInstance& dynamic_cluster) {
+    auto& occupied_map_idxes = dynamic_cluster.occupied_map_idxes_;
+    auto& log_odds = dynamic_cluster.log_odds_for_each_point_;
+//    vector<grid_map::Index> occupied_map_idxes;
+    occupied_map_idxes.reserve(10); // heuristic
+    log_odds.resize(dynamic_cluster.cloud_.size());
+    for (int i = 0; i < dynamic_cluster.cloud_.size(); ++i) {
+        const pcl::PointXYZI &dyn_pt = dynamic_cluster.cloud_[i];
         grid_map::Position p_tmp(dyn_pt.x, dyn_pt.y);
         grid_map::Index    idx_tmp;
         gridmap_submap_.getIndex(p_tmp, idx_tmp);
-        if (gridmap_submap_.at("status", idx_tmp) == NOT_OBSERVED) {
-            total_score += negative_log_odds_;
-        } else {
-            total_score += gridmap_submap_.at("log_odds", idx_tmp);
+        if (idx_tmp(0) > grid_map_info_.width || idx_tmp(0) < 0 ||
+            idx_tmp(1) > grid_map_info_.height || idx_tmp(1) < 0) {
+            cout << "\033[1;33m[ERASOR2] Index overflow occurs! Skipped\033[0m" << endl;
+            continue;
         }
 
-        bool is_first = true;
-        for (const auto& occupied_region: occupied_map_idxes) {
-            // Means already idx_tmp is updated
-            if (idx_tmp(0) == occupied_region(0) && idx_tmp(1) == occupied_region(1)) {
-                is_first = false;
-                break;
+        // 1. Set points' log-odds
+        if (gridmap_submap_.at("status", idx_tmp) == NOT_OBSERVED) {
+            log_odds[i] = negative_log_odds_;
+        } else {
+            log_odds[i] = gridmap_submap_.at("log_odds", idx_tmp);
+        }
+
+        // 2. Find unique map indices
+        if (occupied_map_idxes.empty()) {
+            occupied_map_idxes.push_back(idx_tmp);
+        } else {
+            bool is_first = true;
+            for (const grid_map::Index &occupied_region: occupied_map_idxes) {
+                // Means already idx_tmp is updated
+                if (isEqual(idx_tmp, occupied_region)) {
+                    is_first = false;
+                    break;
+                }
+            }
+            if (is_first) {
+                occupied_map_idxes.push_back(idx_tmp);
             }
         }
-        if (is_first) {
-            occupied_map_idxes.emplace_back(idx_tmp);
-        }
     }
+}
 
-    return total_score / dynamic_cluster.points.size();
+void ERASOR2::setMovingInstanceScore(DynamicInstance& dynamic_cluster) {
+    float           total_score = 0;
+    for (const auto &log_odds: dynamic_cluster.log_odds_for_each_point_) {
+        total_score += log_odds;
+    }
+    dynamic_cluster.moving_obj_score_ = total_score / dynamic_cluster.log_odds_for_each_point_.size();
 }
 
 void ERASOR2::logOddsGrid2probGrid() {
@@ -1240,7 +1268,7 @@ ERASOR2::publishObjScores(const ros::Publisher &publisher, const vector<pair<Eig
     num_prev_objs = num_curr_objs;
 }
 
-bool ERASOR2::isCloseToSensorFrame(const DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y,
+bool ERASOR2::isCloseToBodyFrame(const DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y,
                               const float range_thr) {
     const float obj_x = dynamic_cluster.centroid_(0);
     const float obj_y = dynamic_cluster.centroid_(1);

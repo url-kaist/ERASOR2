@@ -24,7 +24,7 @@ erasor2:
     ground_likelihood:
         increment: 0.3
         decrement: 0.1
-    ground_log_odds_thr: 0.5
+    region_proposal_thr: 0.5
 
     minimum_num_pts: 5
     rejection_ratio: 0

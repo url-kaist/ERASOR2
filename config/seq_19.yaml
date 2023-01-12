@@ -31,7 +31,7 @@ erasor2:
         initial_prior: 0.0
         increment_gain: 3.0 # Should be larger than one
         increment: 0.5
-    ground_log_odds_thr: 2.2
+    region_proposal_thr: 2.2
     kernel_size: 1
 
     # For checking ground likelihood

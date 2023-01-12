@@ -195,6 +195,8 @@ def evaluate(gt, estimate, voxelsize=0.2):
 
     print(tabulate([printed_data], headers=['# stat. pts', '# dyn. pts', '%', '# est. stat. pts', '# est. dyn. pts',
                                             '%', 'Preservation', 'rejection', 'F1'], tablefmt='github'))
+    return printed_data
+
 def load_pcd(path):
     print("On loading data...")
     data = pypcd.PointCloud.from_path(path)
@@ -208,6 +210,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Analysis of static map')
     parser.add_argument('--gt', default='/home/shapelim/erasor_paper_pcds/gt/00_voxel_0_2.pcd', type=str)
     parser.add_argument('--est', default='/home/shapelim/erasor_paper_pcds/estimate/00_ERASOR.pcd', type=str)
+    parser.add_argument('--seq', default="00", type=str)
     args = parser.parse_args()
     print("GT Path: " + args.gt)
     print("Estimate Path: " + args.est)
@@ -217,4 +220,6 @@ if __name__ == "__main__":
 
     gt_data = load_pcd(args.gt)
     target_data = load_pcd(args.est)
-    evaluate(gt_data, target_data, voxelsize=0.2)
+    printed_values = evaluate(gt_data, target_data, voxelsize=0.2)
+    f = open("/home/shapelim/" + args.seq + ".txt", "a")
+    f.write("%f %f %f\n"%(printed_values[-3], printed_values[-2], printed_values[-1]))
