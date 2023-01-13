@@ -1,45 +1,4 @@
-#include <ros/ros.h>
-#include <pcl/common/transforms.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_types.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_cloud.h>
-#include <pcl/common/transforms.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/passthrough.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/filters/extract_indices.h>
-#include <pcl/io/pcd_io.h>
-#include <unavlib/convt.h>
-#include <unavlib/others.h>
-#include <string>
-#include <map>
-#include <vector>
 
-using namespace unavlib;
-
-std::vector<int> dynamic_classes = {252, 253, 254, 255, 256, 257, 258, 259};
-
-void parseStaticAndDynamic(const pcl::PointCloud<pcl::PointXYZI>& cloudIn, pcl::PointCloud<pcl::PointXYZI>& dynamicOut, pcl::PointCloud<pcl::PointXYZI>& staticOut){
-  dynamicOut.points.clear();
-  staticOut.points.clear();
-
-  for (const auto &pt: cloudIn.points){
-    uint32_t float2int = static_cast<uint32_t>(pt.intensity);
-    uint32_t semantic_label = float2int & 0xFFFF;
-    uint32_t inst_label = float2int >> 16;
-    bool is_static = true;
-    for (int class_num: dynamic_classes){
-      if (semantic_label == class_num){ // 1. check it is in the moving object classes
-        dynamicOut.points.push_back(pt);
-        is_static = false;
-      }
-    }
-    if (is_static){
-      staticOut.points.push_back(pt);
-    }
-  }
-}
 void calc_complement(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
                      pcl::PointCloud<pcl::PointXYZI>::Ptr gt,
                           pcl::PointCloud<pcl::PointXYZI>& complement){
@@ -71,7 +30,6 @@ void calc_complement(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
 
      }
   }
-
 }
 
 int main(int argc, char **argv)
@@ -82,11 +40,11 @@ int main(int argc, char **argv)
 
     std::string rawName, octoMapName, pplName, removertName, erasorName;
 
-    nodeHandler.param<std::string>("/raw", rawName, "/media/shapelim");
-    nodeHandler.param<std::string>("/octoMap", octoMapName, "/media/shapelim");
-    nodeHandler.param<std::string>("/pplremover", pplName, "/media/shapelim");
-    nodeHandler.param<std::string>("/removert", removertName, "/media/shapelim");
-    nodeHandler.param<std::string>("/erasor", erasorName, "/media/shapelim");
+    nodeHandler.param<std::string>("/raw", rawName, "");
+    nodeHandler.param<std::string>("/octoMap", octoMapName, "");
+    nodeHandler.param<std::string>("/pplremover", pplName, "");
+    nodeHandler.param<std::string>("/removert", removertName, "");
+    nodeHandler.param<std::string>("/erasor", erasorName, "");
 
 
     ros::Publisher msPublisher = nodeHandler.advertise<sensor_msgs::PointCloud2>("/map/static", 100);

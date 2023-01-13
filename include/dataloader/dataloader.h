@@ -190,6 +190,4 @@ public:
 //
 //};
 
-
-
 #endif //ERASOR2_DATA_LOADER_H

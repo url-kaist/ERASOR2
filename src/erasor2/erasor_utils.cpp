@@ -1,6 +1,6 @@
 #include "tools/erasor_utils.hpp"
 
-std::vector<int> DYNAMIC_CLASSES = {252, 253, 254, 255, 256, 257, 258, 259};
+std::vector<int> DYNAMIC_CLASSES = {251, 252, 253, 254, 255, 256, 257, 258, 259};
 
 namespace erasor_utils {
     geometry_msgs::Pose eigen2geoPose(Eigen::Matrix4f pose) {
@@ -101,7 +101,7 @@ namespace erasor_utils {
 
     void findCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud,
                              const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
-                             vector<int>& correspondences, const float margin) {
+                             vector<int>& correspondences) {
 
         PointCloud<num_t> cloud;
         pcl2nanoflann(target_cloud, cloud);
@@ -123,6 +123,37 @@ namespace erasor_utils {
             out_dist_sqr.resize(num_results);
 
             correspondences[query_idx] = ret_index[0];
+            ++query_idx;
+        }
+    }
+
+    void findEmptyCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud,
+                             const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
+                             vector<int>& correspondences, const float margin) {
+
+        PointCloud<num_t> cloud;
+        pcl2nanoflann(target_cloud, cloud);
+
+        my_kd_tree_t kdtree(3 /*dim*/, cloud, {10 /* max leaf */});
+
+        correspondences.reserve(query_cloud.size());
+        int query_idx = 0;
+        for (auto &query_pcl: query_cloud.points) {
+            const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
+            size_t                num_results = 1;
+            std::vector<uint32_t> ret_index(num_results);
+            std::vector<num_t>    out_dist_sqr(num_results);
+
+            num_results = kdtree.knnSearch(
+                    &query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
+
+            ret_index.resize(num_results);
+            out_dist_sqr.resize(num_results);
+
+            if (out_dist_sqr[0] > margin) {
+                correspondences.push_back(query_idx);
+            }
+
             ++query_idx;
         }
     }
@@ -250,11 +281,8 @@ namespace erasor_utils {
         voxel_filter.setMinimumPointsNumberPerVoxel(minimum_num_pts_per_voxel);
         voxel_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
         voxel_filter.filter(*ptr_voxelized);
-        cout << "\033[1;35m" << ptr_voxelized->points.size() << endl;
+        cout << "\033[1;35m[Voxelization] " << src->points.size() << " => " << ptr_voxelized->points.size() << "\n";
         std::chrono::system_clock::time_point t_v_e = std::chrono::system_clock::now();
-        cout << "Elapsed time in milliseconds: "
-             << chrono::duration_cast<chrono::milliseconds>(t_v_e - t_v_s).count()
-             << " ms\033[0m" << endl;
         // Does not work...
 //        static HashVoxelGrid<pcl::PointXYZI> hash_voxel_filter;
 //        hash_voxel_filter.setInputCloud(src);
@@ -276,6 +304,11 @@ namespace erasor_utils {
             ptr_voxelized->points[i].intensity = src->points[correspondence].intensity;
         }
         dst = *ptr_voxelized;
+        std::chrono::system_clock::time_point t_f_e = std::chrono::system_clock::now();
+        cout << "Elapsed time in milliseconds: "
+             << chrono::duration_cast<chrono::milliseconds>(t_f_e - t_v_s).count()
+             << " ms(" <<  chrono::duration_cast<chrono::milliseconds>(t_v_e - t_v_s).count() << " ms + ";
+        cout << chrono::duration_cast<chrono::milliseconds>(t_f_e - t_v_e).count()<< " ms)\033[0m\n";
     }
 
     void count_stat_dyn(const pcl::PointCloud<pcl::PointXYZI> &cloudIn, int &num_static, int &num_dynamic) {

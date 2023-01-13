@@ -85,13 +85,19 @@ add_dependencies(inheritance_test erasor_generate_messages_cpp)
 #target_link_libraries(offline_map_updater ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 #add_dependencies(offline_map_updater erasor_generate_messages_cpp)
 
-#add_executable(main src/erasor2/main.cpp ${erasor_src})
-#target_link_libraries(main ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} stdc++fs)
-#add_dependencies(main erasor2_generate_messages_cpp)
+###################################### UTILS ##########################################
+add_executable(accum_4dmos src/accum_4dmos.cpp src/erasor2/erasor_utils.cpp)
+target_link_libraries(accum_4dmos ${catkin_LIBRARIES} stdc++fs)
+add_dependencies(accum_4dmos erasor2_generate_messages_cpp)
 
 add_executable(compare_map src/compare_map.cpp src/erasor2/erasor_utils.cpp)
 target_link_libraries(compare_map ${catkin_LIBRARIES})
 add_dependencies(compare_map erasor2_generate_messages_cpp)
+
+add_executable(fill_removert_labels src/fill_removert_labels.cpp src/erasor2/erasor_utils.cpp)
+target_link_libraries(fill_removert_labels ${catkin_LIBRARIES} stdc++fs)
+add_dependencies(fill_removert_labels erasor2_generate_messages_cpp)
+######################################################################################
 
 set(mapgen_src
     src/erasor2/erasor_utils.cpp

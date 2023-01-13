@@ -134,6 +134,10 @@ namespace erasor_utils {
     bool load_labels(const std::string& label_name, std::vector<uint32_t>& labels);
 
     void findCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
+                     vector<int>& correspondences);
+
+    // For visualization of TPs and FPs
+    void findEmptyCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
                      vector<int>& correspondences, const float margin=0.02);
 
     void radiusSearch(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,

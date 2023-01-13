@@ -71,8 +71,8 @@ SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir, const strin
     }
     ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork";
 //    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork_filtered";
-    est_label_dir_    = abs_data_dir + "/" + seq + "/cais";
-//    est_label_dir_    = abs_data_dir + "/" + seq + "/hdbscan";
+//    est_label_dir_    = abs_data_dir + "/" + seq + "/cais";
+    est_label_dir_    = abs_data_dir + "/" + seq + "/hdbscan";
 
     cloud_format_     = "bin";
     cout << "\033[1;32m[ERASOR2] Data directories are as follows:" << endl;
@@ -92,7 +92,7 @@ void SemanticKITTILoader::loadAllPoses(string pose_path, vector<Eigen::Matrix4f>
 
     Eigen::Matrix4f KITTI_CAM2LIDAR = Eigen::Matrix4f::Identity();
     Eigen::Matrix4f tf_origin = Eigen::Matrix4f::Identity();
-    // Note that coordinates of KITTI odometry and tracking datasets are different!
+
     KITTI_CAM2LIDAR << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
             -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
             9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,

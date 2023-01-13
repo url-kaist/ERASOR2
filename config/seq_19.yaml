@@ -1,5 +1,5 @@
 start_frame: 0
-end_frame: 200
+end_frame: 800 # 1058
 viz_interval: 10
 is_large_scale: true
 
@@ -26,12 +26,9 @@ erasor2:
     min_z_diff_thr: 0.4 # 물체가 존재한다고 가정 할 수있는 최소한의 z 차이
     scan_ratio_threshold: 0.2 # The Larger, the more objects could be candidates
     log_odds:
-        unknown_prior: -3.0
-        informative_prior: 1.0
-        initial_prior: 0.0
-        increment_gain: 3.0 # Should be larger than one
-        increment: 0.5
-    region_proposal_thr: 2.2
+        increment_gain: 2.0 # Should be larger than one
+        increment: 0.15
+    region_proposal_thr: 0.8 # probabiliy. 0 ~ 1
     kernel_size: 1
 
     # For checking ground likelihood
@@ -40,6 +37,7 @@ erasor2:
 
     # For detection moving objects
     moving_object_detection:
+        negative_log_odds: -2.0
         obj_score_soft_thr: 0.8
         obj_score_hard_thr: 14.0
         hard_thr_radius: 10.0

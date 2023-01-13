@@ -206,7 +206,7 @@ void ERASOR2::resize() {
 
 void ERASOR2::updateSteppableRegion() {
     for (int k                   = 0; k < num_data_; ++k) {
-        std::cout << "\r[ERASOR2] Updating " << k << " / " << num_data_ << std::flush;
+        cout << "\r[ERASOR2] Updating " << k + 1 << " / " << num_data_ << flush;
         gridmap_submap_["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
         grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));
         gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]);
@@ -277,7 +277,7 @@ void ERASOR2::updateSteppableRegion() {
         }
     }
     logOddsGrid2probGrid();
-    cout << endl;
+    cout << "\n";
 }
 
 // Re-project ground likelihood to each scan
@@ -286,7 +286,7 @@ void ERASOR2::detectMovingObjects() {
     grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
     GridPublisher.publish(grid_msg);
     for (int k = 0; k < num_data_; ++k) {
-        std::cout << "\r[ERASOR2] Detecting moving instances " << k << " / " << num_data_ << std::flush;
+        cout << "\r[ERASOR2] Detecting moving instances " << k + 1 << " / " << num_data_ << flush;
         vector<float> dyn_cand_ids; // temp. variable
 //        unordered_map<float, DynamicInstance> &ids_clusters  = ids_instances_set_[k];
         noisy_points_transformed_[k].reserve(100);
@@ -316,7 +316,6 @@ void ERASOR2::detectMovingObjects() {
                 ++count;
             }
         }
-        std::cout << std::endl;
 
         // 2. Set Dynamic instance
         auto &ids_clusters  = ids_instances_set_[k];
@@ -333,6 +332,7 @@ void ERASOR2::detectMovingObjects() {
             }
         }
     }
+    cout << "\n";
 }
 
 void ERASOR2::filterDynamicObjects() {
@@ -362,7 +362,7 @@ void ERASOR2::filterDynamicObjects() {
                     DynamicInstance static_inst, partial_dynamic_inst;
                     parseOverSegmentation(dynamic_instance, static_inst, partial_dynamic_inst,
                                           poses_submap_[k](0, 3), poses_submap_[k](1, 3));
-                    cout << static_inst.cloud_.size() << "<-> " << partial_dynamic_inst.cloud_.size() << "\033[0m" << endl;
+                    cout << static_inst.cloud_.size() << " <-> " << partial_dynamic_inst.cloud_.size() << "\033[0m" << endl;
 
                     if (viz_over_seg_) {
                         CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
@@ -418,7 +418,6 @@ void ERASOR2::filterDynamicObjects() {
 
     // Naively assign the static points
     for (int k = 0; k < num_data_; ++k) {
-
         const auto &each_pc      = pcs_transformed_[k];
         const auto &ids_clusters = ids_instances_set_[k];
 
@@ -1014,9 +1013,10 @@ bool ERASOR2::isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI> &pc, cons
     if (pc.empty()) { return false; }
 
     int num_ground_pts = erasor_utils::getNumGroundPoints(pc);
-
+    float min_z, max_z;
+    erasor_utils::calcMinMaxZ(pc, min_z, max_z);
     ratio_num_ = static_cast<float>(num_ground_pts) / pc.points.size();
-    if ((ratio_num_ > ratio_num) && pc.points.size() > num_min_pts) {
+    if ((ratio_num_ > ratio_num) && pc.points.size() > num_min_pts && (max_z - min_z < 2 * grid_resolution_)) {
         return true; // Free
     } else { return false; }
 }

@@ -25,9 +25,9 @@ int main(int argc, char **argv) {
         loader = std::move(std::make_unique<SemanticKITTILoader>(params->abs_data_dir_, params->sequence_));
     }
 
-    std::cout << "Set dataloader complete" << std::endl;
-    std::cout << "From " << params->start_frame_ << " to " << params->end_frame_ << std::endl;
-    std::cout << params->robot_body_size_ << endl;
+    cout << "Set dataloader complete" << endl;
+    cout << "From " << params->start_frame_ << " to " << params->end_frame_ << endl;
+    cout << params->robot_body_size_ << endl;
 
     int start_frame = params->start_frame_;
     int end_frame   = params->end_frame_;
@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
     for (int i = start_frame; i < end_frame + accum_interval; ++i) {
         signal(SIGINT, erasor_utils::signal_callback_handler);
         if (i % 10 == 0) {
-            std::cout << "[ERASOR2] " << i << "th frame comes!" << std::endl;
+            cout << "[DataLoader] " << i << "th frame comes!\n";
         }
 
         // if `accum_interval` == 1, the below condition is not used
@@ -70,7 +70,8 @@ int main(int argc, char **argv) {
             erasor2->setScanAndPose(pose, *cloud_est_filtered);
         }
     }
-    std::cout << "[ERASOR2] Complete to set scans and poses" << std::endl;
+
+    cout << "[ERASOR2] Complete to set scans and poses\n";
     erasor2->setSubmap();
     erasor2->updateSteppableRegion();
 //    erasor2->dilateAndErode();
