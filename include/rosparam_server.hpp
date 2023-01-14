@@ -74,7 +74,6 @@ public:
     int minimum_num_pts_;
 
     int window_size_;
-    int num_closest_;
     bool use_adaptive_voxel_size_;
     float dist_thr_gain_;
 
@@ -162,7 +161,6 @@ public:
         nh_.param<float>("/erasor2/over_segmentation/ratio_of_unknown_prior", ratio_of_unknown_prior_, 0.25);
 
         nh_.param<int>("/erasor2/volumetric_outlier_removal/window_size", window_size_, 1);
-        nh_.param<int>("/erasor2/volumetric_outlier_removal/num_closest", num_closest_, 3);
         nh_.param<bool>("/erasor2/volumetric_outlier_removal/use_adaptive_voxel_size", use_adaptive_voxel_size_, false);
         nh_.param<float>("/erasor2/volumetric_outlier_removal/dist_thr_gain", dist_thr_gain_, 1.0);
 

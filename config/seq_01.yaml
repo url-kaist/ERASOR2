@@ -28,8 +28,8 @@ erasor2:
     scan_ratio_threshold: 0.2 # The Larger, the more aggressive!!
     log_odds:
         increment_gain: 2.0 # Should be larger than one
-        increment: 0.15
-    region_proposal_thr: 0.8 # probabiliy. 0 ~ 1
+        increment: 0.3
+    region_proposal_thr: 0.7 # probabiliy. 0 ~ 1
     kernel_size: 1
 
     # For checking ground likelihood
@@ -49,10 +49,10 @@ erasor2:
         ratio_of_unknown_prior: 0.25
 
     volumetric_outlier_removal:
-        window_size: 5
-        num_closest: 3 # Deprecated
+        window_size: 3
+
         use_adaptive_voxel_size: true
-        dist_thr_gain: 2.0 # The larger, the more aggressive
+        dist_thr_gain: 1.732 # The larger, the more aggressive
 
     viz_flag:
         set_scan_and_pose: false
