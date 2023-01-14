@@ -1,8 +1,6 @@
 #include "tools/erasor_utils.hpp"
 #include "rosparam_server.hpp"
 
-#define PROB_FOR_DEFINITELY_MOVING_OBJ 0.999999 // <-> 14 in log-odds
-
 using namespace std;
 
 struct DynamicInstance {

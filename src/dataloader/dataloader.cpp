@@ -58,7 +58,8 @@ inline void DataLoader::getPose(const size_t i, Eigen::Matrix4f& pose) {
     pose = poses_gt_[i];
 }
 
-SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir, const string &seq) {
+SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir, const string &seq,
+                                         const string& instance_seg_method) {
     // Follow the KITTI format
     seq_              = seq;
     cloud_dir_        = abs_data_dir + "/" + seq + "/velodyne";
@@ -71,11 +72,16 @@ SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir, const strin
     }
     ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork";
 //    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork_filtered";
-//    est_label_dir_    = abs_data_dir + "/" + seq + "/cais";
-    est_label_dir_    = abs_data_dir + "/" + seq + "/hdbscan";
+    if (instance_seg_method == "cais") {
+        cout << "\033[1;32m[DataLoader] Selected isntance seg. method: CAIS\n";
+        est_label_dir_    = abs_data_dir + "/" + seq + "/cais";
+    } else if (instance_seg_method == "hdbscan") {
+        cout << "\033[1;32m[DataLoader] Selected isntance seg. method: HDBSCAN\n";
+        est_label_dir_    = abs_data_dir + "/" + seq + "/hdbscan";
+    }
 
     cloud_format_     = "bin";
-    cout << "\033[1;32m[ERASOR2] Data directories are as follows:" << endl;
+    cout << "\033[1;32m[DataLoader] Data directories are as follows:" << endl;
     cout << cloud_dir_ << endl;
     cout << gt_label_dir_ << endl;
     cout << pose_path_ << endl;

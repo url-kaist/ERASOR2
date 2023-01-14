@@ -66,7 +66,7 @@
 #define TEMPORARILY_OCCUPIED 102.0 // Must be larger than `GROUND_EXISTS`
 
 // Just for visualization
-#define DIST_FROM_GROUND_TO_ORIGIN -2.3
+#define NOT_UPDATED -2.3
 
 #define IS_STATIC 100000
 #define IS_DYNAMIC 100001
@@ -145,6 +145,10 @@ namespace erasor_utils {
 
     void radiusSearch(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
                      const float radius, vector<int>& target_idxes);
+
+    void radiusSearchWithAdaptiveRadii(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
+                     const vector<float>& radii, vector<int>& target_idxes);
+
 
     void fillGTLabel(const pcl::PointCloud<pcl::PointXYZI> &gt_cloud, pcl::PointCloud<pcl::PointXYZI> &est_cloud,
                      const float margin=0.02);

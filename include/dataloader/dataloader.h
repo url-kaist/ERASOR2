@@ -98,7 +98,7 @@ public:
 //    SemanticKITTILoader() = delete;
     SemanticKITTILoader();
 
-    SemanticKITTILoader(const string &abs_data_dir, const string &seq);
+    SemanticKITTILoader(const string &abs_data_dir, const string &seq, const string& instance_seq_method="cais");
 
 //    explicit SemanticKITTILoader(const string &cloud_dir, const string &cloud_format, const string &pose_path)
 //    : DataLoader(cloud_dir, cloud_format, pose_path) { cout << (1 + 3) << endl; };

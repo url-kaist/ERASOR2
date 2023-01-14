@@ -75,6 +75,7 @@ public:
 
     int window_size_;
     int num_closest_;
+    bool use_adaptive_voxel_size_;
     float dist_thr_gain_;
 
     int num_omp_cores_;
@@ -89,6 +90,7 @@ public:
     string cloud_format_;
     string pose_path_;
     string sequence_;
+    string instance_seg_method_;
 
     // ROS msgs
     nav_msgs::Path nav_path_;
@@ -131,6 +133,7 @@ public:
         nh_.param<string>("/dataloader/pose_path", pose_path_, "");
         nh_.param<string>("/dataloader/sequence", sequence_, "");
         nh_.param<string>("/dataloader/abs_save_dir", abs_save_dir_, "/");
+        nh_.param<string>("/dataloader/instance_seg_method", instance_seg_method_, "cais");
         nh_.param<int>("/dataloader/accum_interval", accum_interval_, 2);
         nh_.param<float>("/dataloader/voxel_size", voxel_size_, (float) 0.05);
         nh_.param<float>("/dataloader/map_voxel_size", map_voxel_size_, (float) 0.2);
@@ -160,6 +163,7 @@ public:
 
         nh_.param<int>("/erasor2/volumetric_outlier_removal/window_size", window_size_, 1);
         nh_.param<int>("/erasor2/volumetric_outlier_removal/num_closest", num_closest_, 3);
+        nh_.param<bool>("/erasor2/volumetric_outlier_removal/use_adaptive_voxel_size", use_adaptive_voxel_size_, false);
         nh_.param<float>("/erasor2/volumetric_outlier_removal/dist_thr_gain", dist_thr_gain_, 1.0);
 
         nh_.param<float>("/erasor2/grid_resolution", grid_resolution_, 0.4);

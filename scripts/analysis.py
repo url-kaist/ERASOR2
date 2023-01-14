@@ -210,7 +210,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Analysis of static map')
     parser.add_argument('--gt', default='/home/shapelim/erasor_paper_pcds/gt/00_voxel_0_2.pcd', type=str)
     parser.add_argument('--est', default='/home/shapelim/erasor_paper_pcds/estimate/00_ERASOR.pcd', type=str)
-    parser.add_argument('--seq', default="00", type=str)
+    parser.add_argument('--seq', default="TBU", type=str)
     args = parser.parse_args()
     print("GT Path: " + args.gt)
     print("Estimate Path: " + args.est)

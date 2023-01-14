@@ -11,6 +11,7 @@ dataloader:
     pose_path: ""
     sequence: "02"
     abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+    instance_seg_method: "cais"
 
     accum_interval: 2
     voxel_size: 0.2
@@ -50,6 +51,7 @@ erasor2:
     volumetric_outlier_removal:
         window_size: 1
         num_closest: 3 # Deprecated
+        use_adaptive_voxel_size: true
         dist_thr_gain: 1.732 # The larger, the more aggressive
 
     viz_flag:

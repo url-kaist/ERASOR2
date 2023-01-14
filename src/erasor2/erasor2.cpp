@@ -207,7 +207,7 @@ void ERASOR2::resize() {
 void ERASOR2::updateSteppableRegion() {
     for (int k                   = 0; k < num_data_; ++k) {
         cout << "\r[ERASOR2] Updating " << k + 1 << " / " << num_data_ << flush;
-        gridmap_submap_["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
+        gridmap_submap_["elevation"].setConstant(NOT_UPDATED);
         grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));
         gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]);
 
@@ -247,6 +247,7 @@ void ERASOR2::updateSteppableRegion() {
                 } else if (isLikelyToBeGround(xygrids_[k][count])) {
                     if (gridmap_submap_.at("status", idx) == NOT_OBSERVED) {
                         gridmap_submap_.at("status", idx) = GROUND_EXISTS;
+                        gridmap_submap_.at("elevation", idx) = erasor_utils::calcMeanZOfGround(map_grid[count]);
                     }
                     updateLogOdds(idx, increment_);
                 }
@@ -536,8 +537,6 @@ void ERASOR2::accumDynamicCloud(const int k, const int window_size,
 
 void ERASOR2::accumInstanceWiseDynamicCloud(const int k, const int window_size,
                                pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization) {
-    float dynamic_score_thr_ = 14.0;
-
     int lower_bound = k - window_size / 2;
     int upper_bound = k + (window_size + 1) / 2;
     pcl::PointCloud<pcl::PointXYZI>::Ptr dyn_points_accum(new pcl::PointCloud<pcl::PointXYZI>);
@@ -546,7 +545,7 @@ void ERASOR2::accumInstanceWiseDynamicCloud(const int k, const int window_size,
         const auto& noisy_points = noisy_points_transformed_[i];
         const auto& ids_clusters = ids_instances_set_[i];
         for (auto &[dyn_cand_id, dynamic_instance]: ids_clusters) {
-            if (dynamic_instance.is_dynamic_ && dynamic_instance.moving_obj_score_ > dynamic_score_thr_) {
+            if (dynamic_instance.is_dynamic_ && dynamic_instance.moving_obj_score_ > obj_score_hard_thr_) {
                 *dyn_points_accum += dynamic_instance.cloud_;
 
                 vector<int> target_idxes;
@@ -681,7 +680,7 @@ bool ERASOR2::isOverSegmented(const DynamicInstance& dynamic_cluster) {
             ++num_unknown_grids;
         }
         if (gridmap_submap_.at("status", idx) == TEMPORARILY_OCCUPIED &&
-        logOdds2prob(gridmap_submap_.at("log_odds", idx)) > PROB_FOR_DEFINITELY_MOVING_OBJ) {
+        gridmap_submap_.at("log_odds", idx) > obj_score_hard_thr_) {
             ++num_dynamic_grids;
         }
     }
@@ -708,7 +707,7 @@ void ERASOR2::parseOverSegmentation(const DynamicInstance& over_segmented, Dynam
         grid_map::Position p_tmp(pt.x, pt.y);
         grid_map::Index    idx_tmp;
         gridmap_submap_.getIndex(p_tmp, idx_tmp);
-        if (logOdds2prob(gridmap_submap_.at("log_odds", idx_tmp)) > PROB_FOR_DEFINITELY_MOVING_OBJ) {
+        if ((gridmap_submap_.at("log_odds", idx_tmp)) > obj_score_hard_thr_) {
             partial_dynamic_inst.cloud_.emplace_back(pt);
         } else {
             static_inst.cloud_.emplace_back(pt);
@@ -782,8 +781,30 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
     vector<int> static_mask(N, IS_STATIC);
 
     vector<int> target_idxes;
-    erasor_utils::radiusSearch(dynamic_points, static_points,
-                               dist_thr_gain_ * voxel_size_, target_idxes);
+
+    if (use_adaptive_voxel_size_) {
+        vector<float> adaptive_radii;
+        adaptive_radii.resize(dynamic_points.size());
+        for (int i = 0; i < dynamic_points.size(); ++i) {
+            const auto& pt = dynamic_points[i];
+            grid_map::Position p_tmp(pt.x, pt.y);
+            grid_map::Index    idx_tmp;
+            gridmap_submap_.getIndex(p_tmp, idx_tmp);
+            bool is_in = idx_tmp(0) < grid_map_info_.width && idx_tmp(0) > -1 &&
+                          idx_tmp(1) < grid_map_info_.height && idx_tmp(1) > -1;
+            if (!is_in || gridmap_submap_.at("status", idx_tmp) == NOT_OBSERVED ||
+                            pt.z - gridmap_submap_.at("elevation", idx_tmp) < voxel_size_ * 0.5) {
+                adaptive_radii[i] = voxel_size_;
+            } else {
+                adaptive_radii[i] = dist_thr_gain_ * voxel_size_;
+            }
+        }
+        erasor_utils::radiusSearchWithAdaptiveRadii(dynamic_points, static_points, adaptive_radii, target_idxes);
+
+    } else {
+        erasor_utils::radiusSearch(dynamic_points, static_points,
+                                   dist_thr_gain_ * voxel_size_, target_idxes);
+    }
 
     for (const int idx: target_idxes) {
         static_mask[idx] = IS_DYNAMIC;
@@ -941,7 +962,7 @@ grid_map::GridMap ERASOR2::setMapcentricGridMap(const GridMapInfo &grid_map_info
     gridmap.setFrameId("map");
     gridmap.setGeometry(grid_map::Length(grid_map_info.x_length, grid_map_info.y_length),
                         grid_map_info.resolution);
-    gridmap["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
+    gridmap["elevation"].setConstant(NOT_UPDATED);
     gridmap["status"].setConstant(NOT_OBSERVED);
     gridmap["prob"].setConstant(0);
     gridmap["log_odds"].setConstant(0);
@@ -1103,7 +1124,7 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(float range,
     grid_map::GridMap gridmap({"elevation", "log_odds"});
     gridmap.setFrameId("map");
     gridmap.setGeometry(grid_map::Length(2 * range, 2 * range), grid_resolution);
-    gridmap["elevation"].setConstant(DIST_FROM_GROUND_TO_ORIGIN);
+    gridmap["elevation"].setConstant(NOT_UPDATED);
     gridmap["log_odds"].setConstant(NOT_OBSERVED);
 
     const int width  = static_cast<int>(2.00000001 * range / grid_resolution);

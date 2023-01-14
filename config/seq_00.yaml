@@ -11,6 +11,7 @@ dataloader:
     pose_path: ""
     sequence: "00"
     abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+    instance_seg_method: "cais"
 
     accum_interval: 1
     voxel_size: 0.2
@@ -38,8 +39,8 @@ erasor2:
     # For detection moving objects
     moving_object_detection:
         negative_log_odds: -2.0
-        obj_score_soft_thr: 2.0
-        obj_score_hard_thr: 20.0
+        obj_score_soft_thr: 4.6   # 75% - 1.098, 80% - 1.386, 90% - 2.197, 95.3 % - 3.0
+        obj_score_hard_thr: 14.0  # 99.99 % - 10.0, 99.9999 % - 14.0
         hard_thr_radius: 10.0
 
     # To manage over-segmented parts
@@ -50,13 +51,14 @@ erasor2:
     volumetric_outlier_removal:
         window_size: 1
         num_closest: 3 # Deprecated
+        use_adaptive_voxel_size: true
         dist_thr_gain: 1.732 # The larger, the more aggressive
 
     viz_flag:
         set_scan_and_pose: false
         set_submap: false
         update: false
-        detect: true
+        detect: false
 
 stop_for_each_frame: true
 

@@ -211,6 +211,36 @@ namespace erasor_utils {
         }
     }
 
+    void radiusSearchWithAdaptiveRadii(const pcl::PointCloud<pcl::PointXYZI> &query_cloud, const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
+                     const vector<float>& radii, vector<int>& target_idxes) {
+        PointCloud<num_t> cloud;
+        erasor_utils::pcl2nanoflann(target_cloud, cloud);
+        erasor_utils::my_kd_tree_t kdtree(3 /*dim*/, cloud, {10 /* max leaf */});
+
+        int N = target_cloud.size();
+        vector<bool> is_neighboring(N, false);
+        int query_idx = 0;
+        for (auto &query_pcl: query_cloud.points) {
+            const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
+            std::vector<nanoflann::ResultItem<uint32_t, num_t>> ret_matches;
+
+            int num_matched = kdtree.radiusSearch(
+                    &query_pt[0], radii[query_idx], ret_matches);
+
+            for (int i = 0; i < num_matched; ++i) {
+                is_neighboring[ret_matches[i].first] = true;
+            }
+            ++query_idx;
+        }
+
+        target_idxes.clear();
+        for (int j = 0; j < N; ++j) {
+            if (is_neighboring[j]) {
+                target_idxes.push_back(j);
+            }
+        }
+    }
+
     void fillGTLabel(const pcl::PointCloud<pcl::PointXYZI> &gt_cloud, pcl::PointCloud<pcl::PointXYZI> &est_cloud,
                      const float margin) {
         vector<int> correspondences;
@@ -397,7 +427,11 @@ namespace erasor_utils {
             }
         }
         int num_ground_pts = getNumGroundPoints(pcs);
-        return sum_z / num_ground_pts;
+        if (num_ground_pts == 0) {
+            return NOT_UPDATED;
+        } else {
+            return sum_z / num_ground_pts;
+        }
     }
 
     int getNumGroundPoints(const pcl::PointCloud<pcl::PointXYZI>& pc) {

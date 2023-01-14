@@ -22,7 +22,9 @@ int main(int argc, char **argv) {
     std::unique_ptr<DataLoader> loader;
     string                      dataset_name = params->dataset_name_;
     if (dataset_name == "SemanticKITTI") {
-        loader = std::move(std::make_unique<SemanticKITTILoader>(params->abs_data_dir_, params->sequence_));
+        loader = std::move(std::make_unique<SemanticKITTILoader>(params->abs_data_dir_,
+                                                                 params->sequence_,
+                                                                 params->instance_seg_method_));
     }
 
     cout << "Set dataloader complete" << endl;
