@@ -74,6 +74,7 @@ public:
     int minimum_num_pts_;
 
     int window_size_;
+    float vor_cand_score_thr_;
     bool use_adaptive_voxel_size_;
     float dist_thr_gain_;
 
@@ -162,6 +163,7 @@ public:
 
         nh_.param<int>("/erasor2/volumetric_outlier_removal/window_size", window_size_, 1);
         nh_.param<bool>("/erasor2/volumetric_outlier_removal/use_adaptive_voxel_size", use_adaptive_voxel_size_, false);
+        nh_.param<float>("/erasor2/volumetric_outlier_removal/vor_cand_score_thr", vor_cand_score_thr_, 3.0);
         nh_.param<float>("/erasor2/volumetric_outlier_removal/dist_thr_gain", dist_thr_gain_, 1.0);
 
         nh_.param<float>("/erasor2/grid_resolution", grid_resolution_, 0.4);

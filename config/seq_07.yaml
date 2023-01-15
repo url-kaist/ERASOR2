@@ -51,7 +51,8 @@ erasor2:
     volumetric_outlier_removal:
         window_size: 1
         use_adaptive_voxel_size: true
-        dist_thr_gain: 1.732 # The larger, the more aggressive
+        vor_cand_score_thr: 3.0 # Larger than `obj_score_soft_thr` and smaller than `obj_score_hard_thr`
+        dist_thr_gain: 2.0 # The larger, the more aggressive
 
     viz_flag:
         set_scan_and_pose: false

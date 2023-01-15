@@ -545,7 +545,7 @@ void ERASOR2::accumInstanceWiseDynamicCloud(const int k, const int window_size,
         const auto& noisy_points = noisy_points_transformed_[i];
         const auto& ids_clusters = ids_instances_set_[i];
         for (auto &[dyn_cand_id, dynamic_instance]: ids_clusters) {
-            if (dynamic_instance.is_dynamic_ && dynamic_instance.moving_obj_score_ > obj_score_hard_thr_) {
+            if (dynamic_instance.is_dynamic_ && dynamic_instance.moving_obj_score_ > vor_cand_score_thr_) {
                 *dyn_points_accum += dynamic_instance.cloud_;
 
                 vector<int> target_idxes;

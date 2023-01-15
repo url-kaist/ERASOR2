@@ -11,7 +11,7 @@ dataloader:
     pose_path: ""
     sequence: "19"
     abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
-    instance_seg_method: "cais"
+    instance_seg_method: "hdbscan"
 
     accum_interval: 2
     voxel_size: 0.2
@@ -27,7 +27,7 @@ erasor2:
     min_z_diff_thr: 0.4 # 물체가 존재한다고 가정 할 수있는 최소한의 z 차이
     scan_ratio_threshold: 0.2 # The Larger, the more objects could be candidates
     log_odds:
-        increment_gain: 4.0 # Should be larger than one
+        increment_gain: 3.0 # Should be larger than one
         increment: 0.15
     region_proposal_thr: 0.8 # probabiliy. 0 ~ 1
     kernel_size: 1
@@ -48,9 +48,11 @@ erasor2:
         minimum_area_thr: 56 # [m^2]
         ratio_of_unknown_prior: 0.25
 
+    # To manage under-segmented parts
     volumetric_outlier_removal:
         window_size: 3
         use_adaptive_voxel_size: true
+        vor_cand_score_thr: 3.0 # Larger than `obj_score_soft_thr` and smaller than `obj_score_hard_thr`
         dist_thr_gain: 1.732 # The larger, the more aggressive
 
     viz_flag:
