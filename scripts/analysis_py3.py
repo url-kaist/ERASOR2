@@ -1,17 +1,15 @@
-import pypcd
+from pypcd_py3 import pypcd
 from tqdm import tqdm
 import numpy as np
-
 from sklearn.neighbors import NearestNeighbors
 from tabulate import tabulate
+DYNAMIC_CLASSES = [252, 253, 254, 255, 256, 257, 259]
 
 def intensity2labels(intensity_np):
     label = intensity_np.astype(np.uint32)
     sem_label = label & 0xFFFF  # semantic label in lower half
     inst_label = label >> 16  # instance id in upper half
     return sem_label, inst_label
-
-DYNAMIC_CLASSES = [252, 253, 254, 255, 256, 257, 259]
 
 def fetch_dynamic_objects_ids(intensity_np):
     sem_label, inst_label = intensity2labels(intensity_np)
@@ -180,16 +178,10 @@ def evaluate(gt, estimate, voxelsize=0.2):
 
     pr = float(num_static_preserved) / float(num_gt['static']) * 100
     rr = float(num_gt['dynamic'] - num_dynamic_preserved) / float(num_gt['dynamic']) * 100
-    printed_data = gt_data + est_data \
-                   + [num_estimate['percentage']/num_gt['percentage']
-                      , pr
-                      , rr
-                      , np.log(num_estimate['percentage']/100) / np.log(num_gt['percentage']/100)
-                      , precision
-                      , recall
-                      , 2 * ( (pr/100) * (rr/100) ) / ((pr/100) + (rr/100))]
-    print(tabulate([printed_data], headers=['# s', '# d', '%', '# s out.', '# d out.', '%',
-                                             "% / %", 'Preservation', 'rejection', 'REL (log % / log %)', 'precision', 'recall', 'F1'], tablefmt='orgtbl'))
+    printed_data = gt_data + est_data + [pr, rr, 2 * (pr/100) * (rr/100) / ((pr/100) + (rr/100))]
+
+    print(tabulate([printed_data], headers=['# stat. pts', '# dyn. pts', '%', '# est. stat. pts', '# est. dyn. pts',
+                                            '%', 'Preservation', 'rejection', 'F1'], tablefmt='orgtbl'))
 def load_pcd(path):
     print("On loading data...")
     data = pypcd.PointCloud.from_path(path)
@@ -197,44 +189,19 @@ def load_pcd(path):
     return data
 
 if __name__ == "__main__":
-    seq = "00"
-    print("target: " + seq)
-    src_path = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/src_v2/07_630_to_820_w_interval2_voxel__0_2.pcd"
-    # src_path = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/src_0_2/00_4390_to_4530_w_interval2_voxel_0.200000.pcd"
-    # target = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/erasor_best_pcd/00_result.pcd"
-    # target = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/erasor_best_pcd/00_result_best.pcd"
-    # rm3 = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/removert_rm3_00_w_label.pcd"
-    # rv1 = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/removert_rv1_00_w_label.pcd"
+    import argparse
+    import os
 
-    target1 = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/octomap_output/voxel_size_0.05/07_0.050000_1_w_label.pcd"
-    target2 = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/octomap_output/voxel_size_0.2/07_0.200000_1_w_label.pcd"
-    # in case of seq. 01
-    # target1 = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/octomap_output/voxel_size_0.05/01_0.075000_1_w_label.pcd"
-    # target2 = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/octomap_output/voxel_size_0.2/01_0.200000_1_w_label.pcd"
+    parser = argparse.ArgumentParser(description='Analysis of static map')
+    parser.add_argument('--gt', default='/home/shapelim/erasor_paper_pcds/gt/00_voxel_0_2.pcd', type=str)
+    parser.add_argument('--est', default='/home/shapelim/erasor_paper_pcds/estimate/00_ERASOR.pcd', type=str)
+    args = parser.parse_args()
+    print("GT Path: " + args.gt)
+    print("Estimate Path: " + args.est)
 
-    # target3 = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/octomap_output/insertpc_00_0.100000_1_w_label.pcd"
-    # target4 = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/octomap_output/insertpc_00_0.050000_1_w_label.pcd"
+    assert os.path.isfile(args.gt), "GT path does not exist"
+    assert os.path.isfile(args.est), "Est path does not exist"
 
-
-    gt_data = load_pcd(src_path)
-    t1 = load_pcd(target1)
-    t2 = load_pcd(target2)
-
-
-    evaluate(gt_data, t1, voxelsize=0.2)
-    evaluate(gt_data, t2, voxelsize=0.2)
-
-    # w_floor = load_pcd(w_floor_path)
-    # wo_floor = load_pcd(wo_floor_path)
-    # floor = load_pcd(floor_path)
-
-    ##########################################
-    # evaluate(gt_data, wo_floor, voxelsize=0.2)
-    # evaluate(gt_data, w_floor, voxelsize=0.2)
-    # evaluate(gt_data, floor, voxelsize=0.2)
-    ##########################################
-
-    # path = "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/08_0_to_249_w_interval3_voxel_0_2.pcd"
-    # data = load_pcd(path)
-    # fetch_dynamic_objects_ids(data.pc_data['intensity'])
-    #
+    gt_data = load_pcd(args.gt)
+    target_data = load_pcd(args.est)
+    evaluate(gt_data, target_data, voxelsize=0.2)

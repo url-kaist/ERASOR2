@@ -1,0 +1,50 @@
+name: erasor_analysis
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=main
+  - _openmp_mutex=5.1=1_gnu
+  - ca-certificates=2022.12.7=ha878542_0
+  - certifi=2020.6.20=pyhd3eb1b0_3
+  - libffi=3.4.2=h6a678d5_6
+  - libgcc-ng=11.2.0=h1234567_1
+  - libgomp=11.2.0=h1234567_1
+  - libstdcxx-ng=11.2.0=h1234567_1
+  - ncurses=6.3=h5eee18b_3
+  - pip=19.3.1=py27_0
+  - progressbar=2.5=py_0
+  - python=2.7.18=h42bf7aa_3
+  - readline=8.2=h5eee18b_0
+  - setuptools=44.0.0=py27_0
+  - sqlite=3.40.0=h5082296_0
+  - tk=8.6.12=h1ccaba5_0
+  - wheel=0.37.1=pyhd3eb1b0_0
+  - zlib=1.2.13=h5eee18b_0
+  - pip:
+    - backports-functools-lru-cache==1.6.4
+    - contextlib2==0.6.0.post1
+    - cycler==0.10.0
+    - importlib-resources==3.3.1
+    - kiwisolver==1.1.0
+    - matplotlib==2.2.5
+    - numpy==1.16.6
+    - pathlib2==2.3.7.post1
+    - pyparsing==2.4.7
+    - pypcd==0.1.1
+    - python-dateutil==2.8.2
+    - python-lzf==0.2.4
+    - pytz==2022.7
+    - pyyaml==5.4.1
+    - scandir==1.10.0
+    - scikit-learn==0.20.4
+    - scipy==1.2.3
+    - singledispatch==3.7.0
+    - six==1.16.0
+    - subprocess32==3.5.4
+    - tabulate==0.8.10
+    - tqdm==4.64.1
+    - typing==3.10.0.0
+    - zipp==1.2.0
+prefix: /home/shapelim/anaconda3/envs/erasor_analysis
+

@@ -1,28 +1,61 @@
-# :rainbow: ERASOR (RA-L'21 with ICRA Option)
+# ERASOR2 (RSS'22)
 
-Official page of [*"ERASOR: Egocentric Ratio of Pseudo Occupancy-based Dynamic Object Removal for Static 3D Point Cloud Map Building"*](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9361109), which is accepted by RA-L with ICRA'21 option 
-[[Video](https://www.youtube.com/watch?v=Nx27ZO8afm0)] [[Preprint Paper](https://arxiv.org/abs/2103.04316)] 
+Official page of *"ERASOR2"*
 
-![overview](img/fig_overview.png)
+[Video] [Preprint Paper] 
 
+## Test Env.
+The code is tested successfully at
+* Linux 20.04 LTS
+* ROS Noetic
 
+### Evaluation part for Benedikt
 
-We provide all contents including
+* what we need is a) GT map that contains moving objects and b) estimated map by a MOS method.
+* To get an accumulated GT map, i) set `config/kitti_mapgen.yaml` (in particular, `dataloader/abs_data_dir` and `dataloader/abs_save_dir`). The File hierarchy should follow this:
 
-- [x] Source code of ERASOR
-- [x] All outputs of the State-of-the-arts
-- [x] Visualization
-- [x] Calculation code of Preservation Rate/Rejection Rate
+```
+${dataloader/abs_data_dir}
+├── 19
+│   ├── labels
+│   └── velodyne
+│   └── kiss_icp_poses.txt
+│   └── benedikt_4dmos_labels
+│   └── benedikt_scan2map_labels
+```
 
-So enjoy our codes! :)
+If you want to test other sequences, then revise the `SemanticKITTILoader::SemanticKITTILoader()` constructor in line 61 of `src/dataloader/dataloader.cpp`.
 
-Contact: Hyungtae Lim (shapelim`at`kaist`dot`ac`dot`kr)
+ and then ii) run below command:
 
-Advisor: Hyun Myung (hmyung`at`kaist`dot`ac`dot`kr)
+```
+$ roslaunch erasor2 mapgen.launch start_frame:=0 end_frame:=800 seq:="19"
+```
 
-## NEWS (Recent update: Oct., 2021) 
-- An example of running ERASOR in your own env. is provided.
-    - Please refer to please refer to `src/offline_map_updater/main_in_your_env.cpp` and `launch/run_erasor_in_your_env_vel16.launch`. The more details are  [here](#ERASOR-in-the-Wild).
+* Next, launch below command:
+ 
+```
+$ roslaunch erasor2 accum_4dmos.launch start_frame:=0 end_frame:=800 seq:="19"
+```
+* Finally, run python script `scripts/analysis.py` as follows:
+
+```asm
+# Example:
+$ python2.7 analysis.py --gt /media/shapelim/UX980/erasor_outputs/SemanticKITTI/19_0_to_800_w_interval_2_voxel_0_2.pcd --est /media/shapelim/UX980/erasor_outputs/SemanticKITTI/19_from_0_to_800_benedikt_4dmos_labels.pc
+```
+
+Then, you'll see like this!
+
+```asm
+|   # stat. pts |   # dyn. pts |       % |   # est. stat. pts |   # est. dyn. pts |       % |   Preservation |   rejection |       F1 |
+|---------------|--------------|---------|--------------------|-------------------|---------|----------------|-------------|----------|
+|        945214 |       197225 | 20.8656 |             947318 |             36918 | 3.89711 |        99.6017 |     78.2092 | 0.876185 |
+
+```
+
+**Why python2.7?!**: Due to pypcd...Rhiney also gives me `analysis_py3.py`. Please check it. 
+* For python2.7, there is a `scripts/py2.7_environment.yml`.
+
 ---
 
 ## Contents
