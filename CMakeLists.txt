@@ -23,10 +23,6 @@ find_package(catkin REQUIRED COMPONENTS
     grid_map_cv
 )
 
-add_message_files(
-   FILES
-)
-
 generate_messages(
   DEPENDENCIES
   std_msgs

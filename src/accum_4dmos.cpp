@@ -155,6 +155,8 @@ int loadCloud(const string& cloud_dir, size_t idx, pcl::PointCloud<T> &cloud) {
 int main(int argc, char **argv) {
     ros::init(argc, argv, "erasor2_main");
     ros::NodeHandle nh;
+    string    target_mos_type =  "benedikt_4dmos_labels"; // "benedikt_scan2map_labels";
+    nh.param<string>("/target_mos_type", target_mos_type, "");
 
     std::cout << "4D MOS mapping started" << std::endl;
 
@@ -167,13 +169,18 @@ int main(int argc, char **argv) {
     int end_frame      = params->end_frame_;
     int accum_interval = params->accum_interval_;
 
-    string map_path      = params->abs_save_dir_ + "/" + params->sequence_ + "_" + to_string(start_frame) +
-                           "_to_" + to_string(end_frame) + "_estimated.pcd";
-    string    target_alg =  "benedikt_4dmos_labels"; // "benedikt_scan2map_labels";
-    string abs_gt_label_dir = "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences/19/labels";
-    string abs_label_dir = "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences/19/" + target_alg;
-    string abs_cloud_dir = "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences/19/velodyne";
-    string abs_pose_path = "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences/19/kiss_icp_poses.txt";
+    string abs_data_dir =  params->abs_data_dir_;
+    string sequence     =  params->sequence_;
+
+    string abs_gt_label_dir = abs_data_dir + "/" + sequence + "/labels";
+    string abs_label_dir = abs_data_dir + "/" + sequence + "/" + target_mos_type;
+    string abs_cloud_dir = abs_data_dir + "/" + sequence + "/velodyne";
+    string abs_pose_path = abs_data_dir + "/" + sequence + "/kiss_icp_poses.txt";
+
+    cout << "\033[1;32m" << abs_gt_label_dir << "\n";
+    cout << abs_label_dir << "\n";
+    cout << abs_cloud_dir << "\n";
+    cout << abs_pose_path << "\033[0m\n";
 
     vector<Eigen::Matrix4f> poses;
     loadAllPoses(abs_pose_path, poses);
@@ -231,9 +238,8 @@ int main(int argc, char **argv) {
             } else {
                 if (est_labels[count] == 9.0) {
                     est_static->points.emplace_back(pt);
-                } else {
+                } else { // Maybe 251 is dynamic label!
                     est_dynamic->points.emplace_back(pt);
-
                 }
             }
             ++count;
@@ -249,9 +255,9 @@ int main(int argc, char **argv) {
     std::cout << "[Debug]: (" << static_map_voxelized->width << ", " << static_map_voxelized->height << ") => "
               << static_map_voxelized->points.size()
               << std::endl;
-    std::cout << "\033[1;32mSaving the map to pcd...\033[0m" << std::endl;
-    string static_map_path = "/media/shapelim/UX980/4dmos_kitti_tracking19/" + target_alg + "_from_"
-            + to_string(start_frame) + "_to_" + to_string(end_frame) + "_est.pcd";
+    string static_map_path = params->abs_save_dir_ + "/" + sequence + "_from_"
+            + to_string(start_frame) + "_to_" + to_string(end_frame) + "_" + target_mos_type + ".pcd";
+    std::cout << "\033[1;32mSaving the map to pcd...: " << static_map_path << "\033[0m" << std::endl;
     pcl::io::savePCDFileASCII(static_map_path, *static_map_voxelized);
 
     cout << "[ERASOR2] Complete to set scans and poses\n";
