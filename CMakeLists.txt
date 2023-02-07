@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(erasor2)
-set(CMAKE_CONFIGURATION_TYPES "Release" CACHE STRING "" FORCE)
+set(CMAKE_BUILD_TYPE Release)
 add_compile_options(-std=c++17)
 
 find_package(catkin REQUIRED COMPONENTS

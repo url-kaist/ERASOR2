@@ -21,8 +21,8 @@ if __name__ == "__main__":
     for s in range(22):
         odometry_sequences.append(str(s).zfill(2))
 
-    ABS_DATA_DIR = "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
-    ABS_SAVE_DIR = "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
+    ABS_DATA_DIR = "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
+    ABS_SAVE_DIR = "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
 
     parser = argparse.ArgumentParser(description="Convert KITTI dataset to ROS bag file the easy way!")
     # parser.add_argument("--dir", nargs="?", default = os.getcwd(), help="base directory of the dataset, if no directory passed the deafult is current working directory")

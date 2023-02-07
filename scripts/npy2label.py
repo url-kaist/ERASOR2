@@ -6,7 +6,7 @@ from pathlib import Path
 
 if __name__ == "__main__":
     abs_src_dir = "/media/shapelim/Elements/3DUIS"
-    abs_save_dir = "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
+    abs_save_dir = "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
     seq = "00"
     start_frame = 4520
     end_frame = 4530 + 1

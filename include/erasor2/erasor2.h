@@ -36,6 +36,12 @@ struct GridMapInfo {
     float y_length;
 };
 
+struct ParsedCurrCloud {
+    pcl::PointCloud<pcl::PointXYZRGB> non_ground_;
+    pcl::PointCloud<pcl::PointXYZI> ground_;
+    pcl::PointCloud<pcl::PointXYZI> noise_;
+};
+
 class ERASOR2 : public RosParamServer {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -61,6 +67,10 @@ public:
     vector<vector<pcl::PointCloud<pcl::PointXYZI>>> xygrids_;
     vector<grid_map::Index>                         idxes_approx_;
     vector<unordered_map<float, DynamicInstance>>   ids_instances_set_;
+
+
+    // For visualize clusters
+    vector<vector<uint8_t>> colors;
 
     // For visualize the moving object score
     vector<vector<pair<Eigen::Matrix<float, 4, 1>, float> >> rejected_objs_set_;
@@ -111,6 +121,8 @@ public:
     /***********************/
 
     void resize();
+
+    ParsedCurrCloud parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &cloud);
 
     void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
                             const unordered_map<float, DynamicInstance> &ids_clusters,
@@ -245,6 +257,8 @@ private:
     bool isInsideTheDynamicInstances(const pcl::PointXYZI& query, const pcl::PointXYZI& target);
 
     void printClusterInfo(const DynamicInstance& dynamic_cluster);
+
+    void publishPose(int k);
 };
 
 

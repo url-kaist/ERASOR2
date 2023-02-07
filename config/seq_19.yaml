@@ -5,7 +5,7 @@ is_large_scale: true
 
 dataloader:
     dataset_name: "SemanticKITTI"
-    abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_w_gt/dataset/sequences"
+    abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
     cloud_dir: ""
     cloud_format: ""
     pose_path: ""

@@ -147,8 +147,13 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
         grid_map::GridMap gridmap = setEgocentricGridMap(range_of_interest_,
                                                          grid_resolution_, xygrid);
 
+        auto parsed_cloud = parseCurrCloud(cloud_est_label);
+
         // Viz
         CurrCloudPublisher.publish(erasor_utils::cloud2msg(cloud_est_label));
+        NonGroundCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.non_ground_));
+        GroundCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.ground_));
+        NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.noise_));
         grid_map_msgs::GridMap grid_msg;
         grid_map::GridMapRosConverter::toMessage(gridmap, grid_msg);
         EgocentricGridPublisher.publish(grid_msg);
@@ -202,6 +207,48 @@ void ERASOR2::resize() {
     potential_dynamic_points_transformed_.resize(num_data_);
 
     ids_instances_set_.resize(num_data_);
+}
+
+ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &cloud) {
+    // Viz
+    ParsedCurrCloud parsed_cloud;
+    parsed_cloud.non_ground_.reserve(50000);
+    parsed_cloud.ground_.reserve(50000);
+    parsed_cloud.noise_.reserve(10000);
+
+    int max_idx = max_ids_.back();
+    vector<float> tmp_idxes;
+    for (const auto& pt: cloud) {
+        if (pt.intensity == GROUND_LABEL) {
+            parsed_cloud.ground_.emplace_back(pt);
+        } else if (pt.intensity == NOT_INTEREST) {
+            parsed_cloud.noise_.emplace_back(pt);
+        } else if(pt.intensity != NOT_VOLUME_OF_INTEREST) {
+            pcl::PointXYZRGB pt_new;
+            pt_new.x = pt.x;
+            pt_new.y = pt.y;
+            pt_new.z = pt.z;
+            tmp_idxes.push_back(pt.intensity);
+            parsed_cloud.non_ground_.emplace_back(pt_new);
+        }
+    }
+
+    for (int i = 0; i < max_idx + 1; ++i) {
+        uint8_t r = static_cast<uint8_t>(rand() % 0xff);
+        uint8_t g = static_cast<uint8_t>(rand() % 0xff);
+        uint8_t b = static_cast<uint8_t>(rand() % 0xff);
+        vector<uint8_t> color = {r, g, b};
+        colors.emplace_back(color);
+    }
+    int ccc = 0;
+    for (auto&pt: parsed_cloud.non_ground_) {
+        int idx_tmp = int(tmp_idxes[ccc]);
+        pt.r = colors[idx_tmp][0];
+        pt.g = colors[idx_tmp][1];
+        pt.b = colors[idx_tmp][2];
+        ++ccc;
+    }
+    return parsed_cloud;
 }
 
 void ERASOR2::updateSteppableRegion() {
@@ -261,6 +308,8 @@ void ERASOR2::updateSteppableRegion() {
             pcl::PointCloud<pcl::PointXYZI>::Ptr map_voi(new pcl::PointCloud<pcl::PointXYZI>);
             xygrid2cloud(xygrids_[k], *curr_voi);
             xygrid2cloud(map_grid, *map_voi);
+
+            publishPose(k);
 
             CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
             CurrVoIPublisher.publish(erasor_utils::cloud2msg(*curr_voi));
@@ -387,27 +436,6 @@ void ERASOR2::filterDynamicObjects() {
                     rejected_objs.push_back({dynamic_instance.centroid_, dynamic_instance.moving_obj_score_});
                 }
             }
-
-//            if (k > 10 || k < 20) {  // seq. 00
-//            if (k == 46 || k == 51 || k > 90) {  // seq. 07
-//            if (k == 15 || k == 32 ||k == 85 || k == 86 || k == 87) { // seq 0.5
-//            if (k == 15 || k == 32 ||k == 85 || k == 86 || k == 87) { // seq 0.5
-//                CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
-//                DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_instance.cloud_));
-//
-//                const float obj_x = dynamic_instance.centroid_(0);
-//                const float obj_y = dynamic_instance.centroid_(1);
-//                const float pos_x = poses_submap_[k](0, 3);
-//                const float pos_y = poses_submap_[k](1, 3);
-//                float dist = sqrt((obj_x - pos_x) * (obj_x - pos_x) + (obj_y - pos_y) * (obj_y - pos_y));
-//                cout << "Dist: " << dist << endl;
-//                cout << "Score: " << dynamic_instance.moving_obj_score_ << endl;
-//                cout << "Is close? " << dynamic_instance.is_close_to_body_frame_ << endl;
-//                cout << "Is dyn? " << dynamic_instance.is_dynamic_ << endl;
-//                printClusterInfo(dynamic_instance);
-//
-//                cin.ignore();
-//            }
         }
 
         updateNewParsedInstances(instances_to_be_updated, pcs_transformed_[k], ids_clusters);
@@ -450,6 +478,30 @@ void ERASOR2::filterDynamicObjects() {
         (*map_dynamic_) += dynamic_points_transformed_[k] + potential_dynamic_points_transformed_[k];
 
         if (viz_detect_) {
+            publishPose(k);
+
+            pcl::PointCloud<pcl::PointXYZRGB> inst_colored;
+            pcl::PointXYZRGB pt_colored;
+            for (auto &[dyn_cand_id, dynamic_instance]: ids_instances_set_[k]) {
+                while (colors.size() <= dyn_cand_id) {
+                   uint8_t r = static_cast<uint8_t>(rand() % 0xff);
+                   uint8_t g = static_cast<uint8_t>(rand() % 0xff);
+                   uint8_t b = static_cast<uint8_t>(rand() % 0xff);
+                   vector<uint8_t> color = {r, g, b};
+                   colors.emplace_back(color);
+                }
+                pt_colored.r = colors[dyn_cand_id][0];
+                pt_colored.g = colors[dyn_cand_id][1];
+                pt_colored.b = colors[dyn_cand_id][2];
+                for (const auto &pt: dynamic_instance.cloud_) {
+                    pt_colored.x = pt.x;
+                    pt_colored.y = pt.y;
+                    pt_colored.z = pt.z;
+                    inst_colored.emplace_back(pt_colored);
+                }
+            }
+            DynInstCurrCloudPublisher.publish(erasor_utils::cloud2msg(inst_colored));
+
             cout << pcs_transformed_[k].points.size() << " => " << static_points_transformed_[k].points.size() << " / ";
             cout << dynamic_points_transformed_[k].points.size() << " / " << noisy_points_transformed_[k].size() << " / ";
             cout << potential_dynamic_points_transformed_[k].points.size() << endl;
@@ -1383,4 +1435,26 @@ void ERASOR2::printClusterInfo(const DynamicInstance& dynamic_cluster) {
         cout << endl;
     }
 
+}
+
+void ERASOR2::publishPose(int k) {
+    geometry_msgs::PoseStamped pose;
+    pose.header.stamp = ros::Time::now();
+    pose.header.frame_id = "map";
+    pose.pose = erasor_utils::eigen2geoPose(poses_submap_[k]);
+    PosePublisher.publish(pose);
+
+    static tf2_ros::TransformBroadcaster br;
+    geometry_msgs::TransformStamped trans_msg;
+    trans_msg.header.stamp = ros::Time::now();
+    trans_msg.transform.translation.x = pose.pose.position.x;
+    trans_msg.transform.translation.y = pose.pose.position.y;
+    trans_msg.transform.translation.z = pose.pose.position.z;
+    trans_msg.transform.rotation.x = pose.pose.orientation.x;
+    trans_msg.transform.rotation.y = pose.pose.orientation.y;
+    trans_msg.transform.rotation.z = pose.pose.orientation.z;
+    trans_msg.transform.rotation.w = pose.pose.orientation.w;
+    trans_msg.header.frame_id = "map";
+    trans_msg.child_frame_id = "body";
+    br.sendTransform(trans_msg);
 }

@@ -106,10 +106,13 @@ public:
     ros::Publisher NoiseMapPublisher;
     ros::Publisher CurrCloudPublisher;
     ros::Publisher DynCurrCloudPublisher;
+    ros::Publisher DynInstCurrCloudPublisher;
     ros::Publisher RejectedDynCurrCloudPublisher;
     ros::Publisher OutlierCurrCloudPublisher;
     ros::Publisher AcceptedMovingObjScorePublisher;
     ros::Publisher RejectedMovingObjScorePublisher;
+    ros::Publisher NonGroundCurrCloudPublisher;
+    ros::Publisher GroundCurrCloudPublisher;
     ros::Publisher NoiseCurrCloudPublisher;
     ros::Publisher StaticCloudPublisher;
     ros::Publisher DynamicCloudPublisher;
@@ -117,6 +120,8 @@ public:
     ros::Publisher EgocentricGridPublisher;
     ros::Publisher GridPublisher;
     ros::Publisher AdaptiveRangePublisher;
+
+    ros::Publisher PosePublisher;
 
     RosParamServer()
     {
@@ -208,11 +213,16 @@ public:
 
         CurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/curr_scan", 100, true);
         DynCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dyn_points", 100, true);
+        DynInstCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dyn_inst_points", 100, true);
         RejectedDynCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/rejected_dyn_points", 100, true);
         OutlierCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/outlier_points", 100, true);
         AcceptedMovingObjScorePublisher = nh_.advertise<visualization_msgs::MarkerArray>("/erasor2/accetped_moving_obj_scores", 100, true);
         RejectedMovingObjScorePublisher = nh_.advertise<visualization_msgs::MarkerArray>("/erasor2/rejected_moving_obj_scores", 100, true);
+
+        NonGroundCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/non_ground_points", 100, true);
+        GroundCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/ground_points", 100, true);
         NoiseCurrCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/noise_points", 100, true);
+
         StaticCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/static", 100, true);
         DynamicCloudPublisher = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/dynamic", 100, true);
 
@@ -220,6 +230,7 @@ public:
         GridPublisher = nh_.advertise<grid_map_msgs::GridMap>("/erasor2/gridmap", 100, true);
         AdaptiveRangePublisher = nh_.advertise<visualization_msgs::Marker>("/erasor2/adaptive_range", 100, true);
 
+        PosePublisher = nh_.advertise<geometry_msgs::PoseStamped>("/erasor2/pose", 100, true);
 
 //        pub_map_rejected  = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/map_rejected", 100);
 //        pub_curr_rejected = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/curr_rejected", 100);
