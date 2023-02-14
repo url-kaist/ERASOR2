@@ -84,6 +84,20 @@ public:
             CurrCloudPublisher.publish(erasor_utils::cloud2msg(*cloud_curr_wrt_world_));
             MapCloudPublisher.publish(erasor_utils::cloud2msg(*cloud_map_));
             PathPublisher.publish(nav_path_);
+
+            static tf2_ros::TransformBroadcaster br;
+            geometry_msgs::TransformStamped trans_msg;
+            trans_msg.header.stamp = ros::Time::now();
+            trans_msg.transform.translation.x = pose_stamped.pose.position.x;
+            trans_msg.transform.translation.y = pose_stamped.pose.position.y;
+            trans_msg.transform.translation.z = pose_stamped.pose.position.z;
+            trans_msg.transform.rotation.x = pose_stamped.pose.orientation.x;
+            trans_msg.transform.rotation.y = pose_stamped.pose.orientation.y;
+            trans_msg.transform.rotation.z = pose_stamped.pose.orientation.z;
+            trans_msg.transform.rotation.w = pose_stamped.pose.orientation.w;
+            trans_msg.header.frame_id = "map";
+            trans_msg.child_frame_id = "body";
+            br.sendTransform(trans_msg);
         }
         ++count_;
     }
