@@ -57,6 +57,7 @@ include_directories(
 set(erasor2_src
     src/dataloader/dataloader.cpp
     src/erasor2/erasor_utils.cpp
+    
 )
 
 add_executable(inheritance_test src/example/inheritance_test.cpp ${erasor2_src})

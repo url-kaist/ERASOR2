@@ -1,21 +1,100 @@
 //
 // Created by shapelim on 22.12.22.
 //
+
+#ifndef ERASOR2_DATALOADER_H
+#define ERASOR2_DATALOADER_H
+
+
 #include <iostream>
 #include <iomanip>
 #include <memory>
 #include <boost/format.hpp>
 #include <Eigen/Core>
 #include <filesystem>
+
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/common/io.h>
 #include "tools/erasor_utils.hpp"
+#include <experimental/filesystem> 
 
-#ifndef ERASOR2_DATALOADER_H
-#define ERASOR2_DATALOADER_H
+namespace fs = std::experimental::filesystem;
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
 
 using namespace std;
+struct PointXYZIRT
+{
+    PCL_ADD_POINT4D;
+    PCL_ADD_INTENSITY;
+    uint16_t ring;
+    float time;
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRT,
+    (float, x, x) (float, y, y) (float, z, z) (float, intensity, intensity)
+    (uint16_t, ring, ring) (float, time, time)
+)
+
+struct OusterPointXYZIRT
+{
+    PCL_ADD_POINT4D;
+    PCL_ADD_INTENSITY;
+    uint32_t t;
+    uint16_t reflectivity;
+    uint16_t ring;
+    uint16_t ambient;
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+POINT_CLOUD_REGISTER_POINT_STRUCT (OusterPointXYZIRT,
+    (float, x, x) (float, y, y) (float, z, z) (float, intensity, intensity)
+    (uint32_t, t, t) (uint16_t, reflectivity, reflectivity) 
+    (uint16_t, ring, ring) (uint16_t, ambient, ambient)
+)
+
+struct AevaPointXYZIRT
+{
+    PCL_ADD_POINT4D;
+    PCL_ADD_INTENSITY;
+    float reflectivity;
+    float velocity;
+    int32_t time_offset_ns;
+    uint8_t line_index;
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+POINT_CLOUD_REGISTER_POINT_STRUCT (AevaPointXYZIRT,
+    (float, x, x) (float, y, y) (float, z, z) (float, intensity, intensity)
+    (float, reflectivity, reflectivity) (float, velocity, velocity) 
+    (int32_t, time_offset_ns, time_offset_ns) (uint8_t, line_index, line_index)
+)
+
+struct LivoxPointXYZI
+{
+    PCL_ADD_POINT4D;
+    uint8_t reflectivity;
+    uint8_t tag;
+    uint8_t line;
+    uint32_t offset_time;
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+POINT_CLOUD_REGISTER_POINT_STRUCT (LivoxPointXYZI,
+    (float, x, x) (float, y, y) (float, z, z) (uint8_t, reflectivity, reflectivity)
+    (uint8_t, tag, tag) (uint8_t, line, line) (uint32_t, offset_time, offset_time)
+)
+
+using pc_type = PointXYZIRT;
+using pc_type_o = OusterPointXYZIRT;
+using pc_type_l = LivoxPointXYZI;
+using pc_type_a = AevaPointXYZIRT;
 
 class DataLoader {
 public:
@@ -59,7 +138,7 @@ public:
     inline void getPose(const size_t i, Eigen::Matrix4f& pose);
 
     /*
-     * Virtual functions
+     * Virtual functions virtual로 정의된 함수에서는 파생 클래스가 함수를 재정의 할 수 있음
      */
     // Important! 'virtual' is necessary
     // + the functions must be declared, i.e. {} is needed
@@ -71,7 +150,9 @@ public:
     virtual void getGTLabeledScan(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud) {}
 
     // Estimated labels are added
-    virtual void getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud, Eigen::Matrix4f &pose) {}
+    virtual void getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud, Eigen::Matrix4f &pose) {
+        cout << "[DefaultLoader] Default getScanandPose is Loaded" << endl;
+    }
 
     virtual void loadEstGroundAndInstanceLabels(const int i, std::vector<uint32_t>& ground_label,
                                                          std::vector<uint32_t>& instance_label) {}
@@ -91,8 +172,9 @@ public:
     string                  ground_label_dir_;
     string                  est_label_dir_;
     vector<Eigen::Matrix4f> poses_gt_;
+    vector<string> timestamp_lists_; // for HeLiPR
 };
-
+// ! 위에까지가 기본적인 데이터 로더의 형태였고, 이제 아래부터가 커스터마이징 된 데이터 로더!
 class SemanticKITTILoader : public DataLoader {
 public:
 //    SemanticKITTILoader() = delete;
@@ -179,15 +261,70 @@ public:
     }
 };
 
-//class BongeunsaLoader : public DataLoader {
-//public:
+class HeLiPRLoader : public DataLoader{
+  public:
+    HeLiPRLoader();
+    HeLiPRLoader(const string &abs_data_dir, const string &sensor, const string& instance_seq_method="cais");
+    ~HeLiPRLoader(){}
 
-//    BongeunsaLoader(string abs_dir) {
-//        path_ = path;
-//    }
-//
-//    ~BongeunsaLoader() {}
-//
-//};
+    inline void countNumFrames(const string &pcd_dir, const string &pcd_format, vector<string> &files);
+
+    void loadAllPoses(const string pose_path, vector<Eigen::Matrix4f> &poses);
+
+    // 
+    // void getScanAndPose(size_t i, pcl::PointCloud<T>& cloud, Eigen::Matrix4f &pose);
+    // template<typename T>
+    void getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI> &cloud, Eigen::Matrix4f &pose);
+    // void getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI>& cloud, Eigen::Matrix4f &pose);
+    
+    template<typename T>
+    int loadCloud(size_t idx, pcl::PointCloud<T> &cloud){
+      // 이건 생성자에 따라서 수정이 좀 필요해 보임... 일단 4개 다 불러오는 건 고사하고 하나하나 불러오는 걸로 바꿔야겠다.
+      string idx_timestamp = timestamp_lists_[idx];
+      string filename = (boost::format("%s/%s.%s") % cloud_dir_ % idx_timestamp % cloud_format_).str();
+      printf("Loading %s\n", filename.c_str());
+      uint64_t data = std::stoull(idx_timestamp);
+      cloud.clear();
+
+      if(seq_ == "Velodyne"){
+          loadCloudVelodyne(filename, cloud);
+        }
+      else if (seq_ == "Ouster"){ // Ouster
+          loadCloudOuster(filename, cloud);
+        }
+      else if (seq_ == "Avia"){ // livox
+          loadCloudAvia(filename, cloud);
+        }
+      else if (seq_ == "Aeva"){ // aeva
+          loadCloudAeva(filename, cloud, data);
+        }
+      else{
+          std::cout << "Error: invalid point type" << std::endl;
+          return -1;
+        }  
+
+    return 0;
+    }
+
+    template<typename T>
+    void loadCloudOuster(string filename, pcl::PointCloud<T> &cloud);
+
+    template<typename T>
+    void loadCloudVelodyne(string filename, pcl::PointCloud<T> &cloud);
+
+    template<typename T>
+    void loadCloudAvia(string filename, pcl::PointCloud<T> &cloud);
+
+    template<typename T>
+    void loadCloudAeva(string filename, pcl::PointCloud<T> &cloud, uint64_t data);
+    // void loadCloudXYZ(string filename, pcl::PointCloud<pcl::PointXYZ> &cloud);
+  
+  Eigen::Matrix4f T_OS2_VLP16;
+  Eigen::Matrix4f T_OS2_Avia;
+  Eigen::Matrix4f T_OS2_Aeva;
+
+};
+
+
 
 #endif //ERASOR2_DATA_LOADER_H

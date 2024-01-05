@@ -27,13 +27,19 @@ int main(int argc, char **argv) {
                                                                  params->instance_seg_method_));
     }
 
+    else if (dataset_name == "HeLiPR") {
+        loader = std::move(std::make_unique<HeLiPRLoader>(params->abs_data_dir_,
+                                                          params->sequence_,
+                                                          params->instance_seg_method_));
+    }
+
     cout << "Set dataloader complete" << endl;
     cout << "From " << params->start_frame_ << " to " << params->end_frame_ << endl;
     cout << params->robot_body_size_ << endl;
 
     int start_frame = params->start_frame_;
     int end_frame   = params->end_frame_;
-    int accum_interval = params->accum_interval_;
+    int accum_interval = params->accum_interval_; // 여기서는 accumulation 의 interval 이 2로 설정되어 있기는 함.
 
     string map_path = params->abs_save_dir_ + "/" + params->sequence_ + "_" + to_string(start_frame) +
                       "_to_" + to_string(end_frame) + "_estimated.pcd";
@@ -64,22 +70,29 @@ int main(int argc, char **argv) {
         }
 
         loader->getScanAndPose(i, *cloud_est_label, pose);
-        loader->rejectNeighboringPoints(*cloud_est_label, erasor2->robot_body_size_, *cloud_est_filtered, *noise);
+        cout << i << "th pose: " << endl <<pose << endl;
+        cout << i << "th cloud size: " << cloud_est_label->size() << endl;
+        // loader->rejectNeighboringPoints(*cloud_est_label, erasor2->robot_body_size_, *cloud_est_filtered, *noise);
 
-        if (dataset_name == "SemanticKITTI") {
-            erasor2->setScanAndPose(pose, *cloud_gt_filtered, *cloud_est_filtered);
-        } else {
-            erasor2->setScanAndPose(pose, *cloud_est_filtered);
-        }
+        // if (dataset_name == "SemanticKITTI") {
+        //     erasor2->setScanAndPose(pose, *cloud_gt_filtered, *cloud_est_filtered);
+        // } else {
+        //     erasor2->setScanAndPose(pose, *cloud_est_filtered);
+        // }
     }
 
     cout << "[ERASOR2] Complete to set scans and poses\n";
-    erasor2->setSubmap();
-    erasor2->updateSteppableRegion();
-//    erasor2->dilateAndErode();
-    erasor2->detectMovingObjects();
-    erasor2->filterDynamicObjects();
-    erasor2->saveStaticMap(map_path);
+
+
+//     erasor2->setSubmap();
+//     erasor2->updateSteppableRegion();
+// //    erasor2->dilateAndErode(); // not using
+//     erasor2->detectMovingObjects();
+//     erasor2->filterDynamicObjects();
+//     erasor2->saveStaticMap(map_path);
+
+
+
 //    erasor2->publishStaticMapResults();
 
     return 0;

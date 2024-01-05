@@ -1,9 +1,10 @@
 <launch>
 
-<arg name="target_seq" default="seq_07"/>
+<arg name="target_seq" default="HeLiPR"/>
 
 <rosparam command="load" file="$(find erasor2)/config/$(arg target_seq).yaml" />
 
 <node name="run_erasor2" pkg="erasor2" type="run_erasor2" output="screen"/>
+<!-- run_erasor2 가 곧 main.cpp 파일을 의미.. -->
 
 </launch>

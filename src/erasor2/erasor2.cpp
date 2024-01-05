@@ -106,36 +106,41 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
 void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                              const pcl::PointCloud<pcl::PointXYZI> &cloud_gt_label,
                              const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label) {
+
+    // gt label 안에는 instance gt label 이 들어있고, est_label 안에는 초기 인스턴스 및 ground label 이 들어있다.
+
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_est_w_voi_label(new pcl::PointCloud<pcl::PointXYZI>);
+
+    // 1. 입력 point 수 만큼 할당해주기
     transformed->reserve(cloud_est_label.size());
     cloud_est_w_voi_label->reserve(cloud_est_label.size());
 
     if (is_initial_) {
-        new_origin_ = pose_raw;
+        new_origin_ = pose_raw; // ** pose 의 첫 위치를 new_origin_ 으로 저장한다.
         is_initial_ = false;
     }
-    poses_submap_.emplace_back(new_origin_.inverse() * pose_raw);
+    poses_submap_.emplace_back(new_origin_.inverse() * pose_raw); // ** new_origin_ 을 기준으로 삼아서 pose 를 저장한다. 그니까 오돔엣더리가 아니라, 첫번째 포즈를 서브맵의 기준으로 삼으시겠다는 거지.
 
     // NOTE: `tf_h_of_ground_to_be_zero_` is not necessary, but we follow the legacy of ERASOR 1.0
     if (dataset_name_ == "SemanticKITTI") {
-        pcl::transformPointCloud(cloud_gt_label, *transformed, poses_submap_.back() * tf_h_of_ground_to_be_zero_);
-        pcs_gt_transformed_.emplace_back(*transformed);
+        pcl::transformPointCloud(cloud_gt_label, *transformed, poses_submap_.back() * tf_h_of_ground_to_be_zero_); // tf_h_of_ground_to_be_zero_ 는 Identity matrix 인데 왜 곱하는것인가묘
+        pcs_gt_transformed_.emplace_back(*transformed); // ** pcs_gt_transformed_ 에는 global 좌표계의 포인트 클라우드를 하나씩 넣어준다.
     }
 
     // NOTE: First, VoI is set in an egocentric viewpoint
     // This affects the quality of xygrid
     maskNonVoI(cloud_est_label, *cloud_est_w_voi_label, min_z_voi_, max_z_voi_);
-    pcl::transformPointCloud(*cloud_est_w_voi_label, *transformed, poses_submap_.back() * tf_h_of_ground_to_be_zero_);
+    pcl::transformPointCloud(*cloud_est_w_voi_label, *transformed, poses_submap_.back() * tf_h_of_ground_to_be_zero_); 
+    // ** 여까지 하고 나면 transformed 는 VoI information 이 포함되었으며, global 좌표계로 변환된 포인트 클라우드가 된다.
 
     // Parse VoI and Non-VoI. Because non-VoIs are not targets of static map building
-
-    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_voi(new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_non_voi(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_voi(new pcl::PointCloud<pcl::PointXYZI>); // ** 안 쓰는데 왜 존재하죠
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_non_voi(new pcl::PointCloud<pcl::PointXYZI>); // ** 이것도 안 쓰는데 왜 존재하죠
     pcs_transformed_.emplace_back(*transformed);
 
-    float max_id = getMaxInstanceId(*transformed);
-    max_ids_.push_back(max_id);
+    float max_id = getMaxInstanceId(*transformed); // VoI 도 붙어있는 포인트 클라우드에서 MaxInstanceId 를 구해준다.
+    max_ids_.push_back(max_id); // 아까 id 는 다 rearrange 해줬으니까, max_ids 에 현재 스캔에서의 max instance id 를 넣어주면 그것도 어떠한 의미가 있겠징!
 
     if (viz_set_scan_and_pose_) {
         ros::Rate                               sleep_rate(30);
@@ -171,16 +176,16 @@ void ERASOR2::setSubmap() {
     int                                  num_data = pcs_transformed_.size();
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_partial_src(new pcl::PointCloud<pcl::PointXYZI>);
     for (int                             k        = 0; k < num_data; ++k) {
-        *map_partial_src += pcs_transformed_[k];
+        *map_partial_src += pcs_transformed_[k]; // ** voI + instance information 이 붙은 global 좌표계 스캔들을 모두 쌓아서 map_partial_src 에 넣어준다.
     }
 
     cout << "[ERASOR2] Voxelizing submap..." << endl;
     // Estimated labels are preserved!
-    erasor_utils::voxelize_preserving_labels_by_nanoflann(map_partial_src, *map_accum_, map_voxel_size_);
+    erasor_utils::voxelize_preserving_labels_by_nanoflann(map_partial_src, *map_accum_, map_voxel_size_); // 그렇게 해서 만들어진 전체 맵은 map_accum_ 에 넣어주고 ,여기서는 voxel size 를 0.4 로 설정했네.
 
     cout << "[ERASOR2] Calculating  min-max x, y values given " << pcs_transformed_.size() << " scan-pose pairs..." << endl;
     float min_x, min_y, max_x, max_y;
-    erasor_utils::calcMinMaxXY(pcs_transformed_, min_x, min_y, max_x, max_y);
+    erasor_utils::calcMinMaxXY(pcs_transformed_, min_x, min_y, max_x, max_y); // voxelized 되지 않은 맵에서 min, max X, Y 를 구해주고,
     cout << "[ERASOR2] Min-max x: " << min_x << " <-> " << max_x << endl;
     cout << "[ERASOR2] Min-max y: " << min_y << " <-> " << max_y << endl;
 
@@ -255,8 +260,8 @@ void ERASOR2::updateSteppableRegion() {
     for (int k                   = 0; k < num_data_; ++k) {
         cout << "\r[ERASOR2] Updating " << k + 1 << " / " << num_data_ << flush;
         gridmap_submap_["elevation"].setConstant(NOT_UPDATED);
-        grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));
-        gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]);
+        grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));// new_origin_ 을 기준으로 삼아서 pose 를 저장해놓은 것에서 저 떄의 로봇 x, y 좌표의 위치 뽑아오기
+        gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]); // 현재 로봇 위치를 기준으로 gridmap 에서의 인덱스를 뽑아서 idxes_approx_ 안에 넣어준다.
 
         int w_pc = idxes_approx_[k](0);
         int h_pc = idxes_approx_[k](1);
@@ -275,7 +280,7 @@ void ERASOR2::updateSteppableRegion() {
         // Assume that range of interest is square
         grid_map::Index idx;
         int             count = 0;
-        for (int        h     = h_pc - neighboring_height_ / 2; h < h_pc + neighboring_height_ / 2; ++h) {
+        for (int        h     = h_pc - neighboring_height_ / 2; h < h_pc + neighboring_height_ / 2; ++h) { // 현재 로봇의 위치를 기점으로 약 10m 의 영역을 관측함.
             for (int w = w_pc - neighboring_width_ / 2; w < w_pc + neighboring_width_ / 2; ++w) {
                 // x direction first
                 idx(0) = w;
@@ -283,20 +288,24 @@ void ERASOR2::updateSteppableRegion() {
 //                    cout << "(" << w << ", " << h << ") - ";
                 if (isLikelyToBeSteppableRegion(xygrids_[k][count], map_grid[count],
                                                 scan_ratio_threshold_,
-                                                min_z_diff_thr_, verbose_)) {
+                                                min_z_diff_thr_, verbose_)) { // 오직 map, scan 으의 높이차이가 꽤 나면서도 scan 이 바닥으로 정확히 판명난 경우에만 True
                     // For debugging
                     gridmap_submap_.at("elevation", idx) = erasor_utils::calcMeanZOfGround(map_grid[count]);
 //                    cout << "(" << w << ", " << h << "): " << scan_ratio_ << " | " << ratio_num_ << " // ";
 //                    cout << xygrids_[k][count].size() << " <-> "
 //                         << erasor_utils::getNumGroundPoints(xygrids_[k][count]) << endl;
-                    gridmap_submap_.at("status", idx) = TEMPORARILY_OCCUPIED;
-                    updateLogOdds(idx, increment_ * increment_gain_);
-                } else if (isLikelyToBeGround(xygrids_[k][count])) {
+                    gridmap_submap_.at("status", idx) = TEMPORARILY_OCCUPIED; // ** 아직 관측되지 않았을 때가 100.0 이었고, TEMPORARILY OCCUPIED 일 때가 102.0 에 해당
+                    updateLogOdds(idx, increment_ * increment_gain_); // gridmap 의 idx 부분에 increment_ * increment_gain_ 만큼을 더해줌. 만약애 TEMPORARILY_OCCUPIED 라면 log_odds 에는 0.15 * 2.0 만큼 
+                } 
+                
+                
+                
+                else if (isLikelyToBeGround(xygrids_[k][count])) { // ** 그냥 map 자체가 ground 인 것 같아...! 라면.
                     if (gridmap_submap_.at("status", idx) == NOT_OBSERVED) {
                         gridmap_submap_.at("status", idx) = GROUND_EXISTS;
                         gridmap_submap_.at("elevation", idx) = erasor_utils::calcMeanZOfGround(map_grid[count]);
                     }
-                    updateLogOdds(idx, increment_);
+                    updateLogOdds(idx, increment_); // 0.15 * 2.0 만큼 계속 더해지고
                 }
 
                 ++count;
@@ -992,8 +1001,8 @@ GridMapInfo ERASOR2::setGridMapParams(const float min_x, const float min_y,
     grid_map_info.center_y   = (min_y + max_y) / 2.0;
     grid_map_info.resolution = grid_resolution;
 
-    grid_map_info.width  = static_cast<int>(ceil((max_x - min_x) / grid_resolution));
-    grid_map_info.height = static_cast<int>(ceil((max_y - min_y) / grid_resolution));
+    grid_map_info.width  = static_cast<int>(ceil((max_x - min_x) / grid_resolution)); // 
+    grid_map_info.height = static_cast<int>(ceil((max_y - min_y) / grid_resolution)); // 
 
     // Remainders of x_length / grid_resolution and
     // y_length / grid_resolution should be zeros, respectively.
@@ -1106,14 +1115,16 @@ bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> 
     float map_min_z, map_max_z;
 
 //    cout << "FF?" << curr_pc.size() << endl;
-    erasor_utils::calcMinMaxZ(curr_pc, curr_min_z, curr_max_z);
+    erasor_utils::calcMinMaxZ(curr_pc, curr_min_z, curr_max_z); // ** 현쟈 스캔에서의 min, max z 값을 구해주고,
 //    cout << "FF0" << map_pc.size() << endl;
-    erasor_utils::calcMinMaxZWithoutGround(map_pc, map_min_z, map_max_z);
+    erasor_utils::calcMinMaxZWithoutGround(map_pc, map_min_z, map_max_z); // ** 맵에서는 ground를 제외한 min, max z 값을 구해준다.
 //    cout << "FF!" << endl;
-    float curr_mean_ground_z = erasor_utils::calcMeanZOfGround(curr_pc);
+    float curr_mean_ground_z = erasor_utils::calcMeanZOfGround(curr_pc); // label 이 ground 로 분류된 것들의 평균적인 높이 값을 구해주는 함수.
     float map_mean_ground_z  = erasor_utils::calcMeanZOfGround(map_pc);
 
-    float lowest_z    = min(curr_mean_ground_z, map_mean_ground_z);
+
+    // ** 아래 부분이 원본 ERASOR 괴ㅏ 동일한 부분
+    float lowest_z    = min(curr_mean_ground_z, map_mean_ground_z); // 스캔과 맵의 평균 ground 높이중에 더 낮은 것을 고르고 
     float map_h_diff  = map_max_z - lowest_z;
     float curr_h_diff = curr_max_z - lowest_z;
 
@@ -1128,20 +1139,20 @@ bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> 
     // Dynamic!
     if (scan_ratio_ < scan_ratio_threshold &&
         isLikelyToBeGround(curr_pc, ratio_num_pts_, minimum_num_pts_)) { // find dynamic!
-        return true;
+        return true; // scan ratio 가 threshold 보다 낮고, 
     } else {
         return false;
     }
 }
 
 void ERASOR2::updateLogOdds(const grid_map::Index &idx, const float increment, const int kernel_size) {
-    gridmap_submap_.at("log_odds", idx) += increment;
+    gridmap_submap_.at("log_odds", idx) += increment; // 원래 0에서 시작함
 
     auto idx_for_neighboring = idx;
     int  w                   = idx(0);
     int  h                   = idx(1);
 
-    if (kernel_size == 3) {
+    if (kernel_size == 3) { // ** 이거 일단 안함
         // Refer to https://www.opencv-srf.com/2018/03/gaussian-blur.html
         vector<pair<float, float> > plus_minus_for_adjacent = {{1,  0},
                                                                {-1, 0},
