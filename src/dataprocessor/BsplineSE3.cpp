@@ -19,7 +19,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "BsplineSE3.h"
+#include "dataprocessor/BsplineSE3.h"
 #include <vector>
 #include <Eigen/Dense>
 #include <fstream>

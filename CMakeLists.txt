@@ -115,3 +115,26 @@ add_executable(run_erasor2 src/erasor2/main.cpp ${erasor2_src})
 target_link_libraries(run_erasor2 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} stdc++fs)
 target_compile_options(run_erasor2 PRIVATE ${OpenMP_CXX_FLAGS})
 add_dependencies(run_erasor2 erasor2_generate_messages_cpp)
+
+
+set(dataprocessor_src
+  src/dataprocessor/visualizer.cpp
+  src/dataprocessor/PointCloudProcessor.cpp
+  src/dataprocessor/utility.cpp
+  src/dataprocessor/BsplineSE3.cpp
+)
+
+# Add executable
+add_executable(helipr_to_kitti src/dataprocessor/pointSaver.cpp ${dataprocessor_src})
+
+# Link libraries
+target_link_libraries(helipr_to_kitti 
+  ${catkin_LIBRARIES} 
+  ${PCL_LIBRARIES} 
+  ${EIGEN3_LIBRARIES}
+)
+
+catkin_install_python(PROGRAMS
+  src/dataprocessor/python/transformINStoLiDAR.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

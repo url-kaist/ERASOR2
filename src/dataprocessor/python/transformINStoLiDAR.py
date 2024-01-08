@@ -4,6 +4,11 @@ import open3d as o3d
 from scipy.spatial.transform import Rotation as R
 from pyproj import Proj, transform
 
+import sys
+import yaml
+import os
+
+import rospy
 
 def latlon2local(lat, lon, alt, origin):
     # Define the projection for geographic coordinates
@@ -20,7 +25,7 @@ def latlon2local(lat, lon, alt, origin):
 
     return xEast, yNorth, zUp
 
-def processTrajectory(inputPath, outputPath, typeLiDAR):
+def processTrajectory(inputPath, outputPath, typeLiDAR, visualize = False):
     # Read the CSV file
     latlonheight = pd.read_csv(inputPath, header=None)
     latlonheight = latlonheight.iloc[:, :10].to_numpy()
@@ -68,7 +73,7 @@ def processTrajectory(inputPath, outputPath, typeLiDAR):
     
     #Livox
     R_IL = np.dot(R_IO, T_OS2_Avia)
-    print("R_IL: ", R_IL)
+    # print("R_IL: ", R_IL)
     # np.array([[0.999260281307309, 0.0383884500761334, 0.00228409771914936, 0.205400000000000],
     #                  [-0.0383981303207532, 0.999253021123844, 0.00435699010113986, -0.352800000000000],
     #                  [-0.00211513344942227, -0.00444147223600340, 0.999987899694225, 0.0706000000000000],
@@ -76,7 +81,7 @@ def processTrajectory(inputPath, outputPath, typeLiDAR):
     
     # Aeva
     R_IA = np.dot(R_IO, T_OS2_Aeva) 
-    print("R_IA: ", R_IA)
+    # print("R_IA: ", R_IA)
     # np.array([[0.998593404866819, 0.0471428768856460, -0.0242643960451897, 0.133700000000000],
     #                  [-0.0476188752386917, 0.998676624578879, -0.0194278727795602, 0.355700000000000],
     #                  [0.0233163993252583, 0.0205559888762785, 0.999516781671935, 0.221900000000000],
@@ -88,7 +93,7 @@ def processTrajectory(inputPath, outputPath, typeLiDAR):
 
     # Velodyne
     R_IV = np.dot(R_IO, T_OS2_VLP16) # 이거 아래꺼랑 똑같은디요....
-    print("R_IV: ", R_IV)
+    # print("R_IV: ", R_IV)
     
     
     # np.array([[0.999995760375673, 0.000773891425480788, -0.00280719125478291, -1.37200000000000],
@@ -97,7 +102,7 @@ def processTrajectory(inputPath, outputPath, typeLiDAR):
     #                  [0, 0, 0, 1]])  # Replace with actual R_IV matrix
 
     # Select the appropriate LiDAR matrix
-    if typeLiDAR == "Livox":
+    if typeLiDAR == "Avia" or typeLiDAR == "Livox":
         LiDAR = R_IL
     elif typeLiDAR == "Aeva":
         LiDAR = R_IA
@@ -138,16 +143,32 @@ def processTrajectory(inputPath, outputPath, typeLiDAR):
     np.savetxt(outputPath, trajLiDAR, fmt=fmt, delimiter=' ')
     
     print("Saved to " + outputPath)
-    print("Visualizing the trajectory...")
-    print("Press 'q' to exit")
-    o3d.visualization.draw_geometries(meshArrayTrajLiDAR)
-    print("Done")
+    if visualize:
+      print("Visualizing the trajectory...")
+      print("Press 'q' to exit")
+      o3d.visualization.draw_geometries(meshArrayTrajLiDAR)
+      print("Done")
 
 if __name__ == "__main__":
 # User inputs
-    LiDAR = "Aeva"
-    inputCSV = "/media/se0yeon00/SY_Other/HeliPR/KAIST05/Inertial_data/inspva.csv" #input("Enter the path of the input CSV file: ")
-    outputTXT = "/media/se0yeon00/SY_Other/HeliPR/KAIST05/Trajectory/{}/trajectory.txt".format(LiDAR) #input("Enter the path of the output file: ")
-    typeLiDAR = LiDAR # input("Enter the LiDAR type (Livox, Aeva, Ouster, Velodyne): ")
+  rospy.init_node('fastlio2travelnode', anonymous=True)
+  dataset_root = rospy.get_param("/dataprocessor/dataset_root")
+  process_lidar_list = rospy.get_param("/dataprocessor/process_lidar_list")
+  save_ins_to_LiDAR_root = rospy.get_param("/dataprocessor/save_ins_to_LiDAR_root")
+
+#   dataset_root = config['transform_ins_to_lidar']['dataset_root']
+#   process_lidar_list = config['transform_ins_to_lidar']['process_lidar_list']
+  inputCSV = os.path.join(dataset_root, "Inertial_data/inspva.csv")
+  for lidar in process_lidar_list:
+    #   inputCSV = "/media/se0yeon00/SY_Other/HeliPR/KAIST05/Inertial_data/inspva.csv" #input("Enter the path of the input CSV file: ")
+    # save_ins_to_LiDAR_root = config['transform_ins_to_lidar']['save_ins_to_LiDAR_root']
+    os.makedirs(save_ins_to_LiDAR_root, exist_ok=True)
+    
+    outputTXT = os.path.join(save_ins_to_LiDAR_root, "{}_trajectory.txt".format(lidar)) #input("Enter the path of the output file: ")
+    typeLiDAR = lidar # input("Enter the LiDAR type (Livox, Aeva, Ouster, Velodyne): ")
 
     processTrajectory(inputCSV, outputTXT, typeLiDAR)
+    
+    print("========================================")
+    print("Transform INS to LIDAR {} is done".format(lidar))
+    print("saved to {}".format(outputTXT))

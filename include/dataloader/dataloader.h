@@ -268,7 +268,6 @@ class HeLiPRLoader : public DataLoader{
     ~HeLiPRLoader(){}
 
     inline void countNumFrames(const string &pcd_dir, const string &pcd_format, vector<string> &files);
-
     void loadAllPoses(const string pose_path, vector<Eigen::Matrix4f> &poses);
 
     // 
@@ -280,43 +279,56 @@ class HeLiPRLoader : public DataLoader{
     template<typename T>
     int loadCloud(size_t idx, pcl::PointCloud<T> &cloud){
       // 이건 생성자에 따라서 수정이 좀 필요해 보임... 일단 4개 다 불러오는 건 고사하고 하나하나 불러오는 걸로 바꿔야겠다.
-      string idx_timestamp = timestamp_lists_[idx];
-      string filename = (boost::format("%s/%s.%s") % cloud_dir_ % idx_timestamp % cloud_format_).str();
-      printf("Loading %s\n", filename.c_str());
-      uint64_t data = std::stoull(idx_timestamp);
-      cloud.clear();
+    //  string filename = (boost::format("%s/%s.%s") % cloud_dir_ % idx_timestamp % cloud_format_).str();
 
-      if(seq_ == "Velodyne"){
-          loadCloudVelodyne(filename, cloud);
-        }
-      else if (seq_ == "Ouster"){ // Ouster
-          loadCloudOuster(filename, cloud);
-        }
-      else if (seq_ == "Avia"){ // livox
-          loadCloudAvia(filename, cloud);
-        }
-      else if (seq_ == "Aeva"){ // aeva
-          loadCloudAeva(filename, cloud, data);
-        }
-      else{
-          std::cout << "Error: invalid point type" << std::endl;
-          return -1;
-        }  
+        string filename = (boost::format("%s/%06d.%s") % cloud_dir_ % idx % cloud_format_).str();
+        pcl::PointCloud<pcl::PointXYZI> cloud_raw;
+        pcl::io::loadPCDFile(filename, cloud_raw);
+        cloud = cloud_raw;
+        // FILE   *file    = fopen(filename.c_str(), "rb");
+        // if (!file) {
+        //     std::cerr << "Error: failed to load " << filename << std::endl;
+        //     return -1;
+        // }
 
+        // std::vector<float> buffer(2000000);
+        // size_t             num_points =
+        //                            fread(reinterpret_cast<char *>(buffer.data()), sizeof(float), buffer.size(), file) / 4;
+        // fclose(file);
+
+        // cloud.resize(num_points);
+        // if (std::is_same<T, pcl::PointXYZ>::value) {
+        //     for (int i = 0; i < num_points; i++) {
+        //         auto &pt = cloud.at(i);
+        //         pt.x = buffer[i * 4];
+        //         pt.y = buffer[i * 4 + 1];
+        //         pt.z = buffer[i * 4 + 2];
+        //     }
+        // } else if (std::is_same<T, pcl::PointXYZI>::value) {
+        //     for (int i = 0; i < num_points; i++) {
+        //         auto &pt = cloud.at(i);
+        //         pt.x         = buffer[i * 4];
+        //         pt.y         = buffer[i * 4 + 1];
+        //         pt.z         = buffer[i * 4 + 2];
+        //         pt.intensity = buffer[i * 4 + 3];
+        //     }
+        // }
+        return 0;
+      
     return 0;
     }
 
-    template<typename T>
-    void loadCloudOuster(string filename, pcl::PointCloud<T> &cloud);
+    // template<typename T>
+    // void loadCloudOuster(string filename, pcl::PointCloud<T> &cloud);
 
-    template<typename T>
-    void loadCloudVelodyne(string filename, pcl::PointCloud<T> &cloud);
+    // template<typename T>
+    // void loadCloudVelodyne(string filename, pcl::PointCloud<T> &cloud);
 
-    template<typename T>
-    void loadCloudAvia(string filename, pcl::PointCloud<T> &cloud);
+    // template<typename T>
+    // void loadCloudAvia(string filename, pcl::PointCloud<T> &cloud);
 
-    template<typename T>
-    void loadCloudAeva(string filename, pcl::PointCloud<T> &cloud, uint64_t data);
+    // template<typename T>
+    // void loadCloudAeva(string filename, pcl::PointCloud<T> &cloud, uint64_t data);
     // void loadCloudXYZ(string filename, pcl::PointCloud<pcl::PointXYZ> &cloud);
   
   Eigen::Matrix4f T_OS2_VLP16;

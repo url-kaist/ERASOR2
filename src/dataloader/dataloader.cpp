@@ -66,25 +66,6 @@ inline void DataLoader::countNumFrames(const string &pcd_dir, const string &pcd_
     }
 }
 
-inline void HeLiPRLoader::countNumFrames(const string &pcd_dir, const string &pcd_format, vector<string> &files) {
-  // std::vector<std::string> files;
-  for (const auto& entry :fs::directory_iterator(pcd_dir)){
-    if (entry.path().extension() == "." + pcd_format){
-      // file extension ".bin" remove, then push back
-      string filename = entry.path().filename().string();
-      filename = filename.substr(0, filename.size() - 4);
-      // printf("filename: %s\n", filename.c_str());
-      files.push_back(filename);
-
-    }
-  }
-
-  std::sort(files.begin(), files.end());
-  num_frames_ = files.size();
-  printf("Total %d frames are loaded\n", num_frames_);
-  // printf("First frame: %s\n", files[0].c_str());
-}
-
 inline void DataLoader::getPose(const size_t i, Eigen::Matrix4f& pose) {
     pose = poses_gt_[i];
 }
@@ -160,7 +141,7 @@ void SemanticKITTILoader::loadAllPoses(string pose_path, vector<Eigen::Matrix4f>
         Eigen::Matrix4f tf4x4_cam = Eigen::Matrix4f::Identity(); // Crucial!
         vec2tf4x4(pose, tf4x4_cam);
         Eigen::Matrix4f tf4x4_lidar = tf_origin * tf4x4_cam * KITTI_CAM2LIDAR;
-//        Eigen::Matrix4f tf4x4_lidar = KITTI_CAM2LIDAR.inverse() * tf4x4_cam * KITTI_CAM2LIDAR;
+    //        Eigen::Matrix4f tf4x4_lidar = KITTI_CAM2LIDAR.inverse() * tf4x4_cam * KITTI_CAM2LIDAR;
         poses.emplace_back(tf4x4_lidar);
         count++;
     }
@@ -298,13 +279,13 @@ void SemanticKITTILoader::parseGTLabel(const vector<uint32_t> &labels,
 HeLiPRLoader::HeLiPRLoader(const string &abs_data_dir, const string &sensor, const string& instance_seq_method)
 {
   seq_ = sensor;
-  cloud_dir_ = abs_data_dir + "/LiDAR/" + sensor;
+  cloud_dir_ = abs_data_dir + sensor + "/velodyne";
   gt_label_dir_ = "";
 
-  pose_path_ = abs_data_dir + "/LiDAR_GT/" + sensor + "_gt.txt";
+  pose_path_ = abs_data_dir + sensor + "/poses.txt";
   est_label_dir_ = "";
   ground_label_dir_ = "";
-  cloud_format_ = "bin";
+  cloud_format_ = "pcd";
 
   T_OS2_Avia << 0.999821044774776  ,      0.0159071210418969,	0.0102392346214582, 0.628232128507671, 
                 -0.0160846635739714   ,    0.999717526758036,0.0174971509254758, -0.338773055024622, 
@@ -337,6 +318,24 @@ HeLiPRLoader::HeLiPRLoader(const string &abs_data_dir, const string &sensor, con
   loadAllPoses(pose_path_, poses_gt_); // pose 를 일단 전부 저장해둘거임
 }
 
+inline void HeLiPRLoader::countNumFrames(const string &pcd_dir, const string &pcd_format, vector<string> &files) {
+  // std::vector<std::string> files;
+  for (const auto& entry :fs::directory_iterator(pcd_dir)){
+    if (entry.path().extension() == "." + pcd_format){
+      // file extension ".bin" remove, then push back
+      string filename = entry.path().filename().string();
+      filename = filename.substr(0, filename.size() - 4);
+      // printf("filename: %s\n", filename.c_str());
+      files.push_back(filename);
+    }
+  }
+
+  std::sort(files.begin(), files.end());
+  num_frames_ = files.size();
+  printf("Total %d frames are loaded\n", num_frames_);
+  // printf("First frame: %s\n", files[0].c_str());
+}
+
 void HeLiPRLoader::loadAllPoses(const string pose_path, vector<Eigen::Matrix4f> &poses){
 
   Eigen::Matrix4f tf_origin = Eigen::Matrix4f::Identity();
@@ -355,19 +354,22 @@ void HeLiPRLoader::loadAllPoses(const string pose_path, vector<Eigen::Matrix4f> 
     vector<float> pose = splitLine(line, ' ');
     Eigen::Matrix4f tf4x4_sensor = Eigen::Matrix4f::Identity();
     vec2tf4x4(pose, tf4x4_sensor);
-    Eigen::Matrix4f tf4x4_lidar = tf_origin * tf4x4_sensor;
+
+    Eigen::Matrix4f tf4x4_lidar = tf4x4_sensor;
+
     if (seq_ == "Avia")
     {
-      tf4x4_lidar = tf_origin * tf4x4_sensor * T_OS2_Avia;
+      tf4x4_lidar = T_OS2_Avia * tf4x4_sensor;
     }
     else if(seq_ == "Aeva")
     {
-      tf4x4_lidar = tf_origin * tf4x4_sensor * T_OS2_Aeva;
+      tf4x4_lidar = T_OS2_Aeva * tf4x4_sensor;
     }
     else if(seq_ == "VLP16")
     {
-      tf4x4_lidar = tf_origin * tf4x4_sensor * T_OS2_VLP16;
+      tf4x4_lidar = T_OS2_VLP16 * tf4x4_sensor;
     }
+
     poses.push_back(tf4x4_lidar);
     count++;
   }
@@ -377,105 +379,11 @@ void HeLiPRLoader::loadAllPoses(const string pose_path, vector<Eigen::Matrix4f> 
 }
 
 void HeLiPRLoader::getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI> &cloud, Eigen::Matrix4f &pose)
-    { 
-      printf("[HeLiPRLoader] my sensor type is %s\n", seq_.c_str());
-      loadCloud(i, cloud);
-      getPose(i, pose);
-    }
-
-template<typename T>
-void HeLiPRLoader::loadCloudOuster(string filename, pcl::PointCloud<T> &cloud)
-{
-  ifstream file;
-  file.open(filename, ios::in | ios::binary);
-  while(!file.eof()){
-    pc_type_o point_os;
-    pcl::PointXYZI point;
-    file.read(reinterpret_cast<char *>(&point_os.x), sizeof(float));
-    point.x = point_os.x;
-    file.read(reinterpret_cast<char *>(&point_os.y), sizeof(float));
-    point.y = point_os.y;
-    file.read(reinterpret_cast<char *>(&point_os.z), sizeof(float));
-    point.z = point_os.z;
-    file.read(reinterpret_cast<char *>(&point_os.intensity), sizeof(float));
-    point.intensity = point_os.intensity;
-    file.read(reinterpret_cast<char *>(&point_os.t), sizeof(uint32_t));
-    file.read(reinterpret_cast<char *>(&point_os.reflectivity), sizeof(uint16_t));
-    file.read(reinterpret_cast<char *>(&point_os.ring), sizeof(uint16_t));
-    file.read(reinterpret_cast<char *>(&point_os.ambient), sizeof(uint16_t));
-    cloud.push_back(point);
-    }
-    file.close();
+{ 
+    printf("[HeLiPRLoader] my sensor type is %s\n", seq_.c_str());
+    loadCloud(i, cloud);
+    getPose(i, pose);
 }
 
-template<typename T>
-void HeLiPRLoader::loadCloudVelodyne(string filename, pcl::PointCloud<T> &cloud)
-{
-  ifstream file;
-  file.open(filename, ios::in | ios::binary);
-  while(!file.eof()){
-    pc_type point_velo;
-    pcl::PointXYZI point;
-    file.read(reinterpret_cast<char *>(&point_velo.x), sizeof(float));
-    point.x = point_velo.x;
-    file.read(reinterpret_cast<char *>(&point_velo.y), sizeof(float));
-    point.y = point_velo.y;
-    file.read(reinterpret_cast<char *>(&point_velo.z), sizeof(float));
-    point.z = point_velo.z;
-    file.read(reinterpret_cast<char *>(&point_velo.intensity), sizeof(float));
-    point.intensity = point_velo.intensity;
-    file.read(reinterpret_cast<char *>(&point_velo.ring), sizeof(uint16_t));
-    file.read(reinterpret_cast<char *>(&point_velo.time), sizeof(float));
-    cloud.push_back(point); // Velodyne
-    }
-    file.close();
-}
 
-template<typename T>
-void HeLiPRLoader::loadCloudAvia(string filename, pcl::PointCloud<T> &cloud){
-  ifstream file;
-  file.open(filename, ios::in | ios::binary);
-  while(!file.eof()){
-    pc_type_l point_avia;
-    pcl::PointXYZI point;
-    file.read(reinterpret_cast<char *>(&point_avia.x), sizeof(float));
-    point.x = point_avia.x;
-    file.read(reinterpret_cast<char *>(&point_avia.y), sizeof(float));
-    point.y = point_avia.y;
-    file.read(reinterpret_cast<char *>(&point_avia.z), sizeof(float));
-    point.z = point_avia.z;
-    file.read(reinterpret_cast<char *>(&point_avia.reflectivity), sizeof(uint8_t));
-    point.intensity = point_avia.reflectivity;
-    file.read(reinterpret_cast<char *>(&point_avia.tag), sizeof(uint8_t));
-    file.read(reinterpret_cast<char *>(&point_avia.line), sizeof(uint8_t));
-    file.read(reinterpret_cast<char *>(&point_avia.offset_time), sizeof(uint32_t));
-    cloud.push_back(point);
-    }
-    file.close();
-}
-
-template<typename T>
-void HeLiPRLoader::loadCloudAeva(string filename, pcl::PointCloud<T> &cloud, uint64_t data){
-  ifstream file;
-  file.open(filename, ios::in | ios::binary);
-  while(!file.eof()){
-      pc_type_a point_aeva;
-      pcl::PointXYZI point;
-      file.read(reinterpret_cast<char *>(&point_aeva.x), sizeof(float));
-      point.x = point_aeva.x;
-      file.read(reinterpret_cast<char *>(&point_aeva.y), sizeof(float));
-      point.y = point_aeva.y;
-      file.read(reinterpret_cast<char *>(&point_aeva.z), sizeof(float));
-      point.z = point_aeva.z;
-      file.read(reinterpret_cast<char *>(&point_aeva.reflectivity), sizeof(float));
-      point.intensity = point_aeva.reflectivity;
-      file.read(reinterpret_cast<char *>(&point_aeva.velocity), sizeof(float));
-      file.read(reinterpret_cast<char *>(&point_aeva.time_offset_ns), sizeof(int32_t));
-      file.read(reinterpret_cast<char *>(&point_aeva.line_index), sizeof(uint8_t));
-      if(data > 1691936557946849179)
-          file.read(reinterpret_cast<char *>(&point_aeva.intensity), sizeof(float));
-      cloud.push_back(point);
-    }
-    file.close();
-}
 

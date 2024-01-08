@@ -7,13 +7,15 @@
 #include <sstream>
 #include <fstream>
 
+#include "ros/ros.h"
+
 using namespace ov_core;
 using namespace std;
 
 class PointCloudProcessor
 {
 public:
-    PointCloudProcessor();
+    PointCloudProcessor(std::string absPath, std::string sensorType, std::string saveDir, std::string trajectoryDir);
     ~PointCloudProcessor();
 
     BsplineSE3 bsplineSE3;
@@ -27,6 +29,7 @@ public:
     std::vector<pcl::PointCloud<PointXYZIRT>> vecVelodyne;
     std::vector<pcl::PointCloud<LivoxPointXYZI>> vecLivox;
     std::vector<pcl::PointCloud<AevaPointXYZIRT>> vecAeva;
+    std::vector<pcl::PointCloud<pcl::PointXYZI>> vecXYZI;
 
     std::vector<Eigen::VectorXd> trajPoints;
     Point3D lastPoint;
@@ -79,10 +82,16 @@ public:
     template <class T>
     void accumulateScans(std::vector<pcl::PointCloud<T>> &vecCloud, Point3D &lastPoint);
 
-    void readBinFile(const std::string &filename, pcl::PointCloud<OusterPointXYZIRT> &cloud);
-    void readBinFile(const std::string &filename, pcl::PointCloud<PointXYZIRT> &cloud);
-    void readBinFile(const std::string &filename, pcl::PointCloud<LivoxPointXYZI> &cloud);
-    void readBinFile(const std::string &filename, pcl::PointCloud<AevaPointXYZIRT> &cloud, double timeStart);
+    // void readBinFile(const std::string &filename, pcl::PointCloud<OusterPointXYZIRT> &cloud);
+    // void readBinFile(const std::string &filename, pcl::PointCloud<PointXYZIRT> &cloud);
+    // void readBinFile(const std::string &filename, pcl::PointCloud<LivoxPointXYZI> &cloud);
+    // void readBinFile(const std::string &filename, pcl::PointCloud<AevaPointXYZIRT> &cloud, double timeStart);
+
+    void readBinFile(const std::string &filename, pcl::PointCloud<OusterPointXYZIRT> &cloud, pcl::PointCloud<pcl::PointXYZI> &save_cloud);
+    void readBinFile(const std::string &filename, pcl::PointCloud<PointXYZIRT> &cloud, pcl::PointCloud<pcl::PointXYZI> &save_cloud);
+    void readBinFile(const std::string &filename, pcl::PointCloud<LivoxPointXYZI> &cloud, pcl::PointCloud<pcl::PointXYZI> &save_cloud);
+    void readBinFile(const std::string &filename, pcl::PointCloud<AevaPointXYZIRT> &cloud, double timeStart, pcl::PointCloud<pcl::PointXYZI> &save_cloud);
+
 
     void processFile(const std::string &filename);
     void loadAndProcessBinFiles();

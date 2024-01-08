@@ -1,9 +1,53 @@
-#include "PointCloudProcessor.h"
+#include "dataprocessor/PointCloudProcessor.h"
 
-PointCloudProcessor::PointCloudProcessor()
+PointCloudProcessor::PointCloudProcessor(std::string absPath, std::string sensorType, std::string saveDir, std::string trajectoryDir)
 {
-  displayBanner();
-  gatherInput();
+  // displayBanner();
+  // gatherInput();
+  this->absPath = absPath;
+  this->sensorType = sensorType;
+  
+  this->binPath = absPath + "/LiDAR/" + sensorType + "/";
+  this->originPose = absPath + "/LiDAR_GT/" + sensorType + "_gt.txt";
+  loadAllPoses(originPose, gt_poses_, timestamp_lists_);
+
+  this->trajPath = trajectoryDir + "/" + sensorType + "_trajectory.txt";
+
+  this->saveDir = saveDir;
+  this->savePath = saveDir + "/" + sensorType + "/velodyne/";
+
+  if (!std::filesystem::exists(saveDir))
+  {
+    std::cout << yellow << "The path does not exist. Creating a new directory." << reset << std::endl;
+    // Attempt to create the directory
+    std::filesystem::create_directory(saveDir);
+    std::filesystem::create_directory(saveDir + "/" + sensorType);
+    std::filesystem::create_directory(savePath);
+
+
+  }
+
+  std::string poses_txt = saveDir + "/" + sensorType + "/poses.txt";
+  fout_pose.open(poses_txt);
+  std::cout << "poses.txt is created in " << poses_txt << std::endl;
+
+  if(sensorType == "Ouster")
+    LiDAR = OUSTER;
+  else if(sensorType == "Velodyne")
+    LiDAR = VELODYNE;
+  else if(sensorType == "Livox")
+    LiDAR = LIVOX;
+  else if(sensorType == "Aeva")
+    LiDAR = AEVA;
+  else
+    LiDAR = OUSTER;
+
+  distanceThreshold = 0.01;
+  numIntervals = 1000;
+  accumulatedSize = 1;
+  downSampleFlag = 0;
+  undistortFlag = 1;
+
   displayInput();
   visualizer.progressBar(0, 1, "", false);
   loadTrajectory();
@@ -75,16 +119,16 @@ void PointCloudProcessor::displayBanner()
 
 void PointCloudProcessor::gatherInput()
 {
-  absPath = visualizer.getInput(cyan + "Enter the path to the directory containing the .bin files (end with folder/): " + reset);
-  sensorType = visualizer.getInput(cyan + "Enter the sensor type: " + reset);
+  absPath = visualizer.getInput(cyan + "Enter the path to the directory (ex) /media/se0yeon00/SY_Other/HeliPR/KAIST05: " + reset);
+  sensorType = visualizer.getInput(cyan + "Enter the sensor type, (ex) Aeva, Avia, Ouster, Velodyne: " + reset);
   
   binPath = absPath + "/LiDAR/" + sensorType + "/";
   originPose = absPath + "/LiDAR_GT/" + sensorType + "_gt.txt";
 
   while (!std::filesystem::exists(binPath) || binPath.substr(binPath.size() - 1) != "/")
   {
-    absPath = visualizer.getInput(cyan + "Enter the path to the directory containing the .bin files (end with folder/): " + reset);
-    sensorType = visualizer.getInput(cyan + "Enter the sensor type: " + reset);
+    absPath = visualizer.getInput(cyan + "Enter the path to the directory (ex) /media/se0yeon00/SY_Other/HeliPR/KAIST05: " + reset);
+    sensorType = visualizer.getInput(cyan + "Enter the sensor type, (ex) Aeva, Avia, Ouster, Velodyne: " + reset);
 
     binPath = absPath + "/LiDAR/" + sensorType + "/";
     originPose = absPath + "/LiDAR_GT/" + sensorType + "_gt.txt";
@@ -102,11 +146,11 @@ void PointCloudProcessor::gatherInput()
   bool pathCreated = false;
   while (!pathCreated)
   {
-    saveDir = visualizer.getInput(cyan + "Enter the path to the directory to save the processed point clouds (end with '/'): " + reset);
+    saveDir = visualizer.getInput(cyan + "Enter the path to the directory to save the processed point clouds (ex) /media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR: " + reset);
     // Check if the path ends with '/'
-    savePath = saveDir + "velodyne/";
+    savePath = saveDir + "/" + sensorType + "/velodyne/";
     
-    std::string poses_txt = saveDir + "poses.txt";
+    std::string poses_txt = saveDir + "/" + sensorType + "/poses.txt";
     fout_pose.open(poses_txt);
     std::cout << "poses.txt is created in " << poses_txt << std::endl;
 
@@ -300,7 +344,7 @@ void PointCloudProcessor::processPoint(T &point, double timestamp, double timeSt
   point.z = transformedPoint(2);
 }
 
-void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointCloud<OusterPointXYZIRT> &cloud)
+void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointCloud<OusterPointXYZIRT> &cloud, pcl::PointCloud<pcl::PointXYZI> &save_cloud)
 {
   std::ifstream file;
   file.open(filename, std::ios::in | std::ios::binary);
@@ -308,20 +352,26 @@ void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointClo
   while (!file.eof())
   {
     OusterPointXYZIRT point;
+    pcl::PointXYZI pointXYZI;
     file.read(reinterpret_cast<char *>(&point.x), sizeof(float));
+    pointXYZI.x = point.x;
     file.read(reinterpret_cast<char *>(&point.y), sizeof(float));
+    pointXYZI.y = point.y;
     file.read(reinterpret_cast<char *>(&point.z), sizeof(float));
+    pointXYZI.z = point.z;
     file.read(reinterpret_cast<char *>(&point.intensity), sizeof(float));
+    pointXYZI.intensity = point.intensity;
     file.read(reinterpret_cast<char *>(&point.t), sizeof(uint32_t));
     file.read(reinterpret_cast<char *>(&point.reflectivity), sizeof(uint16_t));
     file.read(reinterpret_cast<char *>(&point.ring), sizeof(uint16_t));
     file.read(reinterpret_cast<char *>(&point.ambient), sizeof(uint16_t));
     cloud.push_back(point);
+    save_cloud.push_back(pointXYZI);
   }
   file.close();
 }
 
-void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointCloud<PointXYZIRT> &cloud)
+void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointCloud<PointXYZIRT> &cloud, pcl::PointCloud<pcl::PointXYZI> &save_cloud)
 {
   std::ifstream file;
   file.open(filename, std::ios::in | std::ios::binary);
@@ -329,18 +379,24 @@ void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointClo
   while (!file.eof())
   {
     PointXYZIRT point;
+    pcl::PointXYZI pointXYZI;
     file.read(reinterpret_cast<char *>(&point.x), sizeof(float));
+    pointXYZI.x = point.x;
     file.read(reinterpret_cast<char *>(&point.y), sizeof(float));
+    pointXYZI.y = point.y;
     file.read(reinterpret_cast<char *>(&point.z), sizeof(float));
+    pointXYZI.z = point.z;
     file.read(reinterpret_cast<char *>(&point.intensity), sizeof(float));
+    pointXYZI.intensity = point.intensity;
     file.read(reinterpret_cast<char *>(&point.ring), sizeof(uint16_t));
     file.read(reinterpret_cast<char *>(&point.time), sizeof(float));
     cloud.push_back(point);
+    save_cloud.push_back(pointXYZI);
   }
   file.close();
 }
 
-void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointCloud<LivoxPointXYZI> &cloud)
+void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointCloud<LivoxPointXYZI> &cloud, pcl::PointCloud<pcl::PointXYZI> &save_cloud)
 {
   std::ifstream file;
   file.open(filename, std::ios::in | std::ios::binary);
@@ -348,19 +404,25 @@ void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointClo
   while (!file.eof())
   {
     LivoxPointXYZI point;
+    pcl::PointXYZI pointXYZI;
     file.read(reinterpret_cast<char *>(&point.x), sizeof(float));
+    pointXYZI.x = point.x;
     file.read(reinterpret_cast<char *>(&point.y), sizeof(float));
+    pointXYZI.y = point.y;
     file.read(reinterpret_cast<char *>(&point.z), sizeof(float));
+    pointXYZI.z = point.z;
     file.read(reinterpret_cast<char *>(&point.reflectivity), sizeof(uint8_t));
+    pointXYZI.intensity = point.reflectivity;
     file.read(reinterpret_cast<char *>(&point.tag), sizeof(uint8_t));
     file.read(reinterpret_cast<char *>(&point.line), sizeof(uint8_t));
     file.read(reinterpret_cast<char *>(&point.offset_time), sizeof(uint32_t));
     cloud.push_back(point);
+    save_cloud.push_back(pointXYZI);
   }
   file.close();
 }
 
-void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointCloud<AevaPointXYZIRT> &cloud, double timeStart)
+void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointCloud<AevaPointXYZIRT> &cloud, double timeStart, pcl::PointCloud<pcl::PointXYZI> &save_cloud)
 {
   std::ifstream file;
   file.open(filename, std::ios::in | std::ios::binary);
@@ -368,16 +430,22 @@ void PointCloudProcessor::readBinFile(const std::string &filename, pcl::PointClo
   while (!file.eof())
   {
     AevaPointXYZIRT point;
+    pcl::PointXYZI pointXYZI;
     file.read(reinterpret_cast<char *>(&point.x), sizeof(float));
+    pointXYZI.x = point.x;
     file.read(reinterpret_cast<char *>(&point.y), sizeof(float));
+    pointXYZI.y = point.y;
     file.read(reinterpret_cast<char *>(&point.z), sizeof(float));
+    pointXYZI.z = point.z;
     file.read(reinterpret_cast<char *>(&point.reflectivity), sizeof(float));
+    pointXYZI.intensity = point.reflectivity;
     file.read(reinterpret_cast<char *>(&point.velocity), sizeof(float));
     file.read(reinterpret_cast<char *>(&point.time_offset_ns), sizeof(int32_t));
     file.read(reinterpret_cast<char *>(&point.line_index), sizeof(uint8_t));
     if (timeStart > 1691936557946849179 / 1e9)
       file.read(reinterpret_cast<char *>(&point.intensity), sizeof(float));
     cloud.push_back(point);
+    save_cloud.push_back(pointXYZI);
   }
   file.close();
 }
@@ -387,6 +455,7 @@ void PointCloudProcessor::accumulateScans(std::vector<pcl::PointCloud<T>> &vecCl
 {
   pcl::PCDWriter pcdWriter;
   pcl::PointCloud<T> accumulatedCloud;
+  // pcl::PointCloud<pcl::PointXYZI> accumulatedCloudXYZI;
   if (vecCloud.size() == accumulatedSize)
   {
     if (euclidean_distance(lastPoint, scanPoints[0]) > distanceThreshold)
@@ -404,6 +473,7 @@ void PointCloudProcessor::accumulateScans(std::vector<pcl::PointCloud<T>> &vecCl
           point.x = transformedPoint(0);
           point.y = transformedPoint(1);
           point.z = transformedPoint(2);
+          
           accumulatedCloud.push_back(point);
         }
       }
@@ -417,8 +487,13 @@ void PointCloudProcessor::accumulateScans(std::vector<pcl::PointCloud<T>> &vecCl
         sor.filter(*sampledCloud);
         pcdWriter.writeBinary(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".pcd", *sampledCloud);
       }
-      else
-        pcdWriter.writeBinary(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".pcd", accumulatedCloud);
+      else{
+        pcdWriter.writeBinary(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".pcd", accumulatedCloud); // modified 
+
+        // pcl::PointCloud<pcl::PointXYZI>::Ptr sampledCloud(new pcl::PointCloud<pcl::PointXYZI>);
+        // copyPointCloud(accumulatedCloud, *sampledCloud);
+        // pcdWriter.writeBinary(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".pcd", *sampledCloud);
+      }
       Eigen::Matrix4f tf4x4 = Eigen::Matrix4f::Identity();
       tf4x4 = gt_poses_[keyIndex - accumulatedSize];
       fout_pose << tf4x4(0, 0) << " " << tf4x4(0, 1) << " " << tf4x4(0, 2) << " " << tf4x4(0, 3) << " "
@@ -439,6 +514,8 @@ void PointCloudProcessor::processFile(const std::string &filename) // 여기서�
   pcl::PointCloud<PointXYZIRT>::Ptr scanVelodyne(new pcl::PointCloud<PointXYZIRT>);
   pcl::PointCloud<LivoxPointXYZI>::Ptr scanLivox(new pcl::PointCloud<LivoxPointXYZI>);
   pcl::PointCloud<AevaPointXYZIRT>::Ptr scanAeva(new pcl::PointCloud<AevaPointXYZIRT>);
+
+  pcl::PointCloud<pcl::PointXYZI>:: Ptr scanXYZI(new pcl::PointCloud<pcl::PointXYZI>);
 
   Eigen::Quaterniond qStart;
   Eigen::Quaterniond qScan;
@@ -468,16 +545,16 @@ void PointCloudProcessor::processFile(const std::string &filename) // 여기서�
   switch (LiDAR)
   {
   case OUSTER:
-    readBinFile(filename, *scanOuster);
+    readBinFile(filename, *scanOuster, *scanXYZI);
     break;
   case VELODYNE:
-    readBinFile(filename, *scanVelodyne);
+    readBinFile(filename, *scanVelodyne, *scanXYZI);
     break;
   case LIVOX:
-    readBinFile(filename, *scanLivox);
+    readBinFile(filename, *scanLivox, *scanXYZI);
     break;
   case AEVA:
-    readBinFile(filename, *scanAeva, timeStart);
+    readBinFile(filename, *scanAeva, timeStart, *scanXYZI);
     break;
   }
 
@@ -505,56 +582,95 @@ void PointCloudProcessor::processFile(const std::string &filename) // 여기서�
         exitFlag = true;
       }
     }
-
+    
     switch (LiDAR)
     {
     case OUSTER:
       if (!exitFlag && undistortFlag)
       {
         #pragma omp parallel for
-        for (auto &point : scanOuster->points)
-        {
-          double timestamp = timeStart + point.t / float(1000000000); // nanosec?
+        for(int i = 0; i < scanXYZI->points.size(); i++){
+          OusterPointXYZIRT ref_point = scanOuster->points[i];
+          pcl::PointXYZI point = scanXYZI->points[i];
+
+          double timestamp = timeStart + ref_point.t / float(1000000000); // nanosec?
           processPoint(point, timestamp, timeStart, dt, qStart, pStart, quaternions, positions, numIntervals, qScan, pScan);
         }
+        // for (auto &point : scanOuster->points)
+        // for (auto &point : scanXYZI->points)
+        // {
+        //   double timestamp = timeStart + point.t / float(1000000000); // nanosec?
+        //   processPoint(point, timestamp, timeStart, dt, qStart, pStart, quaternions, positions, numIntervals, qScan, pScan);
+        // }
       }
-      vecOuster.push_back(*scanOuster);
+      // vecOuster.push_back(*scanOuster);
+      vecXYZI.push_back(*scanXYZI);
       break;
+
     case VELODYNE:
       if (!exitFlag && undistortFlag)
       {
         #pragma omp parallel for
-        for (auto &point : scanVelodyne->points)
-        {
-          double timestamp = timeStart + point.time;
+        
+        for(int i = 0; i < scanXYZI->points.size(); i++){
+          PointXYZIRT ref_point = scanVelodyne->points[i];
+          pcl::PointXYZI point = scanXYZI->points[i];
+          double timestamp = timeStart + ref_point.time;
           processPoint(point, timestamp, timeStart, dt, qStart, pStart, quaternions, positions, numIntervals, qScan, pScan);
         }
+        // for (auto &point : scanVelodyne->points)
+        // for (auto &point : scanXYZI->points)
+        // {
+        //   double timestamp = timeStart + point.time;
+        //   processPoint(point, timestamp, timeStart, dt, qStart, pStart, quaternions, positions, numIntervals, qScan, pScan);
+        // }
       }
-      vecVelodyne.push_back(*scanVelodyne);
+      // vecVelodyne.push_back(*scanVelodyne);
+      vecXYZI.push_back(*scanXYZI);
       break;
+
     case LIVOX:
       if (!exitFlag && undistortFlag)
       {
-#pragma omp parallel for
-        for (auto &point : scanLivox->points)
-        {
-          double timestamp = timeStart + point.offset_time / float(1000000000);
+        #pragma omp parallel for
+        // for (auto &point : scanLivox->points)
+        for(int i = 0; i < scanXYZI->points.size(); i++){
+          LivoxPointXYZI ref_point = scanLivox->points[i];
+          pcl::PointXYZI point = scanXYZI->points[i];
+          double timestamp = timeStart + ref_point.offset_time / float(1000000000);
           processPoint(point, timestamp, timeStart, dt, qStart, pStart, quaternions, positions, numIntervals, qScan, pScan);
         }
+
+
+        // for (auto &point : scanXYZI->points)
+        // {
+        //   double timestamp = timeStart + point.offset_time / float(1000000000);
+        //   processPoint(point, timestamp, timeStart, dt, qStart, pStart, quaternions, positions, numIntervals, qScan, pScan);
+        // }
       }
-      vecLivox.push_back(*scanLivox);
+      // vecLivox.push_back(*scanLivox);
+      vecXYZI.push_back(*scanXYZI);
       break;
+
     case AEVA:
       if (!exitFlag && undistortFlag)
       {
         #pragma omp parallel for
-        for (auto &point : scanAeva->points)
-        {
-          double timestamp = timeStart + point.time_offset_ns / float(1000000000);
+         for(int i = 0; i < scanXYZI->points.size(); i++){
+          AevaPointXYZIRT ref_point = scanAeva->points[i];
+          pcl::PointXYZI point = scanXYZI->points[i];
+          double timestamp = timeStart + ref_point.time_offset_ns / float(1000000000);
           processPoint(point, timestamp, timeStart, dt, qStart, pStart, quaternions, positions, numIntervals, qScan, pScan);
         }
+        // for (auto &point : scanAeva->points)
+        // for (auto &point : scanXYZI->points)
+        // {
+        //   double timestamp = timeStart + point.time_offset_ns / float(1000000000);
+        //   processPoint(point, timestamp, timeStart, dt, qStart, pStart, quaternions, positions, numIntervals, qScan, pScan);
+        // }
       }
-      vecAeva.push_back(*scanAeva);
+      // vecAeva.push_back(*scanAeva);
+      vecXYZI.push_back(*scanXYZI);
       break;
     }
     keyIndex++;
@@ -595,16 +711,16 @@ void PointCloudProcessor::loadAndProcessBinFiles()
     switch (LiDAR)
     {
     case OUSTER:
-      accumulateScans(vecOuster, lastPoint);
+      accumulateScans(vecXYZI, lastPoint);
       break;
     case VELODYNE:
-      accumulateScans(vecVelodyne, lastPoint);
+      accumulateScans(vecXYZI, lastPoint);
       break;
     case LIVOX:
-      accumulateScans(vecLivox, lastPoint);
+      accumulateScans(vecXYZI, lastPoint);
       break;
     case AEVA:
-      accumulateScans(vecAeva, lastPoint);
+      accumulateScans(vecXYZI, lastPoint);
       break;
     }
   }

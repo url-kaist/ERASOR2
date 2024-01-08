@@ -3,9 +3,15 @@ end_frame: 10
 viz_interval: 10
 is_large_scale: true
 
+dataprocessor:
+    dataset_root: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/"
+    process_lidar_list: ["Aeva", "Avia", "Ouster", "Velodyne"]
+    save_ins_to_LiDAR_root: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/ins_to_lidar2"
+
+
 dataloader:
     dataset_name: "HeLiPR"
-    abs_data_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05"
+    abs_data_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR2"
     cloud_dir: ""
     cloud_format: ".pcd"
     pose_path: ""

@@ -1,6 +1,6 @@
 <launch>
 
-<arg name="target_seq" default="HeLiPR"/>
+<arg name="target_seq" default="HeLiPR_kitti"/>
 
 <rosparam command="load" file="$(find erasor2)/config/$(arg target_seq).yaml" />
 

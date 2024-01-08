@@ -1,4 +1,4 @@
-#include "visualizer.h"
+#include "dataprocessor/visualizer.h"
 
 Visualizer::Visualizer(){};
 

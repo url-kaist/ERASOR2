@@ -1,0 +1,4 @@
+<launch>
+  <rosparam file="$(find erasor2)/config/HeLiPR_kitti.yaml" command="load" />
+  <node name="helipr_to_kitti" pkg="erasor2" type="helipr_to_kitti" output="screen"/>
+</launch>

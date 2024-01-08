@@ -1,0 +1,6 @@
+<launch>
+
+<rosparam file="$(find erasor2)/config/HeLiPR_kitti.yaml" command="load" />
+<node name="transformINStoLiDAR" pkg="erasor2" type="transformINStoLiDAR.py" output="screen"/>
+
+</launch>
