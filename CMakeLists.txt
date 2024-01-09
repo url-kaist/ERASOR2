@@ -134,6 +134,15 @@ target_link_libraries(helipr_to_kitti
   ${EIGEN3_LIBRARIES}
 )
 
+add_executable(merge_heliclouds src/dataprocessor/pointMerger.cpp ${dataprocessor_src})
+
+# Link libraries
+target_link_libraries(merge_heliclouds
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${EIGEN3_LIBRARIES}
+)
+
 catkin_install_python(PROGRAMS
   src/dataprocessor/python/transformINStoLiDAR.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

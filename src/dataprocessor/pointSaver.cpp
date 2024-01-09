@@ -26,6 +26,7 @@ int main(int argc, char **argv)
   {
     signal(SIGINT, signal_callback_handler);
     PointCloudProcessor processor(absPath, sensorType, saveDir, trajectoryDir);
+    processor.ProcessBinFiles();
   }
   
   // PointCloudProcessor processor(absPath, sensorType, saveDir);

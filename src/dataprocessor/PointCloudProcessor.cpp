@@ -23,13 +23,9 @@ PointCloudProcessor::PointCloudProcessor(std::string absPath, std::string sensor
     std::filesystem::create_directory(saveDir);
     std::filesystem::create_directory(saveDir + "/" + sensorType);
     std::filesystem::create_directory(savePath);
-
-
   }
 
-  std::string poses_txt = saveDir + "/" + sensorType + "/poses.txt";
-  fout_pose.open(poses_txt);
-  std::cout << "poses.txt is created in " << poses_txt << std::endl;
+  posesTxt = saveDir + "/" + sensorType + "/poses.txt";
 
   if(sensorType == "Ouster")
     LiDAR = OUSTER;
@@ -51,7 +47,7 @@ PointCloudProcessor::PointCloudProcessor(std::string absPath, std::string sensor
   displayInput();
   visualizer.progressBar(0, 1, "", false);
   loadTrajectory();
-  loadAndProcessBinFiles();
+  loadBinFileNames();
 }
 
 PointCloudProcessor::~PointCloudProcessor() {}
@@ -260,20 +256,26 @@ void PointCloudProcessor::displayInput()
   std::cout << std::endl;
 }
 
-std::vector<float> PointCloudProcessor::splitLine(const std::string &input, char delimiter)
-{
-  std::vector<float> result;
-  stringstream ss(input);
-  string token;
-  while (getline(ss, token, delimiter))
-  {
-    result.push_back(stof(token));
-  }
-  return result;  
+std::pair<long long, std::vector<float>> PointCloudProcessor::splitLine(std::string input, char delimiter) {
+    // The most front part: timestamp should be long long!!!
+    std::vector<float> answer;
+    std::stringstream  ss(input);
+    std::string        temp;
+
+    long long timestamp;
+    bool check_ts = true;
+    while (getline(ss, temp, delimiter)) {
+        if (check_ts) {
+            timestamp = stoll(temp);
+            check_ts  = false;
+            continue;
+        }
+        answer.push_back(stof(temp));
+    }
+    return {timestamp, answer};
 }
 
-
-void PointCloudProcessor::loadAllPoses(const std::string &pose_path, std::vector<Eigen::Matrix4f> &poses, std::vector<float> &timestamps_)
+void PointCloudProcessor::loadAllPoses(const std::string &pose_path, std::vector<Eigen::Matrix4f> &poses, std::vector<long long> &timestamps_)
 {
   poses.clear();
   poses.reserve(20000);
@@ -282,23 +284,23 @@ void PointCloudProcessor::loadAllPoses(const std::string &pose_path, std::vector
 
   int count = 0;
   while (std::getline(in, line)){
-    std::vector<float> pose = splitLine(line, ' ');
+    const auto & [timestamp, pose] = splitLine(line, ' ');
     Eigen::Matrix4f tf4x4_sensor = Eigen::Matrix4f::Identity();
     vec2tf4x4(pose, tf4x4_sensor);
     poses.push_back(tf4x4_sensor);
-    timestamps_.push_back(pose[0]);
+    timestamps_.push_back(timestamp);
     count++;
   }
   in.close();
   std::cout << "Total " << count << " poses are loaded" << std::endl;
 }
 
-void PointCloudProcessor::vec2tf4x4(std::vector<float> &pose, Eigen::Matrix4f &tf4x4)
+void PointCloudProcessor::vec2tf4x4(const std::vector<float> &pose, Eigen::Matrix4f &tf4x4)
 {
-  Eigen::Matrix3f mat3 = Eigen::Quaternionf(pose[7], pose[4], pose[5], pose[6]).toRotationMatrix();
-  tf4x4 << mat3(0, 0), mat3(0, 1), mat3(0, 2), pose[1],
-            mat3(1, 0), mat3(1, 1), mat3(1, 2), pose[2],
-            mat3(2, 0), mat3(2, 1), mat3(2, 2), pose[3],
+  Eigen::Matrix3f mat3 = Eigen::Quaternionf(pose[6], pose[3], pose[4], pose[5]).toRotationMatrix();
+  tf4x4 << mat3(0, 0), mat3(0, 1), mat3(0, 2), pose[0],
+            mat3(1, 0), mat3(1, 1), mat3(1, 2), pose[1],
+            mat3(2, 0), mat3(2, 1), mat3(2, 2), pose[2],
             0, 0, 0, 1;
 }
 
@@ -498,7 +500,8 @@ void PointCloudProcessor::accumulateScans(std::vector<pcl::PointCloud<T>> &vecCl
       tf4x4 = gt_poses_[keyIndex - accumulatedSize];
       fout_pose << tf4x4(0, 0) << " " << tf4x4(0, 1) << " " << tf4x4(0, 2) << " " << tf4x4(0, 3) << " "
                 << tf4x4(1, 0) << " " << tf4x4(1, 1) << " " << tf4x4(1, 2) << " " << tf4x4(1, 3) << " "
-                << tf4x4(2, 0) << " " << tf4x4(2, 1) << " " << tf4x4(2, 2) << " " << tf4x4(2, 3) << std::endl; 
+                << tf4x4(2, 0) << " " << tf4x4(2, 1) << " " << tf4x4(2, 2) << " " << tf4x4(2, 3) << std::endl;
+      ++numSaved;
     }
     vecCloud.erase(vecCloud.begin());
     scanQuat.erase(scanQuat.begin());
@@ -677,11 +680,12 @@ void PointCloudProcessor::processFile(const std::string &filename) // 여기서�
   }
 }
 
-void PointCloudProcessor::loadAndProcessBinFiles()
-{
+void PointCloudProcessor::loadBinFileNames() {
+  std::cout << "Loading bin files from " << binPath << std::endl;
+  binFiles.clear();
+
   DIR *dir;
   struct dirent *ent;
-  std::vector<std::string> binFiles;
 
   if ((dir = opendir(binPath.c_str())) != NULL)
   {
@@ -697,11 +701,21 @@ void PointCloudProcessor::loadAndProcessBinFiles()
   }
 
   std::sort(binFiles.begin(), binFiles.end()); // 이론적으로라면 파일 이름이 전부 들어가야 함...
+
+  numBins = binFiles.size(); // 라이다 스캔 폴더내의 모든 스캔 수, 예를 들면 12475개.... 이런식
+
+  std::cout << "Total " << numBins << " bin files are loaded" << std::endl;
+}
+
+void PointCloudProcessor::ProcessBinFiles()
+{
+  fout_pose.open(posesTxt);
+  std::cout << "poses.txt is created in " << posesTxt << std::endl;
+
   Point3D lastPoint;
   lastPoint.x = -999;
   lastPoint.y = -999;
   lastPoint.z = -999;
-  numBins = binFiles.size(); // 라이다 스캔 폴더내의 모든 스캔 수, 예를 들면 12475개.... 이런식
   // int count = 0;
 
   for (const std::string &filename : binFiles) // 파일 이름은 12475 개의 파일 이름 1개 1개를 지칭
@@ -726,6 +740,10 @@ void PointCloudProcessor::loadAndProcessBinFiles()
   }
 
   fout_pose.close();
+
+  if (numSaved != numBins) {
+      throw runtime_error("\033[1;31mNumber of saved scans does not match number of bins. Please check it.\033[0m");
+  }
 }
 
 void PointCloudProcessor::loadTrajectory()
@@ -740,6 +758,7 @@ void PointCloudProcessor::loadTrajectory()
     {
       break;
     }
+    // HT: already checked that the timestamp is successfully loaded
     point(0) *= 1e-9;
     trajPoints.push_back(point);
   }

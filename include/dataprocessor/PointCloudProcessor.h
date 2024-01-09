@@ -31,9 +31,11 @@ public:
     std::vector<pcl::PointCloud<AevaPointXYZIRT>> vecAeva;
     std::vector<pcl::PointCloud<pcl::PointXYZI>> vecXYZI;
 
+    std::vector<std::string> binFiles;
     std::vector<Eigen::VectorXd> trajPoints;
     Point3D lastPoint;
     int keyIndex = 0;
+    int numSaved = 0;
     int numBins = 0;
 
     std::string absPath;
@@ -43,6 +45,7 @@ public:
     std::string saveDir;
     std::string savePath; // 디스큐드 된 포인트 클라우
     std::string trajPath;
+    std::string posesTxt;
 
     std::ofstream fout_pose; // for poses.txt
 
@@ -59,12 +62,12 @@ public:
     void displayInput();
 
     // pose save 를 위한 함수 
-    void loadAllPoses(const std::string &pose_path, std::vector<Eigen::Matrix4f> &poses, std::vector<float> &timestamps_);
-    void vec2tf4x4(std::vector<float> &pose, Eigen::Matrix4f &tf4x4);
-    std::vector<float> splitLine(const std::string &input, char delimiter);
+    void loadAllPoses(const std::string &pose_path, std::vector<Eigen::Matrix4f> &poses, std::vector<long long> &timestamps_);
+    void vec2tf4x4(const std::vector<float> &pose, Eigen::Matrix4f &tf4x4);
+    std::pair<long long, std::vector<float>> splitLine(std::string input, char delimiter);
 
     std::vector<Eigen::Matrix4f> gt_poses_;
-    std::vector<float> timestamp_lists_;
+    std::vector<long long> timestamp_lists_;
 
     void interpolate(double timestamp, double timeStart, double dt,
                      const std::vector<Eigen::Quaterniond> &quaternions,
@@ -94,8 +97,9 @@ public:
 
 
     void processFile(const std::string &filename);
-    void loadAndProcessBinFiles();
+    void ProcessBinFiles();
     void loadTrajectory();
+    void loadBinFileNames();
 };
 
 #endif
