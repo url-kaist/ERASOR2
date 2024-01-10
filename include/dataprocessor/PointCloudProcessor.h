@@ -6,16 +6,77 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <boost/format.hpp>
+#include <pcl/common/common.h>
 
 #include "ros/ros.h"
 
 using namespace ov_core;
 using namespace std;
 
+template<typename T>
+void saveToBinFile(const std::string& filename, const pcl::PointCloud<T>& cloud) {
+    std::ofstream outFile(filename, std::ios::out | std::ios::binary);
+    if (!outFile) {
+        std::cerr << "Cannot open file for writing: " << filename << std::endl;
+        return;
+    }
+
+    for (const auto& point : cloud) {
+        outFile.write(reinterpret_cast<const char*>(&point.x), sizeof(point.x));
+        outFile.write(reinterpret_cast<const char*>(&point.y), sizeof(point.y));
+        outFile.write(reinterpret_cast<const char*>(&point.z), sizeof(point.z));
+        if (std::is_same<T, pcl::PointXYZ>::value) {
+          outFile.write(reinterpret_cast<const char *>(0), sizeof(point.z));
+        } else if (std::is_same<T, pcl::PointXYZI>::value) {
+          outFile.write(reinterpret_cast<const char *>(&point.intensity), sizeof(point.intensity));
+        }
+    }
+    outFile.close();
+}
+
+template<typename T>
+int loadCloud(size_t idx, string cloud_dir, string cloud_format, pcl::PointCloud<T> &cloud)
+{
+  if (cloud_dir.back() == '/') { cloud_dir.pop_back(); }
+  string filename = (boost::format("%s/%06d.%s") % cloud_dir % idx % cloud_format).str();
+  FILE   *file    = fopen(filename.c_str(), "rb");
+  if (!file) {
+    std::cerr << "Error: failed to load " << filename << std::endl;
+    return -1;
+  }
+
+  std::vector<float> buffer(2000000);
+  size_t             num_points =
+                       fread(reinterpret_cast<char *>(buffer.data()), sizeof(float), buffer.size(), file) /
+                         4;
+  fclose(file);
+
+  cloud.resize(num_points);
+  if (std::is_same<T, pcl::PointXYZ>::value) {
+    for (int i = 0; i < num_points; i++) {
+      auto &pt = cloud.at(i);
+      pt.x = buffer[i * 4];
+      pt.y = buffer[i * 4 + 1];
+      pt.z = buffer[i * 4 + 2];
+    }
+  } else if (std::is_same<T, pcl::PointXYZI>::value) {
+    for (int i = 0; i < num_points; i++) {
+      auto &pt = cloud.at(i);
+      pt.x         = buffer[i * 4];
+      pt.y         = buffer[i * 4 + 1];
+      pt.z         = buffer[i * 4 + 2];
+      pt.intensity = buffer[i * 4 + 3];
+    }
+  }
+  return 0;
+}
+
 class PointCloudProcessor
 {
 public:
-    PointCloudProcessor(std::string absPath, std::string sensorType, std::string saveDir, std::string trajectoryDir);
+    PointCloudProcessor(std::string absPath, std::string sensorType, std::string saveDir, std::string trajectoryDir,
+                        std::string saveFormat="bin");
     ~PointCloudProcessor();
 
     BsplineSE3 bsplineSE3;
@@ -44,6 +105,7 @@ public:
     std::string originPose;
     std::string saveDir;
     std::string savePath; // 디스큐드 된 포인트 클라우
+    std::string saveFormat = "bin";
     std::string trajPath;
     std::string posesTxt;
 
@@ -75,6 +137,8 @@ public:
                      int numIntervals, Eigen::Quaterniond &qOut,
                      Eigen::Vector3d &pOut);
 
+    void getTransformedCloud(const int i, const Eigen::Matrix4f T_criterion, pcl::PointCloud<pcl::PointXYZI> &transformed);
+
     template <class T>
     void processPoint(T &point, double timestamp, double timeStart, double dt, Eigen::Quaterniond &qStart, Eigen::Vector3d &pStart,
                       const std::vector<Eigen::Quaterniond> &quaternions,
@@ -94,7 +158,6 @@ public:
     void readBinFile(const std::string &filename, pcl::PointCloud<PointXYZIRT> &cloud, pcl::PointCloud<pcl::PointXYZI> &save_cloud);
     void readBinFile(const std::string &filename, pcl::PointCloud<LivoxPointXYZI> &cloud, pcl::PointCloud<pcl::PointXYZI> &save_cloud);
     void readBinFile(const std::string &filename, pcl::PointCloud<AevaPointXYZIRT> &cloud, double timeStart, pcl::PointCloud<pcl::PointXYZI> &save_cloud);
-
 
     void processFile(const std::string &filename);
     void ProcessBinFiles();

@@ -1,7 +1,10 @@
 #include "dataprocessor/PointCloudProcessor.h"
 
-PointCloudProcessor::PointCloudProcessor(std::string absPath, std::string sensorType, std::string saveDir, std::string trajectoryDir)
+PointCloudProcessor::PointCloudProcessor(std::string absPath, std::string sensorType, std::string saveDir, std::string trajectoryDir, std::string saveFormat)
 {
+  if (absPath.back() == '/') { absPath.pop_back(); }
+  if (saveDir.back() == '/') { saveDir.pop_back(); }
+  if (trajectoryDir.back() == '/') { trajectoryDir.pop_back(); }
   // displayBanner();
   // gatherInput();
   this->absPath = absPath;
@@ -12,6 +15,7 @@ PointCloudProcessor::PointCloudProcessor(std::string absPath, std::string sensor
   loadAllPoses(originPose, gt_poses_, timestamp_lists_);
 
   this->trajPath = trajectoryDir + "/" + sensorType + "_trajectory.txt";
+  this->saveFormat = saveFormat;
 
   this->saveDir = saveDir;
   this->savePath = saveDir + "/" + sensorType + "/velodyne/";
@@ -31,7 +35,7 @@ PointCloudProcessor::PointCloudProcessor(std::string absPath, std::string sensor
     LiDAR = OUSTER;
   else if(sensorType == "Velodyne")
     LiDAR = VELODYNE;
-  else if(sensorType == "Livox")
+  else if(sensorType == "Livox" || sensorType == "Avia")
     LiDAR = LIVOX;
   else if(sensorType == "Aeva")
     LiDAR = AEVA;
@@ -462,7 +466,7 @@ void PointCloudProcessor::accumulateScans(std::vector<pcl::PointCloud<T>> &vecCl
   {
     if (euclidean_distance(lastPoint, scanPoints[0]) > distanceThreshold)
     {
-      visualizer.progressBar(keyIndex, numBins, padZeros(keyIndex - accumulatedSize, 6) + ".pcd", true);
+      visualizer.progressBar(keyIndex, numBins, padZeros(keyIndex - accumulatedSize, 6) + "." + saveFormat, true);
       lastPoint = scanPoints[0];
       for (int i = 0; i < accumulatedSize; i++)
       { 
@@ -487,10 +491,20 @@ void PointCloudProcessor::accumulateScans(std::vector<pcl::PointCloud<T>> &vecCl
         sor.setInputCloud(sampledCloud);
         sor.setLeafSize(downSampleSize, downSampleSize, downSampleSize);
         sor.filter(*sampledCloud);
-        pcdWriter.writeBinary(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".pcd", *sampledCloud);
+        if (saveFormat == "pcd") {
+          pcdWriter.writeBinary(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".pcd", *sampledCloud);
+        } else if (saveFormat == "bin") {
+          saveToBinFile(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".bin", *sampledCloud);
+        }
       }
       else{
-        pcdWriter.writeBinary(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".pcd", accumulatedCloud); // modified 
+        if (saveFormat == "pcd") {
+          pcdWriter.writeBinary(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".pcd", accumulatedCloud);
+        } else if (saveFormat == "bin") {
+          pcl::PointCloud<pcl::PointXYZI>::Ptr sampledCloud(new pcl::PointCloud<pcl::PointXYZI>);
+          copyPointCloud(accumulatedCloud, *sampledCloud);
+          saveToBinFile(savePath + padZeros(keyIndex - accumulatedSize, 6) + ".bin", *sampledCloud);
+        }
 
         // pcl::PointCloud<pcl::PointXYZI>::Ptr sampledCloud(new pcl::PointCloud<pcl::PointXYZI>);
         // copyPointCloud(accumulatedCloud, *sampledCloud);
@@ -764,4 +778,21 @@ void PointCloudProcessor::loadTrajectory()
   }
   file.close();
   bsplineSE3.feed_trajectory(trajPoints);
+}
+
+void PointCloudProcessor::getTransformedCloud(const int i, const Eigen::Matrix4f T_criterion, pcl::PointCloud<pcl::PointXYZI> &transformed) {
+  // An already deskewed file is loaded
+  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>);
+  transformed.clear();
+  if (i < timestamp_lists_.size()) {
+    loadCloud(i, savePath, "bin", *cloud);
+  } else {
+    // Empty `transformed` is returned
+    return;
+  }
+
+  const auto T_diff = T_criterion.inverse() * gt_poses_.at(i);
+  std::vector<int> indices;
+  pcl::removeNaNFromPointCloud(*cloud, *cloud, indices);
+  pcl::transformPointCloud(*cloud, transformed, T_diff);
 }
