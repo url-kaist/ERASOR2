@@ -21,14 +21,14 @@ if __name__ == "__main__":
     for s in range(22):
         odometry_sequences.append(str(s).zfill(2))
 
-    ABS_DATA_DIR = "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
-    ABS_SAVE_DIR = "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
+    ABS_DATA_DIR = "/home/shapelim/Documents/KAIST05/deskewed_LiDAR"
+    ABS_SAVE_DIR = "/home/shapelim/Documents/KAIST05/deskewed_LiDAR"
 
     parser = argparse.ArgumentParser(description="Convert KITTI dataset to ROS bag file the easy way!")
     # parser.add_argument("--dir", nargs="?", default = os.getcwd(), help="base directory of the dataset, if no directory passed the deafult is current working directory")
-    parser.add_argument("-s", "--seq", default="00", choices=odometry_sequences, help="sequence of the odometry dataset (between 00 - 21), option is only for ODOMETRY datasets.")
+    parser.add_argument("-s", "--seq", default="Merged", help="sequence of the odometry dataset (between 00 - 21), option is only for ODOMETRY datasets.")
     parser.add_argument("-i", "--init_stamp", default=0, type=int)
-    parser.add_argument("-e", "--end_stamp", default=1000, type=int)
+    parser.add_argument("-e", "--end_stamp", default=12477, type=int)
     args = parser.parse_args()
 
     cloud_dir = ABS_DATA_DIR + "/" + args.seq + "/velodyne"
@@ -63,10 +63,10 @@ if __name__ == "__main__":
         start_time = time.time()
         pcd_ = pcd.select_by_index(ground_inliers, invert=True)
         labels_ = np.expand_dims(clusters_hdbscan(np.asarray(pcd_.points)), axis=-1)
-        print("--- %s seconds ---" % (time.time() - start_time))
-        f = open("/home/shapelim/hdbscan_time.txt", 'a')
-        f.write("%f\n"% (time.time() - start_time))
-        f.close()
+        # print("--- %s seconds ---" % (time.time() - start_time))
+        # f = open("/home/shapelim/hdbscan_time.txt", 'a')
+        # f.write("%f\n"% (time.time() - start_time))
+        # f.close()
         labels = np.ones((num_pts, 1)) * -1
         mask = np.ones(num_pts, dtype=bool)
         mask[ground_inliers] = False

@@ -5,8 +5,7 @@ import open3d as o3d
 def clusters_hdbscan(points_set):
     clusterer = hdbscan.HDBSCAN(algorithm='best', alpha=1., approx_min_span_tree=True,
                                 gen_min_span_tree=True, leaf_size=100,
-                                metric='euclidean', min_cluster_size=10, min_samples=None
-                            )
+                                metric='euclidean', min_cluster_size=15, min_samples=None)
 
     clusterer.fit(points_set)
 
