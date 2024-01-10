@@ -7,7 +7,7 @@ dataprocessor:
     dataset_root: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/"
     process_lidar_list: ["Aeva", "Avia", "Ouster", "Velodyne"]
     save_ins_to_LiDAR_root: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/ins_to_lidar2"
-
+    saveFormat: "bin"
 
 dataloader:
     dataset_name: "HeLiPR"
