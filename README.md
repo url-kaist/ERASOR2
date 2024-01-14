@@ -22,4 +22,4 @@
 
 ## :open_file_folder: What's in this repo
 
-* All things Will be updated soon after ~coming back to ICRA'23~ September (because the first author goes to the military camp as a military duty in South Korea) :thumbsup:
+* All things Will be updated soon!! (currently, we prepare an extension paper)
