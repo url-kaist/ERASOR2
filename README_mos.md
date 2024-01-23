@@ -197,6 +197,8 @@ ${abs_save_dir}
 
 실제 MOS label 저장 함수는 `erasor_utils.hpp` 의 `save_dyn_label` 를 참조해주세요.
 
+- (optional) `dataprocessor/python` 폴더에 가면 `labelMerger.py` 라는 파일이 있는데, 이는 patchwork 에서 나온 dynamic label 을 하나로 묶어주는 역할을 합니다. 이걸 통해서 잠정적으로 0 (Static), 9 (Ground), 251 (Moving) 에 해당하는 레이블들을 줄 수 있습니다!
+
 수정 사항
 
 - bin 파일을 읽어서 데이터 로드할 때 `std::vector<float> buffer(1000000);` 이렇게 로드해오는데, 현재 merged cloud 는 가지고 있는 포인트 수가 매우많아 포인트 오버플로가 빈번하게 일어나는 것 같습니다. 지금 설정된 값으로 하면 1000000 / 4 = 250000 개 까지 밖에 저장되지 않아서... 값을 바꿔주었습니다.
