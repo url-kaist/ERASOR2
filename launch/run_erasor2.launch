@@ -5,6 +5,7 @@
 <rosparam command="load" file="$(find erasor2)/config/$(arg target_seq).yaml" />
 
 <node name="run_erasor2" pkg="erasor2" type="run_erasor2" output="screen"/>
+<node name ="rviz" pkg="rviz" type="rviz" args="-d $(find erasor2)/rviz/gridmap_mapcentric.rviz"/>
 <!-- run_erasor2 가 곧 main.cpp 파일을 의미.. -->
 
 </launch>

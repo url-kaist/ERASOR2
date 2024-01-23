@@ -1,25 +1,25 @@
-start_frame: 0
-end_frame: 10
+start_frame: 8450
+end_frame:  8459 #9000
 viz_interval: 10
 is_large_scale: true
 
 dataprocessor:
     dataset_root: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/"
-    process_lidar_list: ["Aeva", "Avia", "Ouster", "Velodyne"]
+    process_lidar_list: ["Avia", "Ouster", "Velodyne", "Aeva"]
     save_ins_to_LiDAR_root: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/ins_to_lidar2"
     saveFormat: "bin"
 
 dataloader:
     dataset_name: "HeLiPR"
-    abs_data_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR2"
+    abs_data_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/"
     cloud_dir: ""
-    cloud_format: ".pcd"
-    pose_path: ""
-    sequence: "Avia"
-    abs_save_dir: "/media/se0yeon00/SY_Log/ers2_test" #"/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
-    instance_seg_method: "cais"
+    cloud_format: ".bin"
+    pose_path: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/"
+    sequence: "Merged"
+    abs_save_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/test_erasor" #"/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+    instance_seg_method: "hdbscan"
 
-    accum_interval: 2
+    accum_interval: 1
     voxel_size: 0.2
     map_voxel_size: 0.2
 
@@ -70,7 +70,7 @@ erasor2:
 stop_for_each_frame: true
 
 extrinsic:
-    robot_body_size: 2.7
+    robot_body_size: 0.0 # 2.7
     sensor_height: 1.73
     rotation: [ 1, 0, 0,
                 0, 1, 0,

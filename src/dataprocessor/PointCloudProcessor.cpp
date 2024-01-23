@@ -29,6 +29,21 @@ PointCloudProcessor::PointCloudProcessor(std::string absPath, std::string sensor
     std::filesystem::create_directory(savePath);
   }
 
+  else if(!std::filesystem::exists(saveDir + "/" + sensorType))
+  {
+    std::cout << yellow << "The path does not exist. Creating a new directory." << reset << std::endl;
+    // Attempt to create the directory
+    std::filesystem::create_directory(saveDir + "/" + sensorType);
+    std::filesystem::create_directory(savePath);
+  }
+
+  else if (!std::filesystem::exists(savePath))
+  {
+    std::cout << yellow << "The path does not exist. Creating a new directory." << reset << std::endl;
+    // Attempt to create the directory
+    std::filesystem::create_directory(savePath);
+  }
+
   posesTxt = saveDir + "/" + sensorType + "/poses.txt";
 
   if(sensorType == "Ouster")

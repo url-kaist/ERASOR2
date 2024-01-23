@@ -1,11 +1,11 @@
 <launch>
 
-<arg name="seq" default="02"/>
-<arg name="start_frame" default="860"/>
-<arg name="end_frame" default="950" />
+<arg name="seq" default="Merged"/>
+<arg name="start_frame" default="8600"/>
+<arg name="end_frame" default="9000" />
 <arg name="accum_interval" default="2" />
 
-<rosparam command="load" file="$(find erasor2)/config/kitti_mapgen.yaml" />
+<rosparam command="load" file="$(find erasor2)/config/helipr_mapgen.yaml" />
 
 <rosparam param="/dataloader/sequence" subst_value="true">"$(arg seq)"</rosparam>
 <rosparam param="/start_frame" subst_value="true">$(arg start_frame)</rosparam>

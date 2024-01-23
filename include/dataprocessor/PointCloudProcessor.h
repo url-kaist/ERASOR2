@@ -104,7 +104,7 @@ public:
     std::string binPath;
     std::string originPose;
     std::string saveDir;
-    std::string savePath; // 디스큐드 된 포인트 클라우
+    std::string savePath; // 디스큐드 된 포인트 클라우드
     std::string saveFormat = "bin";
     std::string trajPath;
     std::string posesTxt;

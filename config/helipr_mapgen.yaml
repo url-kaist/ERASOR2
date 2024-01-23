@@ -1,0 +1,44 @@
+start_frame: 8600
+end_frame: 9000
+viz_interval: 10
+is_large_scale: true
+
+dataloader:
+    dataset_name: "HeLiPR" # "SemanticKITTI"
+    abs_data_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/"
+    cloud_dir: ""
+    cloud_format: ""
+    pose_path: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/"
+    sequence: "Merged"
+    abs_save_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/merged_map"
+    
+    accum_interval: 2
+    voxel_size: 0.2
+    map_voxel_size: 0.2
+
+erasor2:
+    min_z_voi: -4.0
+    max_z_voi: 1.3
+    scan_ratio_threshold: 0.1 # The Larger, the more aggressive!!
+    min_z_diff_thr: -1.0 # [m]
+    ground_likelihood:
+        increment: 0.3
+        decrement: 0.1
+    region_proposal_thr: 0.5
+
+    minimum_num_pts: 5
+    rejection_ratio: 0
+
+    grid_resolution: 1.0
+    egocentric_grid_resolution: 0.2
+    range_of_interest: 12.0
+
+stop_for_each_frame: false
+
+extrinsic:
+    robot_body_size: 2.7
+    sensor_height: 1.73
+    rotation: [ 1, 0, 0,
+                0, 1, 0,
+                0, 0, 1 ]
+    translation: [ 0.0, 0.0, 0.0 ]

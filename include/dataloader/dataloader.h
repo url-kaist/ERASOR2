@@ -278,44 +278,63 @@ class HeLiPRLoader : public DataLoader{
     
     template<typename T>
     int loadCloud(size_t idx, pcl::PointCloud<T> &cloud){
-      // 이건 생성자에 따라서 수정이 좀 필요해 보임... 일단 4개 다 불러오는 건 고사하고 하나하나 불러오는 걸로 바꿔야겠다.
     //  string filename = (boost::format("%s/%s.%s") % cloud_dir_ % idx_timestamp % cloud_format_).str();
 
         string filename = (boost::format("%s/%06d.%s") % cloud_dir_ % idx % cloud_format_).str();
-        pcl::PointCloud<pcl::PointXYZI> cloud_raw;
-        pcl::io::loadPCDFile(filename, cloud_raw);
-        cloud = cloud_raw;
-        // FILE   *file    = fopen(filename.c_str(), "rb");
-        // if (!file) {
-        //     std::cerr << "Error: failed to load " << filename << std::endl;
-        //     return -1;
-        // }
 
-        // std::vector<float> buffer(2000000);
-        // size_t             num_points =
-        //                            fread(reinterpret_cast<char *>(buffer.data()), sizeof(float), buffer.size(), file) / 4;
-        // fclose(file);
+        if(cloud_format_ == "pcd"){
+          
+            pcl::PointCloud<pcl::PointXYZI> cloud_raw;
+            pcl::io::loadPCDFile(filename, cloud_raw);
+            cloud = cloud_raw;
+        }
+        else if(cloud_format_ == "bin"){        
+        FILE   *file    = fopen(filename.c_str(), "rb");
+            if (!file) {
+                std::cerr << "Error: failed to load " << filename << std::endl;
+                return -1;
+            }
+            std::vector<float> buffer(4000000);
+            size_t num_points = fread(reinterpret_cast<char *>(buffer.data()), sizeof(float), buffer.size(), file) / 4;
+        fclose(file);
 
-        // cloud.resize(num_points);
-        // if (std::is_same<T, pcl::PointXYZ>::value) {
-        //     for (int i = 0; i < num_points; i++) {
-        //         auto &pt = cloud.at(i);
-        //         pt.x = buffer[i * 4];
-        //         pt.y = buffer[i * 4 + 1];
-        //         pt.z = buffer[i * 4 + 2];
-        //     }
-        // } else if (std::is_same<T, pcl::PointXYZI>::value) {
-        //     for (int i = 0; i < num_points; i++) {
-        //         auto &pt = cloud.at(i);
-        //         pt.x         = buffer[i * 4];
-        //         pt.y         = buffer[i * 4 + 1];
-        //         pt.z         = buffer[i * 4 + 2];
-        //         pt.intensity = buffer[i * 4 + 3];
-        //     }
-        // }
+        cloud.resize(num_points);
+        if (std::is_same<T, pcl::PointXYZ>::value) {
+            for (int i = 0; i < num_points; i++) {
+                auto &pt = cloud.at(i);
+                pt.x = buffer[i * 4];
+                pt.y = buffer[i * 4 + 1];
+                pt.z = buffer[i * 4 + 2];
+            }
+        } else if (std::is_same<T, pcl::PointXYZI>::value) {
+            for (int i = 0; i < num_points; i++) {
+                auto &pt = cloud.at(i);
+                pt.x         = buffer[i * 4];
+                pt.y         = buffer[i * 4 + 1];
+                pt.z         = buffer[i * 4 + 2];
+                pt.intensity = buffer[i * 4 + 3];
+            }
+        }
+        }      
         return 0;
-      
-    return 0;
+    }
+
+    void loadEstGroundAndInstanceLabels(const int i, std::vector<uint32_t>& ground_label,
+                                                         std::vector<uint32_t>& instance_label);
+
+    void assignLabels(const std::vector<uint32_t> ground_labels, const std::vector<uint32_t> instance_labels,
+                  pcl::PointCloud<pcl::PointXYZI>& src_cloud, uint32_t& max_instance);
+
+//
+    pcl::PointCloud<pcl::PointXYZ> getAllPositions() const {
+        // For fetching loops
+        pcl::PointCloud<pcl::PointXYZ> poses_cloud;
+        poses_cloud.reserve(num_frames_);
+        for (auto const &pose: poses_gt_) {
+            pcl::PointXYZ pose_pt(pose(0, 3), pose(1, 3), pose(2, 3));
+            poses_cloud.push_back(pose_pt);
+        }
+        return poses_cloud;
     }
 
     // template<typename T>

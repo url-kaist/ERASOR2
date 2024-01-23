@@ -82,7 +82,7 @@ int ERASOR2::globalIdx2LocalIdx(const grid_map::Index& global_idx, const grid_ma
 }
 
 void ERASOR2::initializePointClouds() {
-    int num_pts_for_reserve = 2000000;
+    int num_pts_for_reserve = 5000000;
     map_noise_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     map_dynamic_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     map_accum_.reset(new pcl::PointCloud<pcl::PointXYZI>);
@@ -100,7 +100,73 @@ void ERASOR2::initializePointClouds() {
 
 void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                              const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label) {
-    throw invalid_argument("Not implemented");
+    // throw invalid_argument("Not implemented");
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_est_w_voi_label(new pcl::PointCloud<pcl::PointXYZI>);
+
+    // 1. 입력 point 수 만큼 할당해주기
+    transformed->reserve(cloud_est_label.size());
+    cloud_est_w_voi_label->reserve(cloud_est_label.size());
+
+    if (is_initial_) {
+        new_origin_ = pose_raw; // ** pose 의 첫 위치를 new_origin_ 으로 저장한다.
+        is_initial_ = false;
+    }
+    poses_submap_.emplace_back(new_origin_.inverse() * pose_raw); // ** new_origin_ 을 기준으로 삼아서 pose 를 저장한다. 그니까 오돔엣더리가 아니라, 첫번째 포즈를 서브맵의 기준으로 삼으시겠다는 거지.
+
+    // NOTE: First, VoI is set in an egocentric viewpoint
+    // This affects the quality of xygrid
+    
+    maskNonVoI(cloud_est_label, *cloud_est_w_voi_label, min_z_voi_, max_z_voi_);
+    pcl::transformPointCloud(*cloud_est_w_voi_label, *transformed, poses_submap_.back() * tf_h_of_ground_to_be_zero_); 
+    // ** 여까지 하고 나면 transformed 는 VoI information 이 포함되었으며, 
+    // ** global 좌표계로 변환된 포인트 클라우드가 된다.
+
+    // Parse VoI and Non-VoI. Because non-VoIs are not targets of static map building
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_voi(new pcl::PointCloud<pcl::PointXYZI>); // ** 안 쓰는데 왜 존재하죠
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_non_voi(new pcl::PointCloud<pcl::PointXYZI>); // ** 이것도 안 쓰는데 왜 존재하죠
+    pcs_transformed_.emplace_back(*transformed); 
+    //pcs_transformed_ 에 global 좌표계 포인트 쿨라우드가 들어가는데, accumulate_interval 마다 들어가게 되니까
+    // 실질적으로 관심 대상이 되는 스캔 데이터 보다는 적게 들어갈 듯
+    
+
+    float max_id = getMaxInstanceId(*transformed); // VoI 도 붙어있는 포인트 클라우드에서 MaxInstanceId 를 구해준다.
+    max_ids_.push_back(max_id); // 아까 id 는 다 rearrange 해줬으니까, max_ids 에 현재 스캔에서의 max instance id 를 넣어주면 그것도 어떠한 의미가 있겠징!
+
+    if (viz_set_scan_and_pose_) {
+        ros::Rate                               sleep_rate(30);
+        vector<pcl::PointCloud<pcl::PointXYZI>> xygrid;
+        pcl::PointCloud<pcl::PointXYZI>         complement;
+        // std::cout << "[viz set scan and pose] "<<  "Problem 1" << std::endl;
+        voi2xygrid(*cloud_est_w_voi_label, 0.0, 0.0, 0.0,
+                   range_of_interest_, grid_resolution_,
+                   xygrid, complement, "gridmap");
+        // std::cout << "[viz set scan and pose] "<<  "Problem 2" << std::endl;
+        grid_map::GridMap gridmap = setEgocentricGridMap(range_of_interest_,
+                                                         grid_resolution_, xygrid);
+        // std::cout << "[viz set scan and pose] "<<  "Problem 3" << std::endl;
+        auto parsed_cloud = parseCurrCloud(cloud_est_label);
+        // std::cout << "[viz set scan and pose] "<<  "Problem 4" << std::endl;
+
+        // Viz
+        CurrCloudPublisher.publish(erasor_utils::cloud2msg(cloud_est_label));
+        NonGroundCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.non_ground_));
+        GroundCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.ground_));
+        NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.noise_));
+        grid_map_msgs::GridMap grid_msg;
+        grid_map::GridMapRosConverter::toMessage(gridmap, grid_msg);
+        EgocentricGridPublisher.publish(grid_msg);
+        ros::spinOnce();
+        sleep_rate.sleep();
+        if (stop_for_each_frame_) {
+            std::cout << "[Set scan and pose] Waiting for pressing a key" << std::endl;
+            cin.ignore();
+        }
+    }
+
+
+
+
 }
 
 void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
@@ -173,7 +239,7 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
 
 void ERASOR2::setSubmap() {
     cout << "[ERASOR2] Setting submap..." << endl;
-    int                                  num_data = pcs_transformed_.size();
+    int num_data = pcs_transformed_.size(); // acc interval 만큼 쌓인 실질적인 포인트 클라우드들.
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_partial_src(new pcl::PointCloud<pcl::PointXYZI>);
     for (int                             k        = 0; k < num_data; ++k) {
         *map_partial_src += pcs_transformed_[k]; // ** voI + instance information 이 붙은 global 좌표계 스캔들을 모두 쌓아서 map_partial_src 에 넣어준다.
@@ -182,6 +248,7 @@ void ERASOR2::setSubmap() {
     cout << "[ERASOR2] Voxelizing submap..." << endl;
     // Estimated labels are preserved!
     erasor_utils::voxelize_preserving_labels_by_nanoflann(map_partial_src, *map_accum_, map_voxel_size_); // 그렇게 해서 만들어진 전체 맵은 map_accum_ 에 넣어주고 ,여기서는 voxel size 를 0.4 로 설정했네.
+    // map_partial_src 는 러프하게 쌓인 맵, map_accum_ 은 voxelized 된 맵이다.
 
     cout << "[ERASOR2] Calculating  min-max x, y values given " << pcs_transformed_.size() << " scan-pose pairs..." << endl;
     float min_x, min_y, max_x, max_y;
@@ -217,9 +284,9 @@ void ERASOR2::resize() {
 ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &cloud) {
     // Viz
     ParsedCurrCloud parsed_cloud;
-    parsed_cloud.non_ground_.reserve(50000);
-    parsed_cloud.ground_.reserve(50000);
-    parsed_cloud.noise_.reserve(10000);
+    parsed_cloud.non_ground_.reserve(5000000);
+    parsed_cloud.ground_.reserve(5000000);
+    parsed_cloud.noise_.reserve(1000000);
 
     int max_idx = max_ids_.back();
     vector<float> tmp_idxes;
@@ -237,22 +304,33 @@ ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &c
             parsed_cloud.non_ground_.emplace_back(pt_new);
         }
     }
+    // std::cout << "[Debug] max_idx: " << max_idx << std::endl;
+    // std::cout << "[Debug] cloud.size(): " << cloud.size() << std::endl;
+    // std::cout << "[Debug] tmp_idxes.size(): " << tmp_idxes.size() << std::endl;
 
-    for (int i = 0; i < max_idx + 1; ++i) {
+    // std::cout << "[Debug] parsed_cloud.non_ground_.size(): " << parsed_cloud.non_ground_.size() << std::endl;
+    // std::cout << "[Debug] parsed_cloud.ground_.size(): " << parsed_cloud.ground_.size() << std::endl;
+    // std::cout << "[Debug] parsed_cloud.noise_.size(): " << parsed_cloud.noise_.size() << std::endl;
+
+    for (int i = 0; i < max_idx + 2; ++i) { // ! 240112 modified max_idx + 1 -> max_idx + 2
         uint8_t r = static_cast<uint8_t>(rand() % 0xff);
         uint8_t g = static_cast<uint8_t>(rand() % 0xff);
         uint8_t b = static_cast<uint8_t>(rand() % 0xff);
         vector<uint8_t> color = {r, g, b};
         colors.emplace_back(color);
     }
+    // std::cout << "[Debug] colors.size(): " << colors.size() << std::endl;
     int ccc = 0;
     for (auto&pt: parsed_cloud.non_ground_) {
         int idx_tmp = int(tmp_idxes[ccc]);
+        // std::cout << "[Debug] idx_tmp: " << idx_tmp << std::endl;
         pt.r = colors[idx_tmp][0];
         pt.g = colors[idx_tmp][1];
         pt.b = colors[idx_tmp][2];
         ++ccc;
     }
+    // std::cout << "[Debug] colors2 .size(): " << colors.size() << std::endl;
+
     return parsed_cloud;
 }
 
@@ -394,6 +472,19 @@ void ERASOR2::detectMovingObjects() {
     cout << "\n";
 }
 
+
+void ERASOR2::saveDynamicLabels(const string& dynamic_label_root, const int &start_frame)
+{
+
+    std::cout << "[ERASOR2] On saving label results..." << std::endl;
+    for(int k = 0; k < num_data_; ++k)
+    {
+        cout << "\r[ERASOR2] Saving dynamic labels " << k + 1 << " / " << num_data_ << flush;
+        erasor_utils::save_dyn_label(dynamic_label_root, k + start_frame, pcs_transformed_[k], dynamic_points_transformed_[k], potential_dynamic_points_transformed_[k]);
+    }
+}
+
+
 void ERASOR2::filterDynamicObjects() {
     for (int k = 0; k < num_data_; ++ k) {
         auto &ids_clusters  = ids_instances_set_[k];
@@ -485,7 +576,7 @@ void ERASOR2::filterDynamicObjects() {
 
         (*map_noise_) += noisy_points_transformed_[k];
         (*map_dynamic_) += dynamic_points_transformed_[k] + potential_dynamic_points_transformed_[k];
-
+        // erasor_utils::save_dyn_label( //? modified Test in 240114
         if (viz_detect_) {
             publishPose(k);
 
@@ -514,11 +605,17 @@ void ERASOR2::filterDynamicObjects() {
             cout << pcs_transformed_[k].points.size() << " => " << static_points_transformed_[k].points.size() << " / ";
             cout << dynamic_points_transformed_[k].points.size() << " / " << noisy_points_transformed_[k].size() << " / ";
             cout << potential_dynamic_points_transformed_[k].points.size() << endl;
+
+
             CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
             DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_points_transformed_[k]));
+
+
 //            RejectedDynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*rejected_dynamic_objs));
             OutlierCurrCloudPublisher.publish(erasor_utils::cloud2msg(potential_dynamic_points_transformed_[k]));
             NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(noisy_points_transformed_[k]));
+
+
             if (dataset_name_ == "SemanticKITTI") {
                 pcl::PointCloud<pcl::PointXYZI>::Ptr static_cloud(new pcl::PointCloud<pcl::PointXYZI>);
                 pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -542,7 +639,11 @@ void ERASOR2::filterDynamicObjects() {
                 cin.ignore();
             }
         }
+    
+    
     }
+
+
 }
 
 void ERASOR2::estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,

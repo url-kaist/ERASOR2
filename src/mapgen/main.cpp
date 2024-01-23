@@ -14,6 +14,9 @@ int main(int argc, char **argv) {
     if (dataset_name == "SemanticKITTI") {
         loader = std::move(std::make_unique<SemanticKITTILoader>(mapgen->abs_data_dir_, mapgen->sequence_));
     }
+    else if(dataset_name == "HeLiPR"){
+        loader = std::move(std::make_unique<HeLiPRLoader>(mapgen->abs_data_dir_, mapgen->sequence_, "hdbscan"));
+    }
 
     std::cout << "Set dataloader complete" << std::endl;
     std::cout << "From " << mapgen->start_frame_ << " to " << mapgen->end_frame_ << std::endl;

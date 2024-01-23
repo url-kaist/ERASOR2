@@ -43,6 +43,15 @@ int main(int argc, char **argv) {
 
     string map_path = params->abs_save_dir_ + "/" + params->sequence_ + "_" + to_string(start_frame) +
                       "_to_" + to_string(end_frame) + "_estimated.pcd";
+
+    string dynamic_label_root = params->abs_save_dir_ + "/" + "mos";
+    if(!std::filesystem::exists(params->abs_save_dir_)){
+        std::filesystem::create_directory(params->abs_save_dir_);
+    }
+    if(!std::filesystem::exists(dynamic_label_root)){
+        std::filesystem::create_directory(dynamic_label_root);
+    }
+
     int cnt = 0;
     for (int i = start_frame; i < end_frame + accum_interval; ++i) {
         signal(SIGINT, erasor_utils::signal_callback_handler);
@@ -72,28 +81,30 @@ int main(int argc, char **argv) {
         loader->getScanAndPose(i, *cloud_est_label, pose);
         cout << i << "th pose: " << endl <<pose << endl;
         cout << i << "th cloud size: " << cloud_est_label->size() << endl;
-        // loader->rejectNeighboringPoints(*cloud_est_label, erasor2->robot_body_size_, *cloud_est_filtered, *noise);
+        loader->rejectNeighboringPoints(*cloud_est_label, erasor2->robot_body_size_, *cloud_est_filtered, *noise);
+        std::cout << "cloud_est_filtered size: " << cloud_est_filtered->size() << std::endl;
 
-        // if (dataset_name == "SemanticKITTI") {
-        //     erasor2->setScanAndPose(pose, *cloud_gt_filtered, *cloud_est_filtered);
-        // } else {
-        //     erasor2->setScanAndPose(pose, *cloud_est_filtered);
-        // }
+        if (dataset_name == "SemanticKITTI") {
+            erasor2->setScanAndPose(pose, *cloud_gt_filtered, *cloud_est_filtered);
+        } else {
+            std::cout<<"please get this..." << std::endl;
+            erasor2->setScanAndPose(pose, *cloud_est_filtered);
+        }
     }
-
     cout << "[ERASOR2] Complete to set scans and poses\n";
 
 
-//     erasor2->setSubmap();
-//     erasor2->updateSteppableRegion();
+    erasor2->setSubmap();
+    erasor2->updateSteppableRegion();
 // //    erasor2->dilateAndErode(); // not using
-//     erasor2->detectMovingObjects();
-//     erasor2->filterDynamicObjects();
-//     erasor2->saveStaticMap(map_path);
+    erasor2->detectMovingObjects();
+    erasor2->filterDynamicObjects(); // ? Original 
+    // //erasor2->filterDynamicObjectsAndSaveLabel(dynamic_label_root, start_frame); // ? Modified for saving dynamic labels
+    erasor2->saveDynamicLabels(dynamic_label_root, start_frame);
+    // dynamic_label_root
+    erasor2->saveStaticMap(map_path);
 
-
-
-//    erasor2->publishStaticMapResults();
+    erasor2->publishStaticMapResults();
 
     return 0;
 }

@@ -72,6 +72,9 @@
 #define IS_DYNAMIC 100001
 #define IS_NOISE_YET_POTENTIAL_DYNAMIC 100002
 
+#define DYNAMIC_LABEL 251
+#define STATIC_LABEL 9
+
 using namespace std;
 
 using num_t = float;
@@ -127,6 +130,80 @@ namespace erasor_utils {
         }
         std::cout << "Loaded " << dst.size() << " data points from " << pcd_name << std::endl;
         return 0;
+    }
+
+    template<typename T>
+    void save_dyn_label(const std::string abs_dir, const int frame_num, 
+                      const pcl::PointCloud<T> &cloud_raw,
+                      const pcl::PointCloud<T> &cloud_est_dyn,
+                        const pcl::PointCloud<T> &cloud_est_potential_dyn){
+
+    // Following SemanticKITTI's MOS Label format, Dynamic => 251 | Static => 0 
+    // This function is derived from `savelabel` in patchwork
+    // Save the estimate dynamic points into a `.label` file
+
+    const float SQR_EPSILON = 0.1; // for better gathering of dynamic points
+
+    int num_cloud_raw = cloud_raw.points.size();
+    std::vector<uint32_t> labels(num_cloud_raw, 0); // 0: static or points
+
+    int N_dyn = cloud_est_dyn.points.size();
+    int N_potential_dyn = cloud_est_potential_dyn.points.size();
+
+    PointCloud<num_t> cloud;
+
+    cloud.pts.resize(N_dyn + N_potential_dyn);
+    for (size_t i = 0; i < N_dyn; i++) {
+        cloud.pts[i].x = cloud_est_dyn.points[i].x;
+        cloud.pts[i].y = cloud_est_dyn.points[i].y;
+        cloud.pts[i].z = cloud_est_dyn.points[i].z;
+    }
+    for (size_t i = 0; i < N_potential_dyn; i++) {
+        cloud.pts[i].x = cloud_est_potential_dyn.points[i].x;
+        cloud.pts[i].y = cloud_est_potential_dyn.points[i].y;
+        cloud.pts[i].z = cloud_est_potential_dyn.points[i].z;
+    }
+    // construct a kd-tree index:
+    using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
+            nanoflann::L2_Simple_Adaptor<num_t, PointCloud<num_t>>,
+            PointCloud<num_t>, 3 >;
+
+    my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+
+    int num_valid = 0;
+    for (int j = 0; j < cloud_raw.points.size(); ++j) {
+        const auto query_pcl = cloud_raw.points[j];
+        const num_t query_pt[3] = {query_pcl.x, query_pcl.y, query_pcl.z};
+
+        size_t num_results = 1;
+        std::vector<uint32_t> ret_index(num_results);
+        std::vector<num_t> out_dist_sqr(num_results);
+
+        num_results = index.knnSearch(
+                &query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
+
+        ret_index.resize(num_results);
+        out_dist_sqr.resize(num_results);
+        if(out_dist_sqr[0] < SQR_EPSILON) { // it is in the same voxel point
+            labels[j] = 251; // DYNAMIC_LABEL
+            ++num_valid;
+        }
+    }
+
+    // Must be equal to the # of above-ground points
+    std::cout << "# of valid points: " << num_valid << std::endl;
+
+    //  To follow the KITTI format, # of zeros are set to 6
+    const int NUM_ZEROS = 6;
+
+    std::string count_str = std::to_string(frame_num);
+    std::string count_str_padded = std::string(NUM_ZEROS - count_str.length(), '0') + count_str;
+    std::string abs_label_path = abs_dir + "/" + count_str_padded + ".label";
+
+    std::cout << "\033[1;32m" << abs_label_path << "\033[0m" << std::endl;
+    std::ofstream output_file(abs_label_path, std::ios::out | std::ios::binary);
+    output_file.write(reinterpret_cast<char*>(&labels[0]), num_cloud_raw * sizeof(uint32_t));
+
     }
 
     std::string format(float f, int digits);

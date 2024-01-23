@@ -276,16 +276,27 @@ void SemanticKITTILoader::parseGTLabel(const vector<uint32_t> &labels,
 
 // ! HeLiPR Loader
 
-HeLiPRLoader::HeLiPRLoader(const string &abs_data_dir, const string &sensor, const string& instance_seq_method)
+HeLiPRLoader::HeLiPRLoader(const string &abs_data_dir, const string &sensor, const string& instance_seg_method)
 {
   seq_ = sensor;
-  cloud_dir_ = abs_data_dir + sensor + "/velodyne";
+  std::string abs_data_dir_ = abs_data_dir;
+  if(abs_data_dir_.back() == '/') { abs_data_dir_.pop_back(); }
+  cloud_dir_ = abs_data_dir_ + "/" + sensor + "/velodyne";
   gt_label_dir_ = "";
 
-  pose_path_ = abs_data_dir + sensor + "/poses.txt";
-  est_label_dir_ = "";
-  ground_label_dir_ = "";
-  cloud_format_ = "pcd";
+  pose_path_ = abs_data_dir_ + "/" + sensor + "/poses.txt";
+//   est_label_dir_ = "";
+//   ground_label_dir_ = "";
+    ground_label_dir_ = abs_data_dir_ + "/" + sensor + "/patchwork";
+//    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork_filtered";
+    if (instance_seg_method == "cais") {
+        cout << "\033[1;32m[DataLoader] Selected isntance seg. method: CAIS\n";
+        est_label_dir_    = abs_data_dir_ + "/" + sensor + "/cais";
+    } else if (instance_seg_method == "hdbscan") {
+        cout << "\033[1;32m[DataLoader] Selected isntance seg. method: HDBSCAN\n";
+        est_label_dir_    = abs_data_dir_ + "/" + sensor + "/hdbscan";
+    }
+  cloud_format_ = "bin";
 
   T_OS2_Avia << 0.999821044774776  ,      0.0159071210418969,	0.0102392346214582, 0.628232128507671, 
                 -0.0160846635739714   ,    0.999717526758036,0.0174971509254758, -0.338773055024622, 
@@ -305,19 +316,16 @@ HeLiPRLoader::HeLiPRLoader(const string &abs_data_dir, const string &sensor, con
                   0 ,    0 ,   0 , 1;
   // T_OS2_VLP16 = Eigen::Matrix4f::Identity();
 
-
   cout << ANSI_COLOR_GREEN << " [DataLoader] Data directories are as follows:" << ANSI_COLOR_RESET << endl;
   cout << "cloud_dir_: " << cloud_dir_ << endl;
   cout << "gt_label_dir_: " << gt_label_dir_ << endl;
   cout << "pose_path_: " <<pose_path_ << endl;
   cout << "ground_label_dir_: " << ground_label_dir_ << endl;
   cout << "est_label_dir_: " << est_label_dir_ << "\033[0m" << endl;
-  // 대충 abs_data_dir_ 을 "/media/se0yeon00/SY_Other/HeliPR/KAIST05" 정도로 생각하고
-
-  countNumFrames(cloud_dir_, cloud_format_, timestamp_lists_); // 생성자에서 스캔 수 세고
-  loadAllPoses(pose_path_, poses_gt_); // pose 를 일단 전부 저장해둘거임
+  // 
+  countNumFrames(cloud_dir_, cloud_format_, timestamp_lists_); // 
+  loadAllPoses(pose_path_, poses_gt_); // 
 }
-
 inline void HeLiPRLoader::countNumFrames(const string &pcd_dir, const string &pcd_format, vector<string> &files) {
   // std::vector<std::string> files;
   for (const auto& entry :fs::directory_iterator(pcd_dir)){
@@ -369,6 +377,10 @@ void HeLiPRLoader::loadAllPoses(const string pose_path, vector<Eigen::Matrix4f> 
     {
       tf4x4_lidar = T_OS2_VLP16 * tf4x4_sensor;
     }
+    else if(seq_ == "Merged")
+    {
+        tf4x4_lidar = tf4x4_sensor;
+    }
 
     poses.push_back(tf4x4_lidar);
     count++;
@@ -380,9 +392,73 @@ void HeLiPRLoader::loadAllPoses(const string pose_path, vector<Eigen::Matrix4f> 
 
 void HeLiPRLoader::getScanAndPose(size_t i, pcl::PointCloud<pcl::PointXYZI> &cloud, Eigen::Matrix4f &pose)
 { 
-    printf("[HeLiPRLoader] my sensor type is %s\n", seq_.c_str());
+    // printf("[HeLiPRLoader] my sensor type is %s\n", seq_.c_str());
     loadCloud(i, cloud);
+
+    shared_ptr<vector<uint32_t>> ground_label(new vector<uint32_t>);
+    shared_ptr<vector<uint32_t>> instance_label(new vector<uint32_t>);
+    uint32_t max_instance;
+    loadEstGroundAndInstanceLabels(i, *ground_label, *instance_label);
+    assignLabels(*ground_label, *instance_label,
+                      cloud, max_instance);
+
+
     getPose(i, pose);
+}
+
+void HeLiPRLoader::loadEstGroundAndInstanceLabels(const int i, std::vector<uint32_t>& ground_label,
+                                                         std::vector<uint32_t>& instance_label) {
+    string inst_label_name = (boost::format("%s/%06d.label") % est_label_dir_ % i).str();
+    string ground_label_name = (boost::format("%s/%06d.label") % ground_label_dir_ % i).str();
+
+    // std::cout << inst_label_name << std::endl;
+    // std::cout << ground_label_name << std::endl;
+
+    erasor_utils::load_labels(inst_label_name, instance_label);
+    erasor_utils::load_labels(ground_label_name, ground_label);
+
+    if (instance_label.size() != ground_label.size()) {
+        std::cout << "instance_label size: " << instance_label.size() << std::endl;
+        std::cout << ground_label.size() << std::endl;
+        std::cout << "instance_label name: " << inst_label_name << std::endl;
+        std::cout << "ground_label name: " << ground_label_name << std::endl;
+        throw invalid_argument("[Loading] Something's wrong!");
+    }
+
+    static bool is_initial = true;
+    if (is_initial) {
+        std::vector<uint32_t> tmp_ground_label = ground_label;
+        std::sort(tmp_ground_label.begin(), tmp_ground_label.end());
+        auto last = std::unique(tmp_ground_label.begin(), tmp_ground_label.end());
+        tmp_ground_label.erase(last, tmp_ground_label.end());
+        std::cout << "\033[1;33m[NOTE] Ground label contains ";
+        for (int j = 0; j < tmp_ground_label.size(); ++j) {
+            std::cout << tmp_ground_label[j];
+            if (j < tmp_ground_label.size() - 1) {
+                std::cout << ", ";
+            } else {
+                std::cout << std::endl;
+            }
+        }
+        std::cout << "(check the function `assignLabel()` in `dataloader.cpp`\033[0m" << std::endl;
+        is_initial = false;
+    }
+}
+
+void HeLiPRLoader::assignLabels(const std::vector<uint32_t> ground_labels, const std::vector<uint32_t> instance_labels,
+                  pcl::PointCloud<pcl::PointXYZI>& src_cloud, uint32_t& max_instance) {
+    max_instance = 0;
+    for (int j = 0; j < src_cloud.points.size(); ++j) {
+        // Follow Rhiney and Lucas's format.
+        if (ground_labels[j]) {
+            src_cloud.points[j].intensity = GROUND_LABEL;
+        } else { // For non-ground points
+            uint32_t inst_label            = instance_labels[j] >> 16;
+            src_cloud.points[j].intensity = inst_label;
+//                std::cout << inst_label << ", ";
+            max_instance = max(max_instance, inst_label);
+        }
+    }
 }
 
 

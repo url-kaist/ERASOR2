@@ -61,6 +61,7 @@ namespace erasor {
         ros::Publisher pub_debug_pc2_curr_;
         ros::Publisher pub_debug_map_;
 
+
         /***
          * Variables ralted with global map
          */

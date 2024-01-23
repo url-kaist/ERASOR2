@@ -1,0 +1,4 @@
+<launch>
+  <rosparam file="$(find erasor2)/config/HeLiPR_kitti.yaml" command="load" />
+  <node name="merge_heliclouds" pkg="erasor2" type="merge_heliclouds" output="screen"/>
+</launch>
