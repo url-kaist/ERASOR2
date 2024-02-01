@@ -244,7 +244,7 @@ namespace erasor_utils {
 
     void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
                                                  pcl::PointCloud<pcl::PointXYZI> &dst, const double leaf_size,
-                                                 const int minimum_num_pts_per_voxel=0);
+                                                 const int minimum_num_pts_per_voxel=0, const bool verbose=false);
 
     void count_stat_dyn(const pcl::PointCloud<pcl::PointXYZI> &cloudIn, int &num_static, int &num_dynamic);
 
@@ -265,6 +265,9 @@ namespace erasor_utils {
 
     int getNumGroundPoints(const pcl::PointCloud<pcl::PointXYZI>& pc);
 
+    std::tuple<pcl::PointCloud<pcl::PointXYZI>, pcl::PointCloud<pcl::PointXYZI>>
+            clusterIndices2PointCloud(const vector<Eigen::Vector3f>& positions,
+                                      const vector<vector<size_t>>& cluster_indices);
 
 }
 #endif // ERASOR_UTILS_H

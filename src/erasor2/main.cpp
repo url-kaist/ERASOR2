@@ -4,18 +4,35 @@
 
 #include "tools/erasor_utils.hpp"
 #include "dataloader/dataloader.h"
+#include "dataprocessor/TrajectoryClustering.hpp"
 #include "erasor2/erasor2.h"
 
 using namespace std;
 
 using PointType = pcl::PointXYZI;
 
+vector<Eigen::Vector3f> getPoses(const DataLoader& loader, const int start_frame,
+                                 const int end_frame, const  int accum_interval) {
+    // For fetching loops
+    vector<Eigen::Vector3f> positions;
+    vector<Eigen::Matrix4f> poses_gt;
+    Eigen::Matrix4f pose_tmp = Eigen::Matrix4f::Identity();
+    for (int i = start_frame; i < end_frame + accum_interval; ++i) {
+        pose_tmp = loader.poses_gt_[i];
+        poses_gt.emplace_back(pose_tmp);
+    }
+    for (auto const& pose: poses_gt) {
+        Eigen::Vector3f position_vec(pose(0, 3), pose(1, 3), pose(2, 3));
+        positions.emplace_back(position_vec);
+    }
+    return positions;
+}
+
 int main(int argc, char **argv) {
     ros::init(argc, argv, "erasor2_main");
     ros::NodeHandle nh;
 
     std::cout << "ERASOR2 started" << std::endl;
-    unique_ptr<ERASOR2> erasor2(new ERASOR2());
     unique_ptr<RosParamServer> params(new RosParamServer());
     std::cout << "Set ERASOR2 complete" << std::endl;
 
@@ -39,10 +56,9 @@ int main(int argc, char **argv) {
 
     int start_frame = params->start_frame_;
     int end_frame   = params->end_frame_;
-    int accum_interval = params->accum_interval_; // 여기서는 accumulation 의 interval 이 2로 설정되어 있기는 함.
+    int accum_interval = params->accum_interval_; // 여기서는 accumulation 의 interval이 2로 설정되어 있기는 함.
 
-    string map_path = params->abs_save_dir_ + "/" + params->sequence_ + "_" + to_string(start_frame) +
-                      "_to_" + to_string(end_frame) + "_estimated.pcd";
+
 
     string dynamic_label_root = params->abs_save_dir_ + "/" + "mos";
     if(!std::filesystem::exists(params->abs_save_dir_)){
@@ -52,59 +68,90 @@ int main(int argc, char **argv) {
         std::filesystem::create_directory(dynamic_label_root);
     }
 
-    int cnt = 0;
-    for (int i = start_frame; i < end_frame + accum_interval; ++i) {
-        signal(SIGINT, erasor_utils::signal_callback_handler);
-        if (i % 10 == 0) {
-            cout << "[DataLoader] " << i << "th frame comes!\n";
+    const auto pose_cloud = getPoses(*loader, start_frame, end_frame, accum_interval);
+
+
+    vector<vector<size_t>> submap_indices;
+    if (params->run_traj_clustering_) {
+        submap_indices = clusterTrajectoryXYZ(pose_cloud);
+        const auto &[clustered, unclustered] = erasor_utils::clusterIndices2PointCloud(pose_cloud, submap_indices);
+        if (!unclustered.empty()) {
+            throw runtime_error("Some poses are not clustered!");
         }
 
-        // if `accum_interval` == 1, the below condition is not used
-        if (accum_interval > 1 && ++cnt / accum_interval >= 1) {
-            cnt = 0;
-            continue;
+        // You can see the results by using `rviz/clustering_viz.rviz`
+        ros::Publisher pub_raw_traj = nh.advertise<sensor_msgs::PointCloud2>("unclustered",100, true);
+        ros::Publisher pub_clustered = nh.advertise<sensor_msgs::PointCloud2>("clustered",100, true);
+        sensor_msgs::PointCloud2 output, cluster_output;
+        pcl::toROSMsg(unclustered, output);
+        pcl::toROSMsg(clustered, cluster_output);
+        output.header.frame_id = "map";
+        cluster_output.header.frame_id = "map";
+        for (int i = 0; i < 5; ++i) {
+            pub_raw_traj.publish(output);
+            pub_clustered.publish(cluster_output);
+          ros::spinOnce();
         }
-
-        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_gt_label(new pcl::PointCloud<pcl::PointXYZI>);
-        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_est_label(new pcl::PointCloud<pcl::PointXYZI>);
-        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_gt_filtered(new pcl::PointCloud<pcl::PointXYZI>);
-        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_est_filtered(new pcl::PointCloud<pcl::PointXYZI>);
-        pcl::PointCloud<pcl::PointXYZI>::Ptr noise(new pcl::PointCloud<pcl::PointXYZI>);
-
-        Eigen::Matrix4f pose = Eigen::Matrix4f::Identity();
-        // A scan contains label in `intensity`
-        if (dataset_name == "SemanticKITTI") {
-            loader->getGTLabeledScan(i, *cloud_gt_label);
-            loader->rejectNeighboringPoints(*cloud_gt_label, erasor2->robot_body_size_, *cloud_gt_filtered, *noise);
+    } else {
+        submap_indices.clear();
+        vector<size_t> indices_tmp;
+        for (size_t i = start_frame; i < end_frame + accum_interval; i+= accum_interval) {
+            indices_tmp.emplace_back(i);
         }
-
-        loader->getScanAndPose(i, *cloud_est_label, pose);
-        cout << i << "th pose: " << endl <<pose << endl;
-        cout << i << "th cloud size: " << cloud_est_label->size() << endl;
-        loader->rejectNeighboringPoints(*cloud_est_label, erasor2->robot_body_size_, *cloud_est_filtered, *noise);
-        std::cout << "cloud_est_filtered size: " << cloud_est_filtered->size() << std::endl;
-
-        if (dataset_name == "SemanticKITTI") {
-            erasor2->setScanAndPose(pose, *cloud_gt_filtered, *cloud_est_filtered);
-        } else {
-            std::cout<<"please get this..." << std::endl;
-            erasor2->setScanAndPose(pose, *cloud_est_filtered);
-        }
+        submap_indices.emplace_back(indices_tmp);
     }
-    cout << "[ERASOR2] Complete to set scans and poses\n";
 
+    std::cout << "\033[1;32mStart to run ERASOR2\033[0m" << std::endl;
+    int cluster_id = 0;
+    for (const auto &indices: submap_indices) {
+        unique_ptr<ERASOR2> erasor2(new ERASOR2());
+        for (const auto &idx : indices) {
+            signal(SIGINT, erasor_utils::signal_callback_handler);
+//            if (idx % 10 == 0) {
+//                cout << "[DataLoader] " << idx << "th frame comes!\n";
+//            }
 
-    erasor2->setSubmap();
-    erasor2->updateSteppableRegion();
-// //    erasor2->dilateAndErode(); // not using
-    erasor2->detectMovingObjects();
-    erasor2->filterDynamicObjects(); // ? Original 
-    // //erasor2->filterDynamicObjectsAndSaveLabel(dynamic_label_root, start_frame); // ? Modified for saving dynamic labels
-    erasor2->saveDynamicLabels(dynamic_label_root, start_frame);
-    // dynamic_label_root
-    erasor2->saveStaticMap(map_path);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_gt_label(new pcl::PointCloud<pcl::PointXYZI>);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_est_label(new pcl::PointCloud<pcl::PointXYZI>);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_gt_filtered(new pcl::PointCloud<pcl::PointXYZI>);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_est_filtered(new pcl::PointCloud<pcl::PointXYZI>);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr noise(new pcl::PointCloud<pcl::PointXYZI>);
 
-    erasor2->publishStaticMapResults();
+            Eigen::Matrix4f pose = Eigen::Matrix4f::Identity();
+            // A scan contains label in `intensity`
+            if (dataset_name == "SemanticKITTI") {
+                loader->getGTLabeledScan(idx, *cloud_gt_label);
+                loader->rejectNeighboringPoints(*cloud_gt_label, erasor2->robot_body_size_, *cloud_gt_filtered, *noise);
+            }
 
+            loader->getScanAndPose(idx, *cloud_est_label, pose);
+//            cout << idx << "th pose: " << endl << pose << endl;
+//            cout << idx << "th cloud size: " << cloud_est_label->size() << endl;
+            loader->rejectNeighboringPoints(*cloud_est_label, erasor2->robot_body_size_, *cloud_est_filtered, *noise);
+//            std::cout << "cloud_est_filtered size: " << cloud_est_filtered->size() << std::endl;
+
+            if (dataset_name == "SemanticKITTI") {
+                erasor2->setScanAndPose(pose, *cloud_gt_filtered, *cloud_est_filtered);
+            } else {
+                erasor2->setScanAndPose(pose, *cloud_est_filtered);
+            }
+        }
+        cout << "[ERASOR2] Complete to set scans and poses\n";
+
+        erasor2->setSubmap();
+        erasor2->updateSteppableRegion();
+        //    erasor2->dilateAndErode(); // not using
+        erasor2->detectMovingObjects();
+        erasor2->filterDynamicObjects(); // ? Original
+        //erasor2->filterDynamicObjectsAndSaveLabel(dynamic_label_root, start_frame); // ? Modified for saving dynamic labels
+        erasor2->saveDynamicLabels(dynamic_label_root, indices);
+        // dynamic_label_root
+        string map_path = params->abs_save_dir_ + "/" + params->sequence_ + "_" + to_string(cluster_id) + "_frame_" + to_string(start_frame) +
+                      "_to_" + to_string(end_frame) + "_estimated.pcd";
+//        erasor2->saveStaticMap(map_path);
+//
+//        erasor2->publishStaticMapResults();
+        ++cluster_id;
+    }
     return 0;
 }

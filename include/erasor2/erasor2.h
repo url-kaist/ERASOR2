@@ -118,7 +118,7 @@ public:
     void detectMovingObjects();
 
     void filterDynamicObjects();
-    void saveDynamicLabels(const string& dynamic_label_root, const int &start_frame);
+    void saveDynamicLabels(const string& dynamic_label_root, const vector<size_t> &indices);
     /***********************/
 
     void resize();

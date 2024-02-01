@@ -163,10 +163,6 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
             cin.ignore();
         }
     }
-
-
-
-
 }
 
 void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
@@ -242,7 +238,12 @@ void ERASOR2::setSubmap() {
     int num_data = pcs_transformed_.size(); // acc interval 만큼 쌓인 실질적인 포인트 클라우드들.
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_partial_src(new pcl::PointCloud<pcl::PointXYZI>);
     for (int                             k        = 0; k < num_data; ++k) {
-        *map_partial_src += pcs_transformed_[k]; // ** voI + instance information 이 붙은 global 좌표계 스캔들을 모두 쌓아서 map_partial_src 에 넣어준다.
+        // 너무 많은 points -> voxelization함!
+        pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_transformed(new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::PointCloud<pcl::PointXYZI> cloud_tmp;
+        *ptr_transformed = pcs_transformed_[k];
+        erasor_utils::voxelize_preserving_labels_by_nanoflann(ptr_transformed, cloud_tmp, voxel_size_, minimum_num_per_voxel_);
+        *map_partial_src += cloud_tmp; // ** voI + instance information 이 붙은 global 좌표계 스캔들을 모두 쌓아서 map_partial_src 에 넣어준다.
     }
 
     cout << "[ERASOR2] Voxelizing submap..." << endl;
@@ -348,12 +349,15 @@ void ERASOR2::updateSteppableRegion() {
         pcl::PointCloud<pcl::PointXYZI> complement;
 //        std::cout << poses_submap[k] << std::endl;
 //        std::cout << pos_x_approx << " , " << pos_y_approx << std::endl;
+        cout << "\033[1;32mOn pc voi2xygrid...\033[0m\n";
         voi2xygrid(pcs_transformed_[k], pos_approx(0), pos_approx(1), poses_submap_[k](2, 3),
                    range_of_interest_, grid_resolution_, xygrids_[k], complement);
         vector<pcl::PointCloud<pcl::PointXYZI>> map_grid;
+        cout << "\033[1;32mOn map voi2xygrid...\033[0m\n";
         pcl::PointCloud<pcl::PointXYZI>::Ptr    dummy(new pcl::PointCloud<pcl::PointXYZI>);
         voi2xygrid(*map_accum_, pos_approx(0), pos_approx(1), poses_submap_[k](2, 3),
                    range_of_interest_, grid_resolution_, map_grid, *dummy);
+        cout << "\033[1;32mOn updating...\033[0m\n";
 
         // Assume that range of interest is square
         grid_map::Index idx;
@@ -363,7 +367,7 @@ void ERASOR2::updateSteppableRegion() {
                 // x direction first
                 idx(0) = w;
                 idx(1) = h;
-//                    cout << "(" << w << ", " << h << ") - ";
+//                cout << "\033[1;32m(" << w << ", " << h << ") - \033[0m";
                 if (isLikelyToBeSteppableRegion(xygrids_[k][count], map_grid[count],
                                                 scan_ratio_threshold_,
                                                 min_z_diff_thr_, verbose_)) { // 오직 map, scan 으의 높이차이가 꽤 나면서도 scan 이 바닥으로 정확히 판명난 경우에만 True
@@ -473,14 +477,14 @@ void ERASOR2::detectMovingObjects() {
 }
 
 
-void ERASOR2::saveDynamicLabels(const string& dynamic_label_root, const int &start_frame)
-{
+void ERASOR2::saveDynamicLabels(const string& dynamic_label_root, const vector<size_t> &indices) {
 
     std::cout << "[ERASOR2] On saving label results..." << std::endl;
     for(int k = 0; k < num_data_; ++k)
     {
-        cout << "\r[ERASOR2] Saving dynamic labels " << k + 1 << " / " << num_data_ << flush;
-        erasor_utils::save_dyn_label(dynamic_label_root, k + start_frame, pcs_transformed_[k], dynamic_points_transformed_[k], potential_dynamic_points_transformed_[k]);
+        int frame_num = indices[k];
+        cout << "\r[ERASOR2] Saving dynamic labels " << frame_num << " / " << num_data_ << flush;
+        erasor_utils::save_dyn_label(dynamic_label_root, frame_num, pcs_transformed_[k], dynamic_points_transformed_[k], potential_dynamic_points_transformed_[k]);
     }
 }
 
@@ -639,11 +643,7 @@ void ERASOR2::filterDynamicObjects() {
                 cin.ignore();
             }
         }
-    
-    
     }
-
-
 }
 
 void ERASOR2::estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
@@ -730,6 +730,7 @@ void ERASOR2::accumInstanceWiseDynamicCloud(const int k, const int window_size,
     }
 }
 
+// It shows rather poor performance
 void ERASOR2::instanceAwareOutlierRemoval(const int k, const int window_size,
                                            const float dist_thr_gain,
                                            pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
@@ -1161,8 +1162,8 @@ void ERASOR2::voi2xygrid(
                 h = static_cast<int>((pos_y + range - pt.y) / resolution);
             } else { throw invalid_argument("Not implemented"); }
 
-            if (w + width * h > xygrid.size()) {
-                std::cout << range << " ,,, " << resolution << std::endl;
+            if (w + width * h > xygrid.size()-1) {
+                std::cout << "range: " << range << " , res: " << resolution << std::endl;
                 std::cout << "pt: (" << pt.x << ", " << pt.y << ") | ";
                 std::cout << "position: (" << pos_x << " ,, " << pos_y << ")" << std::endl;
                 std::cout << range << " => " << pos_x + range << " => " << pos_x + range - pt.x << std::endl;
@@ -1180,6 +1181,7 @@ void ERASOR2::voi2xygrid(
             xygrid[w + width * h].points.emplace_back(pt);
         } else { complement.points.push_back(pt); }
     }
+    std::cout << "\n" << std::endl;
 }
 
 void

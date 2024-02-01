@@ -252,7 +252,7 @@ namespace erasor_utils {
     }
 
     void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src, pcl::PointCloud<pcl::PointXYZI> &dst,
-                                    double leaf_size) {
+                                    double leaf_size, const bool verbose) {
         /**< IMPORTANT
          * Because PCL voxlizaiton just does average the intensity of point cloud,
          * so this function is to conduct voxelization followed by nearest points search to re-assign the label of each point */
@@ -301,7 +301,7 @@ namespace erasor_utils {
 
     void voxelize_preserving_labels_by_nanoflann(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
                                                  pcl::PointCloud<pcl::PointXYZI> &dst, const double leaf_size,
-                                                 const int minimum_num_pts_per_voxel) {
+                                                 const int minimum_num_pts_per_voxel, const bool verbose) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_voxelized(new pcl::PointCloud<pcl::PointXYZI>);
 
         // 1. Voxelization
@@ -311,7 +311,7 @@ namespace erasor_utils {
         voxel_filter.setMinimumPointsNumberPerVoxel(minimum_num_pts_per_voxel);
         voxel_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
         voxel_filter.filter(*ptr_voxelized);
-        cout << "\033[1;35m[Voxelization] " << src->points.size() << " => " << ptr_voxelized->points.size() << "\n";
+        if (verbose) cout << "\033[1;35m[Voxelization] " << src->points.size() << " => " << ptr_voxelized->points.size() << "\n";
         std::chrono::system_clock::time_point t_v_e = std::chrono::system_clock::now();
         // Does not work...
 //        static HashVoxelGrid<pcl::PointXYZI> hash_voxel_filter;
@@ -335,10 +335,12 @@ namespace erasor_utils {
         }
         dst = *ptr_voxelized;
         std::chrono::system_clock::time_point t_f_e = std::chrono::system_clock::now();
-        cout << "Elapsed time in milliseconds: "
-             << chrono::duration_cast<chrono::milliseconds>(t_f_e - t_v_s).count()
-             << " ms(" <<  chrono::duration_cast<chrono::milliseconds>(t_v_e - t_v_s).count() << " ms + ";
-        cout << chrono::duration_cast<chrono::milliseconds>(t_f_e - t_v_e).count()<< " ms)\033[0m\n";
+        if (verbose) {
+            cout << "Elapsed time in milliseconds: "
+                 << chrono::duration_cast<chrono::milliseconds>(t_f_e - t_v_s).count()
+                 << " ms(" << chrono::duration_cast<chrono::milliseconds>(t_v_e - t_v_s).count() << " ms + ";
+            cout << chrono::duration_cast<chrono::milliseconds>(t_f_e - t_v_e).count() << " ms)\033[0m\n";
+        }
     }
 
     void count_stat_dyn(const pcl::PointCloud<pcl::PointXYZI> &cloudIn, int &num_static, int &num_dynamic) {
@@ -442,5 +444,37 @@ namespace erasor_utils {
             }
         }
         return num_ground_pts;
+    }
+
+    std::tuple<pcl::PointCloud<pcl::PointXYZI>, pcl::PointCloud<pcl::PointXYZI>>
+            clusterIndices2PointCloud(const vector<Eigen::Vector3f>& positions,
+                                      const vector<vector<size_t>>& cluster_indices) {
+        pcl::PointCloud<pcl::PointXYZI> clustered;
+        pcl::PointCloud<pcl::PointXYZI> unclustered;
+        int               cluster_id = 0;
+        std::vector<bool> is_clustered(positions.size(), false);
+        pcl::PointXYZI    point;
+        for (const auto &indices : cluster_indices) {
+//        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZI>);
+            for (const auto &idx : indices) {
+                is_clustered[idx] = true;
+                point.x         = positions[idx](0);
+                point.y         = positions[idx](1);
+                point.z         = positions[idx](2);
+                point.intensity = static_cast<float>(cluster_id);
+                clustered.push_back(point);
+            }
+            ++cluster_id;
+        }
+
+        for (int i = 0; i < positions.size(); ++i) {
+            if (!is_clustered[i]) {
+                point.x = positions[i](0);
+                point.y = positions[i](1);
+                point.z = positions[i](2);
+                unclustered.push_back(point);
+            }
+        }
+        return std::make_tuple(clustered, unclustered);
     }
 }

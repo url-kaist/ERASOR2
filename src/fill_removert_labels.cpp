@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     erasor_utils::load_pcd(removert_path, removert);
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr removert_voxelized(new pcl::PointCloud<pcl::PointXYZI>);
-    erasor_utils::voxelize_preserving_labels(removert, *removert_voxelized, 0.2); // All evaluation is set to 0.2
+    erasor_utils::voxelize_preserving_labels_by_nanoflann(removert, *removert_voxelized, 0.2); // All evaluation is set to 0.2
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZI>);
     std::cout << "\033[1;32mLoad complete \033[0m" << std::endl;
 
