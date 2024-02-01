@@ -72,6 +72,7 @@ public:
     int neighboring_height_;
     int kernel_size_;
     int minimum_num_pts_;
+    int minimum_num_per_voxel_;
 
     int window_size_;
     float vor_cand_score_thr_;
@@ -83,6 +84,7 @@ public:
     float voxel_size_;
     float map_voxel_size_;
 
+    bool run_traj_clustering_;
     string dataset_name_;
     string abs_save_dir_;
     string abs_data_dir_;
@@ -130,7 +132,7 @@ public:
         nh_.param<int>("/end_frame", end_frame_, -1);
         nh_.param<int>("/viz_interval", viz_interval_, 10);
         nh_.param<bool>("/is_large_scale", is_large_scale_, true);
-
+        nh_.param<bool>("/dataloader/run_traj_clustering", run_traj_clustering_, false);
         nh_.param<string>("/dataloader/dataset_name", dataset_name_, "");
         nh_.param<string>("/dataloader/abs_data_dir", abs_data_dir_, "");
         nh_.param<string>("/dataloader/cloud_dir", cloud_dir_, "");
@@ -156,6 +158,7 @@ public:
 
         nh_.param<float>("/erasor2/ratio_num_pts", ratio_num_pts_, 0.95);
         nh_.param<int>("/erasor2/minimum_num_pts", minimum_num_pts_, 3);
+        nh_.param<int>("/erasor2/minimum_num_per_voxel", minimum_num_per_voxel_, 1);
 
         nh_.param<float>("/erasor2/moving_object_detection/negative_log_odds", negative_log_odds_, -2.0);
         nh_.param<float>("/erasor2/moving_object_detection/obj_score_soft_thr", obj_score_soft_thr_, 0.8);
@@ -245,6 +248,10 @@ public:
 //        pub_ground   = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/ground", 100);
 //        pub_arranged = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/arranged", 100);
 //
+        std::string home_dir = std::getenv("HOME");
+        abs_data_dir_ = home_dir + abs_data_dir_;
+        abs_save_dir_ = home_dir + abs_save_dir_;
+        pose_path_ = home_dir + pose_path_;
 
         tf_h_of_ground_to_be_zero_(2, 3) = sensor_height_;
         usleep(100);

@@ -9,7 +9,7 @@ import open3d as o3d
 import numpy as np
 import os
 import yaml
-
+from tqdm import tqdm
 
 def load_labels(label_path):
   label = np.fromfile(label_path, dtype=np.uint32)
@@ -44,11 +44,12 @@ def rearrange_inst_label(inst_label, cnt):
 
 if __name__ == "__main__":
   
-  seq = "ERASOR_mini" # Set as "Merged"
-  patchwork_root = "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/{}/patchwork".format(seq)
-  mos_root = "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/{}/mos".format(seq)
-  hdbscan_root = "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/{}/hdbscan".format(seq)
-  new_label_root = "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/{}/labels".format(seq)
+  seq = "Merged" # Set as "Merged"
+  home_dir = os.path.expanduser("~")
+  patchwork_root = home_dir + "/kmos_bench/sequences/KAIST05/deskewed_LiDAR/{}/patchwork".format(seq)
+  mos_root = home_dir + "/kmos_bench/sequences/KAIST05/deskewed_LiDAR/{}/mos".format(seq)
+  hdbscan_root = home_dir + "/kmos_bench/sequences/KAIST05/deskewed_LiDAR/{}/hdbscan".format(seq)
+  new_label_root = home_dir + "/kmos_bench/sequences/KAIST05/deskewed_LiDAR/{}/labels".format(seq)
   
   if not os.path.exists(new_label_root):
     os.makedirs(new_label_root)
@@ -57,7 +58,7 @@ if __name__ == "__main__":
   label_names.sort()
 
   cnt = 1
-  for i in range(len(label_names)):
+  for i in tqdm(range(199), desc="Processing labels"):
     ground_label, _ = load_labels(os.path.join(patchwork_root, label_names[i]))
     _, hdbscan_label = load_labels(os.path.join(hdbscan_root, label_names[i]))
     # print(np.unique(hdbscan_label))

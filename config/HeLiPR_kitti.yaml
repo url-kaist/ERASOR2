@@ -12,7 +12,7 @@ dataprocessor:
 dataloader:
     run_traj_clustering: true
     dataset_name: "HeLiPR"
-    abs_data_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/"
+    abs_data_dir: "/kmos_bench/sequences/KAIST05/deskewed_LiDAR"
     cloud_dir: ""
     cloud_format: ".bin"
     pose_path: "/kmos_bench/sequences/KAIST05/deskewed_LiDAR"
