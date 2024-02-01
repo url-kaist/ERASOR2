@@ -1,27 +1,28 @@
-start_frame: 8450
-end_frame:  8459 #9000
+start_frame: 0
+end_frame:  12476 #9000
 viz_interval: 10
 is_large_scale: true
 
 dataprocessor:
-    dataset_root: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/"
+    dataset_root: "/kmos_bench/sequences/KAIST05/"
     process_lidar_list: ["Avia", "Ouster", "Velodyne", "Aeva"]
-    save_ins_to_LiDAR_root: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/ins_to_lidar2"
+    save_ins_to_LiDAR_root: "/kmos_bench/sequences/KAIST05/ins_to_lidar2"
     saveFormat: "bin"
 
 dataloader:
+    run_traj_clustering: true
     dataset_name: "HeLiPR"
     abs_data_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/"
     cloud_dir: ""
     cloud_format: ".bin"
-    pose_path: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/"
+    pose_path: "/kmos_bench/sequences/KAIST05/deskewed_LiDAR"
     sequence: "Merged"
-    abs_save_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/test_erasor" #"/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+    abs_save_dir: "/kmos_bench/sequences/KAIST05/deskewed_LiDAR"
     instance_seg_method: "hdbscan"
 
     accum_interval: 1
-    voxel_size: 0.2
-    map_voxel_size: 0.2
+    voxel_size: 0.4
+    map_voxel_size: 0.4
 
 erasor2:
     grid_resolution: 2.0
@@ -34,13 +35,14 @@ erasor2:
     scan_ratio_threshold: 0.2 # The Larger, the more objects could be candidates
     log_odds:
         increment_gain: 2.0 # Should be larger than one
-        increment: 0.15
+        increment: 0.05
     region_proposal_thr: 0.8 # probabiliy. 0 ~ 1
     kernel_size: 1
 
     # For checking ground likelihood
     ratio_num_pts: 0.95 # Percentage
     minimum_num_pts: 5
+    minimum_num_per_voxel_: 1
 
     # For detection moving objects
     moving_object_detection:

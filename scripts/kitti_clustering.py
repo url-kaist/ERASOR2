@@ -27,7 +27,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert KITTI dataset to ROS bag file the easy way!")
     # parser.add_argument("--dir", nargs="?", default = os.getcwd(), help="base directory of the dataset, if no directory passed the deafult is current working directory")
     parser.add_argument("-s", "--seq", default="Merged", help="sequence of the odometry dataset (between 00 - 21), option is only for ODOMETRY datasets.")
-    parser.add_argument("-i", "--init_stamp", default=0, type=int)
+    parser.add_argument("-i", "--init_stamp", default=9000, type=int)
     parser.add_argument("-e", "--end_stamp", default=12477, type=int)
     args = parser.parse_args()
 

@@ -8,8 +8,6 @@ import sys
 import yaml
 import os
 
-import rospy
-
 def latlon2local(lat, lon, alt, origin):
     # Define the projection for geographic coordinates
     wgs84 = Proj(proj='latlong', datum='WGS84')
@@ -151,10 +149,13 @@ def processTrajectory(inputPath, outputPath, typeLiDAR, visualize = False):
 
 if __name__ == "__main__":
 # User inputs
-  rospy.init_node('fastlio2travelnode', anonymous=True)
-  dataset_root = rospy.get_param("/dataprocessor/dataset_root")
-  process_lidar_list = rospy.get_param("/dataprocessor/process_lidar_list")
-  save_ins_to_LiDAR_root = rospy.get_param("/dataprocessor/save_ins_to_LiDAR_root")
+#   rospy.init_node('fastlio2travelnode', anonymous=True)
+#   dataset_root = rospy.get_param("/dataprocessor/dataset_root")
+#   process_lidar_list = rospy.get_param("/dataprocessor/process_lidar_list")
+#   save_ins_to_LiDAR_root = rospy.get_param("/dataprocessor/save_ins_to_LiDAR_root")
+  dataset_root = "/home/shapelim/Documents/KAIST05/"
+  process_lidar_list = ["Aeva", "Avia", "Ouster", "Velodyne"]
+  save_ins_to_LiDAR_root = "/home/shapelim/Documents/KAIST05/ins_to_lidar"
 
 #   dataset_root = config['transform_ins_to_lidar']['dataset_root']
 #   process_lidar_list = config['transform_ins_to_lidar']['process_lidar_list']
