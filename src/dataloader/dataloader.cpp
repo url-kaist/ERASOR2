@@ -418,10 +418,10 @@ void HeLiPRLoader::loadEstGroundAndInstanceLabels(const int i, std::vector<uint3
     erasor_utils::load_labels(ground_label_name, ground_label);
 
     if (instance_label.size() != ground_label.size()) {
-        std::cout << "instance_label size: " << instance_label.size() << std::endl;
-        std::cout << ground_label.size() << std::endl;
-        std::cout << "instance_label name: " << inst_label_name << std::endl;
-        std::cout << "ground_label name: " << ground_label_name << std::endl;
+        std::cout << "`instance_label` size: " << instance_label.size() << std::endl;
+        std::cout << "`ground_label` size: " << ground_label.size() << std::endl;
+        std::cout << "`instance_label` name: " << inst_label_name << std::endl;
+        std::cout << "`ground_label` name: " << ground_label_name << std::endl;
         throw invalid_argument("[Loading] Something's wrong!");
     }
 

@@ -23,7 +23,11 @@ int main(int argc, char **argv)
   nh.param<std::string>("/dataprocessor/save_ins_to_LiDAR_root", trajectoryDir, "/home/ericlab");
   nh.param<std::string>("/dataprocessor/saveFormat", saveFormat, "bin");
 
-  
+  std::string home_dir = std::getenv("HOME");
+  absPath = home_dir + absPath;
+  saveDir = home_dir + saveDir;
+  trajectoryDir = home_dir + trajectoryDir;
+
   for(auto sensorType : process_lidar_list)
   {
     signal(SIGINT, signal_callback_handler);
