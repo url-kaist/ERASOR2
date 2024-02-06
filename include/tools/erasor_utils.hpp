@@ -191,7 +191,7 @@ namespace erasor_utils {
     }
 
     // Must be equal to the # of above-ground points
-    std::cout << "# of valid points: " << num_valid << std::endl;
+//    std::cout << "# of valid points: " << num_valid << std::endl;
 
     //  To follow the KITTI format, # of zeros are set to 6
     const int NUM_ZEROS = 6;
@@ -269,5 +269,6 @@ namespace erasor_utils {
             clusterIndices2PointCloud(const vector<Eigen::Vector3f>& positions,
                                       const vector<vector<size_t>>& cluster_indices);
 
+    vector<uint8_t> getRandomColor();
 }
 #endif // ERASOR_UTILS_H

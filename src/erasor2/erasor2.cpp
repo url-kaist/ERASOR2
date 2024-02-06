@@ -125,6 +125,7 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
     // Parse VoI and Non-VoI. Because non-VoIs are not targets of static map building
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_voi(new pcl::PointCloud<pcl::PointXYZI>); // ** 안 쓰는데 왜 존재하죠
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_non_voi(new pcl::PointCloud<pcl::PointXYZI>); // ** 이것도 안 쓰는데 왜 존재하죠
+    if (transformed->size() != cloud_est_label.size()) throw runtime_error("# of points should be preserved!");
     pcs_transformed_.emplace_back(*transformed); 
     //pcs_transformed_ 에 global 좌표계 포인트 쿨라우드가 들어가는데, accumulate_interval 마다 들어가게 되니까
     // 실질적으로 관심 대상이 되는 스캔 데이터 보다는 적게 들어갈 듯
@@ -141,12 +142,12 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
         voi2xygrid(*cloud_est_w_voi_label, 0.0, 0.0, 0.0,
                    range_of_interest_, grid_resolution_,
                    xygrid, complement, "gridmap");
-        // std::cout << "[viz set scan and pose] "<<  "Problem 2" << std::endl;
+         std::cout << "[viz set scan and pose] "<<  "Problem 2" << std::endl;
         grid_map::GridMap gridmap = setEgocentricGridMap(range_of_interest_,
                                                          grid_resolution_, xygrid);
-        // std::cout << "[viz set scan and pose] "<<  "Problem 3" << std::endl;
+         std::cout << "[viz set scan and pose] "<<  "Problem 3" << std::endl;
         auto parsed_cloud = parseCurrCloud(cloud_est_label);
-        // std::cout << "[viz set scan and pose] "<<  "Problem 4" << std::endl;
+         std::cout << "[viz set scan and pose] "<<  "Problem 4" << std::endl;
 
         // Viz
         CurrCloudPublisher.publish(erasor_utils::cloud2msg(cloud_est_label));
@@ -264,6 +265,23 @@ void ERASOR2::setSubmap() {
     gridmap_submap_ = setMapcentricGridMap(grid_map_info_);
 
     resize();
+
+    // setting approximated (w, h) and `xygrids_` for each scan
+    // Note that sometimes all the (pose, scan) pairs are not used for updating steppable regions
+    // But for detecting moving instances, all scans may be employed
+    for (int k                   = 0; k < num_data_; ++k) {
+        grid_map::Position pos_xy(poses_submap_[k](0, 3),
+                                  poses_submap_[k](1, 3));
+        gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]);
+        grid_map::Position pos_approx = idx2position(idxes_approx_[k]);
+
+        pcl::PointCloud<pcl::PointXYZI> complement;
+//        std::cout << poses_submap[k] << std::endl;
+//        std::cout << pos_x_approx << " , " << pos_y_approx << std::endl;
+//        cout << "\033[1;32mOn pc voi2xygrid...\033[0m\n";
+        voi2xygrid(pcs_transformed_[k], pos_approx(0), pos_approx(1), poses_submap_[k](2, 3),
+                   range_of_interest_, grid_resolution_, xygrids_[k], complement);
+    }
 }
 
 void ERASOR2::resize() {
@@ -289,7 +307,8 @@ ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &c
     parsed_cloud.ground_.reserve(5000000);
     parsed_cloud.noise_.reserve(1000000);
 
-    int max_idx = max_ids_.back();
+    // If there exists some instances apart from the current frame, then some times max_ids_.back() < getMaxInstanceId(cloud)
+    int max_idx = max(max_ids_.back(), getMaxInstanceId(cloud));
     vector<float> tmp_idxes;
     for (const auto& pt: cloud) {
         if (pt.intensity == GROUND_LABEL) {
@@ -305,26 +324,28 @@ ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &c
             parsed_cloud.non_ground_.emplace_back(pt_new);
         }
     }
-    // std::cout << "[Debug] max_idx: " << max_idx << std::endl;
-    // std::cout << "[Debug] cloud.size(): " << cloud.size() << std::endl;
-    // std::cout << "[Debug] tmp_idxes.size(): " << tmp_idxes.size() << std::endl;
+     std::cout << "[Debug] max_idx: " << max_idx << std::endl;
+     std::cout << "[Debug] cloud.size(): " << cloud.size() << std::endl;
+     std::cout << "[Debug] tmp_idxes.size(): " << tmp_idxes.size() << std::endl;
 
-    // std::cout << "[Debug] parsed_cloud.non_ground_.size(): " << parsed_cloud.non_ground_.size() << std::endl;
-    // std::cout << "[Debug] parsed_cloud.ground_.size(): " << parsed_cloud.ground_.size() << std::endl;
-    // std::cout << "[Debug] parsed_cloud.noise_.size(): " << parsed_cloud.noise_.size() << std::endl;
+     std::cout << "[Debug] parsed_cloud.non_ground_.size(): " << parsed_cloud.non_ground_.size() << std::endl;
+     std::cout << "[Debug] parsed_cloud.ground_.size(): " << parsed_cloud.ground_.size() << std::endl;
+     std::cout << "[Debug] parsed_cloud.noise_.size(): " << parsed_cloud.noise_.size() << std::endl;
 
-    for (int i = 0; i < max_idx + 2; ++i) { // ! 240112 modified max_idx + 1 -> max_idx + 2
-        uint8_t r = static_cast<uint8_t>(rand() % 0xff);
-        uint8_t g = static_cast<uint8_t>(rand() % 0xff);
-        uint8_t b = static_cast<uint8_t>(rand() % 0xff);
-        vector<uint8_t> color = {r, g, b};
-        colors.emplace_back(color);
+    colors.clear();
+    for (int i = 0; i < max_idx; ++i) { // ! 240112 modified max_idx + 1 -> max_idx + 2
+        colors.emplace_back(erasor_utils::getRandomColor());
     }
     // std::cout << "[Debug] colors.size(): " << colors.size() << std::endl;
     int ccc = 0;
     for (auto&pt: parsed_cloud.non_ground_) {
         int idx_tmp = int(tmp_idxes[ccc]);
-        // std::cout << "[Debug] idx_tmp: " << idx_tmp << std::endl;
+        // For defensive programming
+        // ToDo. Fix this weird overflow issue
+        while (idx_tmp >= colors.size()) {
+            std::cout << "[Debug] \033[1;33mOverflow happens: idx_tmp: " << idx_tmp << " vs " << colors.size() << std::endl;
+            colors.emplace_back(erasor_utils::getRandomColor());
+        }
         pt.r = colors[idx_tmp][0];
         pt.g = colors[idx_tmp][1];
         pt.b = colors[idx_tmp][2];
@@ -336,11 +357,11 @@ ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &c
 }
 
 void ERASOR2::updateSteppableRegion() {
-    for (int k                   = 0; k < num_data_; ++k) {
+    for (int k                   = 0; k < num_data_; k+=update_interval_) {
         cout << "\r[ERASOR2] Updating " << k + 1 << " / " << num_data_ << flush;
         gridmap_submap_["elevation"].setConstant(NOT_UPDATED);
-        grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));// new_origin_ 을 기준으로 삼아서 pose 를 저장해놓은 것에서 저 떄의 로봇 x, y 좌표의 위치 뽑아오기
-        gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]); // 현재 로봇 위치를 기준으로 gridmap 에서의 인덱스를 뽑아서 idxes_approx_ 안에 넣어준다.
+//        grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));// new_origin_ 을 기준으로 삼아서 pose 를 저장해놓은 것에서 저 떄의 로봇 x, y 좌표의 위치 뽑아오기
+//        gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]); // 현재 로봇 위치를 기준으로 gridmap 에서의 인덱스를 뽑아서 idxes_approx_ 안에 넣어준다.
 
         int w_pc = idxes_approx_[k](0);
         int h_pc = idxes_approx_[k](1);
@@ -349,15 +370,11 @@ void ERASOR2::updateSteppableRegion() {
         pcl::PointCloud<pcl::PointXYZI> complement;
 //        std::cout << poses_submap[k] << std::endl;
 //        std::cout << pos_x_approx << " , " << pos_y_approx << std::endl;
-        cout << "\033[1;32mOn pc voi2xygrid...\033[0m\n";
-        voi2xygrid(pcs_transformed_[k], pos_approx(0), pos_approx(1), poses_submap_[k](2, 3),
-                   range_of_interest_, grid_resolution_, xygrids_[k], complement);
         vector<pcl::PointCloud<pcl::PointXYZI>> map_grid;
-        cout << "\033[1;32mOn map voi2xygrid...\033[0m\n";
+
         pcl::PointCloud<pcl::PointXYZI>::Ptr    dummy(new pcl::PointCloud<pcl::PointXYZI>);
         voi2xygrid(*map_accum_, pos_approx(0), pos_approx(1), poses_submap_[k](2, 3),
                    range_of_interest_, grid_resolution_, map_grid, *dummy);
-        cout << "\033[1;32mOn updating...\033[0m\n";
 
         // Assume that range of interest is square
         grid_map::Index idx;
@@ -368,7 +385,7 @@ void ERASOR2::updateSteppableRegion() {
                 idx(0) = w;
                 idx(1) = h;
 //                cout << "\033[1;32m(" << w << ", " << h << ") - \033[0m";
-                if (isLikelyToBeSteppableRegion(xygrids_[k][count], map_grid[count],
+                if (isLikelyToBeSteppableRegionbyBinaryDescriptor(xygrids_[k][count], map_grid[count],
                                                 scan_ratio_threshold_,
                                                 min_z_diff_thr_, verbose_)) { // 오직 map, scan 으의 높이차이가 꽤 나면서도 scan 이 바닥으로 정확히 판명난 경우에만 True
                     // For debugging
@@ -379,9 +396,7 @@ void ERASOR2::updateSteppableRegion() {
                     gridmap_submap_.at("status", idx) = TEMPORARILY_OCCUPIED; // ** 아직 관측되지 않았을 때가 100.0 이었고, TEMPORARILY OCCUPIED 일 때가 102.0 에 해당
                     updateLogOdds(idx, increment_ * increment_gain_); // gridmap 의 idx 부분에 increment_ * increment_gain_ 만큼을 더해줌. 만약애 TEMPORARILY_OCCUPIED 라면 log_odds 에는 0.15 * 2.0 만큼 
                 } 
-                
-                
-                
+
                 else if (isLikelyToBeGround(xygrids_[k][count])) { // ** 그냥 map 자체가 ground 인 것 같아...! 라면.
                     if (gridmap_submap_.at("status", idx) == NOT_OBSERVED) {
                         gridmap_submap_.at("status", idx) = GROUND_EXISTS;
@@ -408,6 +423,8 @@ void ERASOR2::updateSteppableRegion() {
 
             logOddsGrid2probGrid();
             grid_map_msgs::GridMap grid_msg;
+            grid_msg.info.header.stamp = ros::Time::now();
+            grid_msg.info.header.frame_id = "map";
             grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
             GridPublisher.publish(grid_msg);
             ros::spinOnce();
@@ -427,7 +444,7 @@ void ERASOR2::detectMovingObjects() {
     grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
     GridPublisher.publish(grid_msg);
     for (int k = 0; k < num_data_; ++k) {
-        cout << "\r[ERASOR2] Detecting moving instances " << k + 1 << " / " << num_data_ << flush;
+        cout << "\r[Detect] Detecting moving instances " << k + 1 << " / " << num_data_ << flush;
         vector<float> dyn_cand_ids; // temp. variable
 //        unordered_map<float, DynamicInstance> &ids_clusters  = ids_instances_set_[k];
         noisy_points_transformed_[k].reserve(100);
@@ -457,6 +474,7 @@ void ERASOR2::detectMovingObjects() {
                 ++count;
             }
         }
+//        cout << "\r[Detect] # of dyn. instances for the " << k+1 << "-th scan: " << dyn_cand_ids.size() << flush;
 
         // 2. Set Dynamic instance
         auto &ids_clusters  = ids_instances_set_[k];
@@ -478,12 +496,15 @@ void ERASOR2::detectMovingObjects() {
 
 
 void ERASOR2::saveDynamicLabels(const string& dynamic_label_root, const vector<size_t> &indices) {
-
+    // Note that num_data_ is the indices of our interest + expanded frames
+    // Thus, we only save the labels of our interest
+    // i.e., the input of ERASOR2 was `frames` + `expanded frames`
+    int save_data_size = indices.size();
     std::cout << "[ERASOR2] On saving label results..." << std::endl;
-    for(int k = 0; k < num_data_; ++k)
+    for(int k = 0; k < save_data_size; ++k)
     {
         int frame_num = indices[k];
-        cout << "\r[ERASOR2] Saving dynamic labels " << frame_num << " / " << num_data_ << flush;
+        cout << "\r[ERASOR2] Saving dynamic labels " << frame_num << " (" << k << " / " << save_data_size << ")" << flush;
         erasor_utils::save_dyn_label(dynamic_label_root, frame_num, pcs_transformed_[k], dynamic_points_transformed_[k], potential_dynamic_points_transformed_[k]);
     }
 }
@@ -588,11 +609,7 @@ void ERASOR2::filterDynamicObjects() {
             pcl::PointXYZRGB pt_colored;
             for (auto &[dyn_cand_id, dynamic_instance]: ids_instances_set_[k]) {
                 while (colors.size() <= dyn_cand_id) {
-                   uint8_t r = static_cast<uint8_t>(rand() % 0xff);
-                   uint8_t g = static_cast<uint8_t>(rand() % 0xff);
-                   uint8_t b = static_cast<uint8_t>(rand() % 0xff);
-                   vector<uint8_t> color = {r, g, b};
-                   colors.emplace_back(color);
+                   colors.emplace_back(erasor_utils::getRandomColor());
                 }
                 pt_colored.r = colors[dyn_cand_id][0];
                 pt_colored.g = colors[dyn_cand_id][1];
@@ -1079,9 +1096,45 @@ void ERASOR2::maskNonVoI(const pcl::PointCloud<pcl::PointXYZI> &src, pcl::PointC
     cloud_out.reserve(N);
     cloud_out = src;
 
-#pragma omp parallel for num_threads(num_omp_cores_)
+    unordered_map<float, int> num_per_instance;
+    unordered_map<float, int> num_of_floating_instance;
     for (int i = 0; i < N; ++i) {
-        if (cloud_out.points[i].z < min_z_voi || cloud_out.points[i].z > max_z_voi) {
+        // To reject reflected noises
+        if (num_per_instance.find(src.points[i].intensity) == num_per_instance.end()) {
+            num_per_instance[src.points[i].intensity] = 1;
+        } else {
+            num_per_instance[src.points[i].intensity] += 1;
+        }
+    }
+//#pragma omp parallel for num_threads(num_omp_cores_)
+    for (int i = 0; i < N; ++i) {
+        // To reject reflected noises
+        if (cloud_out.points[i].z < min_z_voi) {
+            cloud_out.points[i].intensity = NOT_VOLUME_OF_INTEREST;
+        }
+
+        // To reject hanging instances, e.g., leaves from crown of trees
+        if (cloud_out.points[i].z > max_z_voi) {
+            if (num_of_floating_instance.find(cloud_out.points[i].intensity) == num_of_floating_instance.end()) {
+            num_of_floating_instance[cloud_out.points[i].intensity] = 1;
+            } else {
+                num_of_floating_instance[cloud_out.points[i].intensity] += 1;
+            }
+            cloud_out.points[i].intensity = NOT_VOLUME_OF_INTEREST;
+        }
+    }
+    vector<float> floating_instances;
+    // If over 50 % are filtered, then it's floating
+    for (const auto& pair : num_of_floating_instance) {
+        if (static_cast<float>(pair.second) / static_cast<float>(num_per_instance[pair.first]) > 0.4) {
+//            std::cout << "\033[1;33mID" << pair.first << "will be ignored because it's a floating instance\033[0m" << std::endl;
+            floating_instances.emplace_back(pair.first);
+        }
+    }
+
+    for (int i = 0; i < N; ++i) {
+        auto it = std::find(floating_instances.begin(), floating_instances.end(), cloud_out.points[i].intensity);
+        if (it != floating_instances.end()) {
             cloud_out.points[i].intensity = NOT_VOLUME_OF_INTEREST;
         }
     }
@@ -1206,6 +1259,7 @@ bool ERASOR2::isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI> &pc, cons
     } else { return false; }
 }
 
+// Original scan ratio test
 bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
                                           const pcl::PointCloud<pcl::PointXYZI> &map_pc,
                                           const float scan_ratio_threshold, const float min_z_diff_thr,
@@ -1227,7 +1281,19 @@ bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> 
 
 
     // ** 아래 부분이 원본 ERASOR 괴ㅏ 동일한 부분
-    float lowest_z    = min(curr_mean_ground_z, map_mean_ground_z); // 스캔과 맵의 평균 ground 높이중에 더 낮은 것을 고르고 
+    float lowest_z    = min(curr_mean_ground_z, map_mean_ground_z); // 스캔과 맵의 평균 ground 높이중에 더 낮은 것을 고르고
+    float highest_z    = max(curr_max_z, map_max_z);
+
+//    std::cout << "\033[1;33m" << "curr_mean_ground_z: " << curr_mean_ground_z << " | ";
+//    std::cout << "\033[1;33m" << "map_mean_ground_z: " << map_mean_ground_z << "\033[0m" << std::endl;
+//    std::cout << "\033[1;33m" << "curr_max_z: " << curr_max_z << " | ";
+//    std::cout << "\033[1;33m" << "map_max_z: " << map_max_z << "\033[0m" << std::endl;
+//    std::cout << "\033[1;33m" << "lowest_z: " << lowest_z << " highest_z: " << highest_z << "\033[0m" << std::endl;
+    if (highest_z == numeric_limits<float>::lowest() || highest_z < lowest_z) {
+//        std::cout << "\033[1;33mThere are no points of our interest\033[0m" << std::endl;
+        return false;
+    }
+
     float map_h_diff  = map_max_z - lowest_z;
     float curr_h_diff = curr_max_z - lowest_z;
 
@@ -1243,6 +1309,104 @@ bool ERASOR2::isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> 
     if (scan_ratio_ < scan_ratio_threshold &&
         isLikelyToBeGround(curr_pc, ratio_num_pts_, minimum_num_pts_)) { // find dynamic!
         return true; // scan ratio 가 threshold 보다 낮고, 
+    } else {
+        return false;
+    }
+}
+
+bool ERASOR2::isLikelyToBeSteppableRegionbyBinaryDescriptor(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
+                                          const pcl::PointCloud<pcl::PointXYZI> &map_pc,
+                                          const float scan_ratio_threshold, const float min_z_diff_thr,
+                                          const bool verbose) {
+    if (curr_pc.points.size() < minimum_num_pts_ || map_pc.points.size() < minimum_num_pts_) {
+        return false;
+    }
+
+    float curr_min_z, curr_max_z;
+    float map_min_z, map_max_z;
+
+//    cout << "FF?" << curr_pc.size() << endl;
+    erasor_utils::calcMinMaxZ(curr_pc, curr_min_z, curr_max_z); // ** 현쟈 스캔에서의 min, max z 값을 구해주고,
+//    cout << "FF0" << map_pc.size() << endl;
+    erasor_utils::calcMinMaxZWithoutGround(map_pc, map_min_z, map_max_z); // ** 맵에서는 ground를 제외한 min, max z 값을 구해준다.
+//    cout << "FF!" << endl;
+    float curr_mean_ground_z = erasor_utils::calcMeanZOfGround(curr_pc); // label 이 ground 로 분류된 것들의 평균적인 높이 값을 구해주는 함수.
+    float map_mean_ground_z  = erasor_utils::calcMeanZOfGround(map_pc);
+
+
+    // ** 아래 부분이 원본 ERASOR과 동일한 부분
+    float lowest_z    = min(curr_mean_ground_z, map_mean_ground_z); // 스캔과 맵의 평균 ground 높이중에 더 낮은 것을 고르고
+    float highest_z    = max(curr_max_z, map_max_z);
+
+    std::cout << "\033[1;33m" << "curr_mean_ground_z: " << curr_mean_ground_z << " | ";
+    std::cout << "\033[1;33m" << "map_mean_ground_z: " << map_mean_ground_z << "\033[0m" << std::endl;
+    std::cout << "\033[1;33m" << "curr_max_z: " << curr_max_z << " | ";
+    std::cout << "\033[1;33m" << "map_max_z: " << map_max_z << "\033[0m" << std::endl;
+    std::cout << "\033[1;33m" << "lowest_z: " << lowest_z << " highest_z: " << highest_z << "\033[0m" << std::endl;
+    if (highest_z == numeric_limits<float>::lowest() || highest_z < lowest_z) {
+        std::cout << "\033[1;33mThere are no points of our interest\033[0m" << std::endl;
+        return false;
+    }
+    float binary_scan_ratio = 1.0;
+    // The below condition means all the points of a map are from ground
+    int binary_size = static_cast<int>(ceil((highest_z - lowest_z) / voxel_size_));
+
+    vector<int> binary_descriptor_curr(binary_size, 0);
+    vector<int> binary_descriptor_map(binary_size, 0);
+
+    for (int i = 0; i < curr_pc.size(); i++) {
+        int idx = static_cast<int>(floor((curr_pc[i].z - lowest_z) / voxel_size_));
+        if (idx < binary_size && idx >= 0) {
+            binary_descriptor_curr[idx] = 1;
+        }
+    }
+
+    for (int i = 0; i < map_pc.size(); i++) {
+        int idx = static_cast<int>(floor((map_pc[i].z - lowest_z) / voxel_size_));
+        if (idx < binary_size && idx >= 0) {
+            binary_descriptor_map[idx] = 1;
+        }
+    }
+
+    int      count                  = 0;
+    int      count_actual_occupancy = 0;
+    int      count_empty = 0;
+    for (int i                      = 0; i < binary_size; i++) {
+        if (binary_descriptor_curr[i] == 1 && binary_descriptor_map[i] == 1) {
+            ++count;
+        }
+
+        if (binary_descriptor_map[i] == 1) {
+            ++count_actual_occupancy;
+            count_empty = 0;
+        } else {
+            ++count_empty;
+        }
+
+        // This means that map has weird empty spaces ranging from `1.5`
+        if (count_empty > static_cast<int>(min_len_empty_space_ / voxel_size_)) return false;
+    }
+    binary_scan_ratio = static_cast<float>(count) / static_cast<float>(count_actual_occupancy);
+
+    float map_h_diff  = map_max_z - lowest_z;
+    float curr_h_diff = curr_max_z - lowest_z;
+
+    scan_ratio_ = min(map_h_diff / curr_h_diff,
+                      curr_h_diff / map_h_diff);
+
+    std::cout << "\033[1;34m" << "scan ratrio: " << scan_ratio_ << "\033[0m" << std::endl;
+    std::cout << "\033[1;34m" << "binary scan ratrio: " << binary_scan_ratio << "\033[0m" << std::endl;
+    if (scan_ratio_ < scan_ratio_threshold && binary_scan_ratio < scan_ratio_threshold) std::cout << "\033[1;32m===> HERE!\033[0m" << std::endl;
+    std::cout << "------------------------------------------------------------" << std::endl;
+    // To reduce false positives
+    if (map_h_diff < min_z_diff_thr || curr_mean_ground_z - map_min_z > min_z_diff_thr * 1.5) {
+        return false;
+    }
+
+    // Dynamic!
+    if (scan_ratio_ < scan_ratio_threshold && binary_scan_ratio < binary_scan_ratio_threshold_ &&
+        isLikelyToBeGround(curr_pc, ratio_num_pts_, minimum_num_pts_)) { // find dynamic!
+        return true; // scan ratio 가 threshold 보다 낮고,
     } else {
         return false;
     }

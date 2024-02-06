@@ -7,6 +7,8 @@
 #include <sstream>
 #include <fstream>
 #include <boost/format.hpp>
+#include <algorithm>
+#include <random>
 
 using num_t = float;
 using RadiusSearchOutput = nanoflann::ResultItem<uint32_t, num_t>;
@@ -71,11 +73,91 @@ inline void fetchDistantClusteredIdx(size_t& prev_idx, size_t& next_idx, const s
     }
 }
 
+inline vector<pair<uint32_t, uint32_t>> sortAndFindDiscontinuousFrameNum(vector<RadiusSearchOutput>& ret_matches) {
+    sort(ret_matches.begin(), ret_matches.end(), [](const auto& a, const auto& b) {
+        return a.first < b.first;
+    });
+    vector<pair<uint32_t, uint32_t>> discontinuous_indices;
+    for (size_t j = 0; j < ret_matches.size() - 1; j++) {
+        if (ret_matches[j].first + 1 != ret_matches[j + 1].first) {
+//            std::cout << "\033[1;33mDiscnotinuous indices detected:" << ret_matches[j].first << " vs " << ret_matches[j + 1].first << "\033[0m\n";
+            discontinuous_indices.emplace_back(ret_matches[j].first, ret_matches[j + 1].first);
+        }
+    }
+    return discontinuous_indices;
+}
+
+// To deal with some corner cases
+inline void connectDiscontinuousTrajectory(vector<RadiusSearchOutput>& ret_matches,
+                                           const vector<Eigen::Vector3f>& poses,
+                                           const size_t i, const int sufficiently_small_frame_interval=100) {
+    vector<pair<uint32_t, uint32_t>> discontinuous_frame_nums = sortAndFindDiscontinuousFrameNum(ret_matches);
+
+    for (const auto& discontinuous_frame_pair : discontinuous_frame_nums) {
+//        std::cout << discontinuous_frame_pair.first << " <---> " << discontinuous_frame_pair.second << std::endl;
+        int frame_interval = abs(static_cast<int>(discontinuous_frame_pair.first) - static_cast<int>(discontinuous_frame_pair.second));
+        // If these are sufficiently close:
+        if (frame_interval < sufficiently_small_frame_interval) {
+            for (uint32_t k = discontinuous_frame_pair.first + 1; k < discontinuous_frame_pair.second; k++) {
+                float sqr_dist = (poses[k] - poses[i]).squaredNorm();
+                ret_matches.emplace_back(RadiusSearchOutput(k, sqr_dist));
+            }
+        }
+    }
+}
+
+inline vector<vector<RadiusSearchOutput>> separateLoopClusters(vector<RadiusSearchOutput>& ret_matches,
+                                           const vector<Eigen::Vector3f>& poses,
+                                           const size_t i) {
+    connectDiscontinuousTrajectory(ret_matches, poses, i);
+    const auto discontinuous_frame_pairs = sortAndFindDiscontinuousFrameNum(ret_matches);
+
+    vector<uint32_t> indices_tmp;
+    for (const auto& match : ret_matches) {
+        indices_tmp.emplace_back(match.first);
+    }
+
+    vector<vector<RadiusSearchOutput>> separated_clusters;
+    for (uint32_t j = 0; j < discontinuous_frame_pairs.size() + 1; j++) {
+        vector<RadiusSearchOutput> clusters;
+        uint32_t start_idx;
+        if (j == 0) {
+            start_idx = 0;
+        } else {
+            auto it = std::find(indices_tmp.begin(), indices_tmp.end(), discontinuous_frame_pairs[j - 1].second);
+            if (it != indices_tmp.end()) {
+                start_idx = std::distance(indices_tmp.begin(), it);
+            } else {
+                throw std::runtime_error("Value not found in the vector!");
+            }
+        }
+        uint32_t end_idx;
+        if (j != discontinuous_frame_pairs.size()) {
+            auto it = std::find(indices_tmp.begin(), indices_tmp.end(), discontinuous_frame_pairs[j].first);
+            if (it != indices_tmp.end()) {
+                end_idx = std::distance(indices_tmp.begin(), it);
+            } else {
+                throw std::runtime_error("Value not found in the vector!");
+            }
+        } else {
+            end_idx = indices_tmp.size() - 1; // 마지막 인덱스
+        }
+//        std:cout << "Checking indices: " << start_idx << " " << end_idx << std::endl;
+        // `end_idx` should be included, i.e., <= is required
+        for (int k = start_idx; k <= end_idx; ++k) {
+            clusters.emplace_back(ret_matches[k]);
+        }
+        separated_clusters.emplace_back(clusters);
+    }
+    return separated_clusters;
+}
+
 inline void extractClusters(std::vector<bool>& clustered, my_kd_tree_t & index,
-                                vector<vector<RadiusSearchOutput>>& revisited_candidates,
+                                vector<vector<RadiusSearchOutput>>& cluster_candidates,
                                 const vector<Eigen::Vector3f>& poses,
                                 const bool only_consider_crossroad,
                                 const bool only_consider_revisit,
+                                const bool separate_revisited_scenes,
                                 const float angle_threshold,
                                 const float dist_threshold,
                                 const int min_num_neighbors,
@@ -133,50 +215,46 @@ inline void extractClusters(std::vector<bool>& clustered, my_kd_tree_t & index,
                 }
 
                 if (is_valid && ret_matches.size() > min_num_neighbors) {
-                revisited_candidates.emplace_back(ret_matches);
-                for (const auto &match : ret_matches) {
-                    clustered[match.first] = true;
+                    if (separate_revisited_scenes) {
+                        const auto ret_matches_sets = separateLoopClusters(ret_matches, poses, i);
+                        for (const auto& separated_ret_matches : ret_matches_sets) {
+                            cluster_candidates.emplace_back(separated_ret_matches);
+                            for (const auto& match : separated_ret_matches) {
+                                clustered[match.first] = true;
+                            }
+                        }
+                    } else {
+                        sort(ret_matches.begin(), ret_matches.end(), [](const auto& a, const auto& b) {
+                            return a.first < b.first;
+                        });
+                        cluster_candidates.emplace_back(ret_matches);
+                        for (const auto &match : ret_matches) {
+                            clustered[match.first] = true;
+                        }
                     }
                 }
             }
 
             if (!has_revisit && !only_consider_revisit) {
                 if (ret_matches.size() > min_num_neighbors) {
-                    revisited_candidates.emplace_back(ret_matches);
-                    for (const auto &match : ret_matches) {
-                        clustered[match.first] = true;
+                    if (separate_revisited_scenes) {
+                        const auto ret_matches_sets = separateLoopClusters(ret_matches, poses, i);
+                        for (const auto& separated_ret_matches : ret_matches_sets) {
+                            cluster_candidates.emplace_back(separated_ret_matches);
+                            for (const auto& match : separated_ret_matches) {
+                                clustered[match.first] = true;
+                            }
+                        }
+                    } else {
+                        sort(ret_matches.begin(), ret_matches.end(), [](const auto& a, const auto& b) {
+                            return a.first < b.first;
+                        });
+                        cluster_candidates.emplace_back(ret_matches);
+                        for (const auto &match : ret_matches) {
+                            clustered[match.first] = true;
+                        }
                     }
                 }
-            }
-        }
-    }
-}
-
-// To deal with some corner cases
-inline void connectDiscontinuousTrajectory(vector<RadiusSearchOutput>& ret_matches,
-                                           const vector<Eigen::Vector3f>& poses,
-                                           const size_t i, const int sufficiently_small_frame_interval=100) {
-    vector<uint32_t> indices_tmp;
-    for (const auto& match : ret_matches) {
-        indices_tmp.emplace_back(match.first);
-    }
-    sort(indices_tmp.begin(), indices_tmp.end());
-    vector<pair<uint32_t, uint32_t>> discontinous_indices;
-    for (size_t j = 0; j < indices_tmp.size() - 1; j++) {
-        if (indices_tmp[j] + 1 != indices_tmp[j + 1]) {
-            discontinous_indices.emplace_back(indices_tmp[j], indices_tmp[j + 1]);
-        }
-    }
-    std::cout << "\033[1;33mTotal " << discontinous_indices.size() << " discontinous indices found!\033[0m" << std::endl;
-    for (const auto& discontinous_index : discontinous_indices) {
-        float dist_btw_poses = (poses[discontinous_index.first] - poses[discontinous_index.first]).norm();
-        int frame_interval = abs(static_cast<int>(discontinous_index.first) - static_cast<int>(discontinous_index.second));
-        // If these are sufficiently close:
-        if (frame_interval < sufficiently_small_frame_interval) {
-            std::cout << "\033[1;33m" << discontinous_index.first << "-" << discontinous_index.second << " is connected!!!\033[0m" << std::endl;
-            for (uint32_t k = discontinous_index.first + 1; k < discontinous_index.second; k++) {
-                float sqr_dist = (poses[k] - poses[i]).squaredNorm();
-                ret_matches.emplace_back(RadiusSearchOutput(k, sqr_dist));
             }
         }
     }
@@ -188,7 +266,7 @@ inline void connectDiscontinuousTrajectory(vector<RadiusSearchOutput>& ret_match
  */
 inline vector<vector<size_t>> clusterTrajectoryXYZ(const vector<Eigen::Vector3f>& poses,
                           const float angle_threshold=10, const float dist_threshold_for_crossroad_checking=3.0,
-                          const float clustering_radius=100.0, const int min_num_neighbors=200,
+                          const float clustering_radius=50.0, const int min_num_neighbors=200,
                           const int min_frame_interval_for_revisit=500) {
     PointCloud<num_t> cloud;
     int N = poses.size();
@@ -242,21 +320,21 @@ inline vector<vector<size_t>> clusterTrajectoryXYZ(const vector<Eigen::Vector3f>
 
     // Step 1-2 Check the crossroad scenes
     extractClusters(clustered, index, trajectory_clusters, poses,
-                    true, true, 45.0, dist_threshold_for_crossroad_checking,
+                    true, true, false, 45.0, dist_threshold_for_crossroad_checking,
                     min_num_neighbors, clustering_radius, min_frame_interval_for_revisit);
     // Step 1-3 Check the revisited scenes
     extractClusters(clustered, index, trajectory_clusters, poses,
-                    false, true, 45.0, dist_threshold_for_crossroad_checking,
+                    false, true, false, 45.0, dist_threshold_for_crossroad_checking,
                     min_num_neighbors, clustering_radius, min_frame_interval_for_revisit);
     /*
      * Step 1-4 For a trajectory visited only once
      * Thus, `min_num_neighbors` should be set to more lenient threshold
      */
     extractClusters(clustered, index, trajectory_clusters, poses,
-                    false, false, 45.0, dist_threshold_for_crossroad_checking,
+                    false, false, false, 45.0, dist_threshold_for_crossroad_checking,
                     min_num_neighbors * 2 / 3, clustering_radius, min_frame_interval_for_revisit);
     extractClusters(clustered, index, trajectory_clusters, poses,
-                    false, false, 45.0, dist_threshold_for_crossroad_checking,
+                    false, false, false, 45.0, dist_threshold_for_crossroad_checking,
                     min_num_neighbors * 2 / 3, clustering_radius * 2.0 / 3.0, min_frame_interval_for_revisit);
 
     const int not_assigned = -1;
@@ -285,4 +363,198 @@ inline vector<vector<size_t>> clusterTrajectoryXYZ(const vector<Eigen::Vector3f>
         }
     }
     return cluster_indices;
+}
+
+inline vector<vector<size_t>> clusterTrajectoryXYZDistinguishingTemporalTrajectories(const vector<Eigen::Vector3f>& poses,
+                          const float angle_threshold=10, const float dist_threshold_for_crossroad_checking=3.0,
+                          const float clustering_radius=50.0, const int min_num_neighbors=200,
+                          const int min_frame_interval_for_revisit=500, const bool random_shuffle_for_better_viz=false) {
+    PointCloud<num_t> cloud;
+    int N = poses.size();
+    cloud.pts.resize(N);
+    for (size_t n = 0; n < N; n++) {
+        cloud.pts[n].x = poses[n](0);
+        cloud.pts[n].y = poses[n](1);
+        cloud.pts[n].z = poses[n](2);
+    }
+
+    my_kd_tree_t index(3 /*dim*/, cloud, {10 /* max leaf */});
+
+    std::vector<bool> clustered(N, false);
+    // Step 1. Find crossroad by using angular difference and # of points
+    vector<vector<RadiusSearchOutput>> trajectory_clusters;
+    vector<RadiusSearchOutput> ret_matches;
+
+    // Step 1-1. Find crossroad by using angular difference between the local trajectory
+    size_t prev_idx;
+    size_t next_idx;
+    // 1 & N-1: To avoid exceptional cases
+    // 2: To reduce redundant computation
+    for (size_t i = 1; i < N - 1; i+=2) {
+        fetchDistantClusteredIdx(prev_idx, next_idx, i, poses, dist_threshold_for_crossroad_checking);
+//        std::cout << prev_idx << " " << i << " " << next_idx << std::endl;
+        auto& prev_point = poses[prev_idx];
+        auto& curr_point = poses[i];
+        auto& next_point = poses[next_idx];
+
+        Eigen::Vector3f prev_dir = curr_point - prev_point;
+        Eigen::Vector3f next_dir = next_point - curr_point;
+
+        float angle = RAD2DEG(acos(prev_dir.dot(next_dir) / (prev_dir.norm() * next_dir.norm())));
+
+        if ((!clustered[i]) && (angle > angle_threshold && angle < 180.0 - angle_threshold)) {
+            const num_t query_pt[3] = {curr_point(0), curr_point(1), curr_point(2)};
+
+            auto        num_results = index.radiusSearch(
+                    &query_pt[0], clustering_radius * clustering_radius, ret_matches);
+
+//            std::cout << i << " | " << angle << " > " << angle_threshold << "->" << ret_matches.size() << std::endl;
+            if (ret_matches.size() > min_num_neighbors) {
+                const auto ret_matches_sets = separateLoopClusters(ret_matches, poses, i);
+//                std::cout << "ret_matches_sets.size(): " << ret_matches_sets.size() << std::endl;
+                for (const auto& separated_ret_matches : ret_matches_sets) {
+                    trajectory_clusters.emplace_back(separated_ret_matches);
+                    for (const auto match : separated_ret_matches) {
+                        clustered[match.first] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Step 1-2 Check the crossroad scenes
+    extractClusters(clustered, index, trajectory_clusters, poses,
+                    true, true, true, 45.0, dist_threshold_for_crossroad_checking,
+                    min_num_neighbors, clustering_radius, min_frame_interval_for_revisit);
+    // Step 1-3 Check the revisited scenes
+    extractClusters(clustered, index, trajectory_clusters, poses,
+                    false, true, true, 45.0, dist_threshold_for_crossroad_checking,
+                    min_num_neighbors, clustering_radius, min_frame_interval_for_revisit);
+    /*
+     * Step 1-4 For a trajectory visited only once
+     * Thus, `min_num_neighbors` should be set to more lenient threshold
+     */
+    extractClusters(clustered, index, trajectory_clusters, poses,
+                    false, false, true, 45.0, dist_threshold_for_crossroad_checking,
+                    min_num_neighbors * 2 / 3, clustering_radius, min_frame_interval_for_revisit);
+    extractClusters(clustered, index, trajectory_clusters, poses,
+                    false, false, true, 45.0, dist_threshold_for_crossroad_checking,
+                    min_num_neighbors * 2 / 3, clustering_radius * 2.0 / 3.0, min_frame_interval_for_revisit);
+
+    const int not_assigned = -1;
+    std::vector<int> cluster_ids(N, not_assigned);
+
+    int cluster_id = 0;
+    vector<vector<size_t>> cluster_indices;
+    if (random_shuffle_for_better_viz) {
+        std::random_device seed;
+        std::mt19937 engine(seed());
+        std::shuffle(trajectory_clusters.begin(), trajectory_clusters.end(), engine);
+    }
+
+    for (const auto& cluster : trajectory_clusters) {
+        vector<size_t> indices_for_each_cluster;
+        for (const auto& match : cluster) {
+            if (cluster_ids[match.first] == not_assigned) {
+                cluster_ids[match.first] = cluster_id;
+                indices_for_each_cluster.push_back(match.first);
+            }
+        }
+        cluster_indices.emplace_back(indices_for_each_cluster);
+
+        ++cluster_id;
+    }
+
+    // For unclustered poses
+    for (size_t i = 0; i < N; ++i) {
+        if (cluster_ids[i] == not_assigned) {
+            int closest_idx = fetchClosestClusteredIdx(i, clustered);
+            cluster_indices[cluster_ids[closest_idx]].push_back(i);
+        }
+    }
+    return cluster_indices;
+}
+
+template<typename T>
+vector<vector<int>> getContinuousSegments(vector<T>& indices) {
+    sort(indices.begin(), indices.end(), [](const auto &a, const auto &b) {
+        return a < b;
+    });
+
+    vector<vector<int>> continuous_segments;
+    vector<int>         current_segment;
+    int                 previous_idx = -2; // 초기값은 연속성이 없음을 가정
+
+    for (int idx : indices) {
+        if (previous_idx + 1 != idx) {
+            if (!current_segment.empty()) {
+                continuous_segments.push_back(current_segment);
+                current_segment.clear();
+            }
+        }
+        current_segment.push_back(idx);
+        previous_idx = idx;
+    }
+    // add last `current_segment`
+    if (!current_segment.empty()) {
+        continuous_segments.push_back(current_segment);
+    }
+    return continuous_segments;
+}
+
+template<typename T>
+vector<size_t> getExpandedFrameNums(vector<T> indices, const int range, const int max_frame) {
+    // To avoid not sorting the original indices
+    sort(indices.begin(), indices.end(), [](const auto &a, const auto &b) {
+        return a < b;
+    });
+
+    vector<size_t>      edge_frame_nums;
+    vector<vector<int>> continuous_segments;
+    vector<int>         current_segment;
+    int                 previous_idx = -2;
+
+    for (int i = indices[0]-range; i < indices[0]; ++i) {
+        if (i < 0) {
+            continue;
+        }
+        edge_frame_nums.push_back(i);
+    }
+
+    for (int idx : indices) {
+        if (previous_idx + 1 != idx) {
+            if (!current_segment.empty()) {
+                continuous_segments.push_back(current_segment);
+                current_segment.clear();
+
+                for (int i = previous_idx - range; i < previous_idx; ++i) {
+                    if (i < 0) {
+                        continue;
+                    }
+                    edge_frame_nums.push_back(i);
+                }
+
+                for (int i = idx; i < idx + range; ++i) {
+                    if (i > max_frame-1) {
+                        continue;
+                    }
+                    edge_frame_nums.push_back(i);
+                }
+            }
+        }
+        current_segment.push_back(idx);
+        previous_idx = idx;
+    }
+    // add last `current_segment`
+    if (!current_segment.empty()) {
+        continuous_segments.push_back(current_segment);
+    }
+
+    for (int i = current_segment.back(); i < current_segment.back() + range; ++i) {
+        if (i > max_frame-1) {
+            continue;
+        }
+        edge_frame_nums.push_back(i);
+    }
+    return edge_frame_nums;
 }

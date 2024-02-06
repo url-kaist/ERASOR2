@@ -477,4 +477,12 @@ namespace erasor_utils {
         }
         return std::make_tuple(clustered, unclustered);
     }
+
+    vector<uint8_t> getRandomColor() {
+        uint8_t r = static_cast<uint8_t>(rand() % 0xff);
+        uint8_t g = static_cast<uint8_t>(rand() % 0xff);
+        uint8_t b = static_cast<uint8_t>(rand() % 0xff);
+        vector<uint8_t> color = {r, g, b};
+        return color;
+    }
 }

@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pcd_preprocess import clusters_hdbscan
 from pathlib import Path
+from tqdm import tqdm
 
 vis = o3d.visualization.Visualizer()
 if __name__ == "__main__":
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert KITTI dataset to ROS bag file the easy way!")
     # parser.add_argument("--dir", nargs="?", default = os.getcwd(), help="base directory of the dataset, if no directory passed the deafult is current working directory")
     parser.add_argument("-s", "--seq", default="Merged", help="sequence of the odometry dataset (between 00 - 21), option is only for ODOMETRY datasets.")
-    parser.add_argument("-i", "--init_stamp", default=9000, type=int)
+    parser.add_argument("-i", "--init_stamp", default=0, type=int)
     parser.add_argument("-e", "--end_stamp", default=12477, type=int)
     args = parser.parse_args()
 
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     output_dir = ABS_SAVE_DIR + "/" + args.seq + "/hdbscan"
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    for i in range(args.init_stamp, args.end_stamp + 1):
+    for i in tqdm(range(args.init_stamp, args.end_stamp + 1)):
         zfilled_idx = str(i).zfill(6)
         pcd_path = cloud_dir + "/" + zfilled_idx + ".bin"
         scan = np.fromfile(pcd_path, dtype=np.float32)

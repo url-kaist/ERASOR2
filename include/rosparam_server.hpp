@@ -38,6 +38,8 @@ public:
     float min_z_voi_;
     float max_z_voi_;
     float scan_ratio_threshold_;
+    float binary_scan_ratio_threshold_;
+    float min_len_empty_space_;
     float min_z_diff_thr_;
 
     float increment_gain_; // Should be larger than one
@@ -49,6 +51,9 @@ public:
     float obj_score_hard_thr_;
     float hard_thr_radius_;
     float xy_size_thr_;
+
+    float voxel_size_for_pose_correction_;
+    float max_corr_dist_for_pose_correction_;
 
     float minimum_area_thr_;
     float ratio_of_unknown_prior_;
@@ -67,10 +72,12 @@ public:
     int end_frame_;
     int viz_interval_;
     int accum_interval_;
+    int expansion_range_;
 
     int neighboring_width_;
     int neighboring_height_;
     int kernel_size_;
+    int update_interval_;
     int minimum_num_pts_;
     int minimum_num_per_voxel_;
 
@@ -85,6 +92,10 @@ public:
     float map_voxel_size_;
 
     bool run_traj_clustering_;
+    bool distinguish_temporal_trajectories_;
+    bool correct_poses_by_submap_matching_;
+    bool correct_poses_;
+    bool save_map_;
     string dataset_name_;
     string abs_save_dir_;
     string abs_data_dir_;
@@ -133,6 +144,7 @@ public:
         nh_.param<int>("/viz_interval", viz_interval_, 10);
         nh_.param<bool>("/is_large_scale", is_large_scale_, true);
         nh_.param<bool>("/dataloader/run_traj_clustering", run_traj_clustering_, false);
+        nh_.param<bool>("/dataloader/distinguish_temporal_trajectories", distinguish_temporal_trajectories_, false);
         nh_.param<string>("/dataloader/dataset_name", dataset_name_, "");
         nh_.param<string>("/dataloader/abs_data_dir", abs_data_dir_, "");
         nh_.param<string>("/dataloader/cloud_dir", cloud_dir_, "");
@@ -142,19 +154,27 @@ public:
         nh_.param<string>("/dataloader/abs_save_dir", abs_save_dir_, "/");
         nh_.param<string>("/dataloader/instance_seg_method", instance_seg_method_, "cais");
         nh_.param<int>("/dataloader/accum_interval", accum_interval_, 2);
+        nh_.param<int>("/dataloader/expansion_range", expansion_range_, 20);
         nh_.param<float>("/dataloader/voxel_size", voxel_size_, (float) 0.05);
         nh_.param<float>("/dataloader/map_voxel_size", map_voxel_size_, (float) 0.2);
+
+        nh_.param<bool>("/pose_corrector/correct_poses_by_submap_matching", correct_poses_by_submap_matching_, false);
+        nh_.param<float>("/pose_corrector/voxel_size", voxel_size_for_pose_correction_, 1.0);
+        nh_.param<float>("/pose_corrector/max_corr_dist", max_corr_dist_for_pose_correction_, 2.0);
 
         /* ERASOR2 parameters */
         nh_.param<float>("/erasor2/min_z_voi", min_z_voi_, -1.6);
         nh_.param<float>("/erasor2/max_z_voi", max_z_voi_, 1.3);
         nh_.param<float>("/erasor2/scan_ratio_threshold", scan_ratio_threshold_, 0.3);
+        nh_.param<float>("/erasor2/binary_scan_ratio_threshold", binary_scan_ratio_threshold_, 0.3);
+        nh_.param<float>("/erasor2/min_len_empty_space", min_len_empty_space_, 1.8);
         nh_.param<float>("/erasor2/min_z_diff_thr", min_z_diff_thr_, 0.3);
 
         nh_.param<float>("/erasor2/log_odds/increment_gain", increment_gain_, 0.3);
         nh_.param<float>("/erasor2/log_odds/increment", increment_, 0.3);
         nh_.param<float>("/erasor2/region_proposal_thr", region_proposal_thr_, 0.5);
         nh_.param<int>("/erasor2/kernel_size", kernel_size_, 3);
+        nh_.param<int>("/erasor2/update_interval", update_interval_, 1);
 
         nh_.param<float>("/erasor2/ratio_num_pts", ratio_num_pts_, 0.95);
         nh_.param<int>("/erasor2/minimum_num_pts", minimum_num_pts_, 3);
@@ -173,6 +193,8 @@ public:
         nh_.param<bool>("/erasor2/volumetric_outlier_removal/use_adaptive_voxel_size", use_adaptive_voxel_size_, false);
         nh_.param<float>("/erasor2/volumetric_outlier_removal/vor_cand_score_thr", vor_cand_score_thr_, 3.0);
         nh_.param<float>("/erasor2/volumetric_outlier_removal/dist_thr_gain", dist_thr_gain_, 1.0);
+
+        nh_.param<bool>("/erasor2/save_map", save_map_, false);
 
         nh_.param<float>("/erasor2/grid_resolution", grid_resolution_, 0.4);
         nh_.param<float>("/erasor2/egocentric_grid_resolution", egocentric_grid_resolution_, 0.2);

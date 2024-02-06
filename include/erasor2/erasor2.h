@@ -210,6 +210,11 @@ public:
                                      const float scan_ratio_threshold, const float th_bin_max_h,
                                      const bool verbose = false);
 
+    bool isLikelyToBeSteppableRegionbyBinaryDescriptor(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
+                                          const pcl::PointCloud<pcl::PointXYZI> &map_pc,
+                                          const float scan_ratio_threshold, const float min_z_diff_thr,
+                                          const bool verbose=false);
+
     void updateLogOdds(const grid_map::Index& idx, const float increment, const int kernel_size=3);
 
     grid_map::GridMap setMapcentricGridMap(const GridMapInfo &grid_map_info);

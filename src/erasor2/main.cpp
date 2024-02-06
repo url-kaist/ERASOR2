@@ -6,6 +6,9 @@
 #include "dataloader/dataloader.h"
 #include "dataprocessor/TrajectoryClustering.hpp"
 #include "erasor2/erasor2.h"
+#include <pcl/registration/gicp.h>
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
 
 using namespace std;
 
@@ -71,15 +74,22 @@ int main(int argc, char **argv) {
     const auto pose_cloud = getPoses(*loader, start_frame, end_frame, accum_interval);
 
 
-    vector<vector<size_t>> submap_indices;
+    vector<vector<size_t>> frames_clusters;
     if (params->run_traj_clustering_) {
-        submap_indices = clusterTrajectoryXYZ(pose_cloud);
-        const auto &[clustered, unclustered] = erasor_utils::clusterIndices2PointCloud(pose_cloud, submap_indices);
+        if (params->distinguish_temporal_trajectories_) {
+            frames_clusters = clusterTrajectoryXYZDistinguishingTemporalTrajectories(pose_cloud);
+        } else {
+            frames_clusters = clusterTrajectoryXYZ(pose_cloud);
+
+        }
+        const auto &[clustered, unclustered] = erasor_utils::clusterIndices2PointCloud(pose_cloud, frames_clusters);
         if (!unclustered.empty()) {
             throw runtime_error("Some poses are not clustered!");
         }
+        std::cout << "\033[1;32m" << frames_clusters.size() << " clusters are found\033[0m" << std::endl;
 
         // You can see the results by using `rviz/clustering_viz.rviz`
+        // 혹시 모를 논문에 viz를 하기 위해서 넣어 둠,,,
         ros::Publisher pub_raw_traj = nh.advertise<sensor_msgs::PointCloud2>("unclustered",100, true);
         ros::Publisher pub_clustered = nh.advertise<sensor_msgs::PointCloud2>("clustered",100, true);
         sensor_msgs::PointCloud2 output, cluster_output;
@@ -90,22 +100,116 @@ int main(int argc, char **argv) {
         for (int i = 0; i < 5; ++i) {
             pub_raw_traj.publish(output);
             pub_clustered.publish(cluster_output);
-          ros::spinOnce();
         }
     } else {
-        submap_indices.clear();
+        frames_clusters.clear();
         vector<size_t> indices_tmp;
         for (size_t i = start_frame; i < end_frame + accum_interval; i+= accum_interval) {
             indices_tmp.emplace_back(i);
         }
-        submap_indices.emplace_back(indices_tmp);
+        frames_clusters.emplace_back(indices_tmp);
     }
 
     std::cout << "\033[1;32mStart to run ERASOR2\033[0m" << std::endl;
     int cluster_id = 0;
-    for (const auto &indices: submap_indices) {
+    unordered_map<size_t, Eigen::Matrix4f> corrected_poses;
+    for (auto &indices: frames_clusters) {
+        vector<size_t> expanded_frames = indices;
+        if (params->expansion_range_ > 0) {
+            const auto edge_frames_for_expansion = getExpandedFrameNums(indices, 20, end_frame);
+            for (auto &frame: edge_frames_for_expansion) {
+                if (std::find(expanded_frames.begin(), expanded_frames.end(), frame) == expanded_frames.end()) {
+                    expanded_frames.emplace_back(frame);
+                }
+            }
+        }
+
+        if (params->run_traj_clustering_ && !params->distinguish_temporal_trajectories_ && params->correct_poses_by_submap_matching_) {
+            vector<size_t> frames_for_correction = expanded_frames;
+//            const auto continuous_segments = getContinuousSegments(indices);
+            const auto continuous_segments = getContinuousSegments(frames_for_correction);
+            std::cout << "# of continuous_segments: " << continuous_segments.size() << std::endl;
+
+            std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> submaps;
+
+            // 각 세그먼트별로 submap 생성 및 저장
+            for (const auto& segment : continuous_segments) {
+                pcl::PointCloud<pcl::PointXYZI>::Ptr submap(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::PointCloud<pcl::PointXYZI>::Ptr submap_voxelized(new pcl::PointCloud<pcl::PointXYZI>());
+
+                static pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
+                const float voxel_size = params->voxel_size_for_pose_correction_;
+
+                for (int frame_idx : segment) {
+                    corrected_poses[frame_idx] = Eigen::Matrix4f::Identity();
+
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_voxelized(new pcl::PointCloud<pcl::PointXYZI>());
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZI>());
+                    Eigen::Matrix4f pose = Eigen::Matrix4f::Identity(); // 가정: loader->getScanAndPose 함수에서 pose를 가져옴
+                    loader->getScanAndPose(frame_idx, *cloud, pose);
+                    voxel_filter.setInputCloud(cloud);
+                    const float half_vs = voxel_size / 2.0f; // Just heuristics
+                    voxel_filter.setLeafSize(half_vs, half_vs, half_vs);
+                    voxel_filter.filter(*cloud_voxelized);
+                    pcl::transformPointCloud(*cloud_voxelized, *transformed, pose * params->tf_h_of_ground_to_be_zero_);
+                    *submap += *transformed;
+                }
+                voxel_filter.setInputCloud(submap);
+                voxel_filter.setLeafSize(voxel_size, voxel_size, voxel_size);
+                voxel_filter.filter(*submap_voxelized);
+                submaps.push_back(submap_voxelized);
+            }
+
+            // 첫 번째 submap을 기준으로 G-ICP 실행
+            pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZI, pcl::PointXYZI> gicp;
+            gicp.setMaxCorrespondenceDistance(params->max_corr_dist_for_pose_correction_);
+            gicp.setMaximumIterations(100);
+            gicp.setTransformationEpsilon(1e-8);
+            gicp.setEuclideanFitnessEpsilon(1);
+            vector<Eigen::Matrix4f> corrected_transforms(submaps.size(), Eigen::Matrix4f::Identity());
+            for (size_t i = 1; i < submaps.size(); ++i) {
+                std::cout << "Aligning submap " << i << " to submap 0..." << std::endl;
+                pcl::PointCloud<pcl::PointXYZI>::Ptr aligned(new pcl::PointCloud<pcl::PointXYZI>());
+                gicp.setInputSource(submaps[i]);
+                gicp.setInputTarget(submaps[0]); // 첫 번째 submap을 대상으로 설정
+                Eigen::Matrix4f initial_guess = Eigen::Matrix4f::Identity();
+                gicp.align(*aligned, initial_guess);
+
+                if (gicp.hasConverged()) {
+                    std::cout << "G-ICP has converged, score: " << gicp.getFitnessScore() << std::endl;
+                    // 결과 변환 행렬
+                    Eigen::Matrix4f transformation = gicp.getFinalTransformation();
+                    std::cout << "Transformation matrix: " << std::endl << transformation << std::endl;
+
+                    for (const auto& frame_idx: continuous_segments[i]) {
+                        corrected_poses[frame_idx] = transformation;
+                    }
+                } else {
+                    std::cout << "G-ICP did not converge for segment " << i << std::endl;
+                }
+//                ros::Publisher pub_src = nh.advertise<sensor_msgs::PointCloud2>("/map_registration/src",100, true);
+//                ros::Publisher pub_tgt = nh.advertise<sensor_msgs::PointCloud2>("/map_registration/tgt",100, true);
+//                ros::Publisher pub_est = nh.advertise<sensor_msgs::PointCloud2>("/map_registration/est",100, true);
+//                sensor_msgs::PointCloud2 output;
+//                pcl::toROSMsg(*submaps[i], output);
+//                output.header.frame_id = "map";
+//
+//                pub_src.publish(output);
+//                pcl::toROSMsg(*submaps[0], output);
+//                output.header.frame_id = "map";
+//                pub_tgt.publish(output);
+//
+//                pcl::toROSMsg(*aligned, output);
+//                output.header.frame_id = "map";
+//                pub_est.publish(output);
+//                std::cout << "Press Enter to continue...";
+//                cin.ignore();
+            }
+        }
+
         unique_ptr<ERASOR2> erasor2(new ERASOR2());
-        for (const auto &idx : indices) {
+        for (const auto &idx : expanded_frames) {
             signal(SIGINT, erasor_utils::signal_callback_handler);
 //            if (idx % 10 == 0) {
 //                cout << "[DataLoader] " << idx << "th frame comes!\n";
@@ -129,7 +233,9 @@ int main(int argc, char **argv) {
 //            cout << idx << "th cloud size: " << cloud_est_label->size() << endl;
             loader->rejectNeighboringPoints(*cloud_est_label, erasor2->robot_body_size_, *cloud_est_filtered, *noise);
 //            std::cout << "cloud_est_filtered size: " << cloud_est_filtered->size() << std::endl;
-
+            if (params->run_traj_clustering_ && !params->distinguish_temporal_trajectories_ && params->correct_poses_by_submap_matching_) {
+                pose = corrected_poses[idx] * pose;
+            }
             if (dataset_name == "SemanticKITTI") {
                 erasor2->setScanAndPose(pose, *cloud_gt_filtered, *cloud_est_filtered);
             } else {
@@ -146,11 +252,14 @@ int main(int argc, char **argv) {
         //erasor2->filterDynamicObjectsAndSaveLabel(dynamic_label_root, start_frame); // ? Modified for saving dynamic labels
         erasor2->saveDynamicLabels(dynamic_label_root, indices);
         // dynamic_label_root
-        string map_path = params->abs_save_dir_ + "/" + params->sequence_ + "_" + to_string(cluster_id) + "_frame_" + to_string(start_frame) +
+
+        if (params->save_map_) {
+             string map_path = params->abs_save_dir_ + "/" + params->sequence_ + "_" + to_string(cluster_id) + "_frame_" + to_string(start_frame) +
                       "_to_" + to_string(end_frame) + "_estimated.pcd";
-//        erasor2->saveStaticMap(map_path);
-//
-//        erasor2->publishStaticMapResults();
+             erasor2->saveStaticMap(map_path);
+            erasor2->publishStaticMapResults();
+        }
+
         ++cluster_id;
     }
     return 0;
