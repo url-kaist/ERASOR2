@@ -299,6 +299,9 @@ inline vector<vector<size_t>> clusterTrajectoryXYZ(const vector<Eigen::Vector3f>
         Eigen::Vector3f prev_dir = curr_point - prev_point;
         Eigen::Vector3f next_dir = next_point - curr_point;
 
+        // To prevent the case that the car is stopped
+        if (prev_dir.norm() < 1e-1 || next_dir.norm() < 1e-1) continue;
+
         float angle = RAD2DEG(acos(prev_dir.dot(next_dir) / (prev_dir.norm() * next_dir.norm())));
 
         if ((!clustered[i]) && (angle > angle_threshold && angle < 180.0 - angle_threshold)) {
@@ -307,7 +310,8 @@ inline vector<vector<size_t>> clusterTrajectoryXYZ(const vector<Eigen::Vector3f>
             auto        num_results = index.radiusSearch(
                     &query_pt[0], clustering_radius * clustering_radius, ret_matches);
 
-            std::cout << i << " | " << angle << " > " << angle_threshold << "->" << ret_matches.size() << std::endl;
+            std::cout << prev_idx << " <-> " << i << " <-> " << next_idx << " | " << angle << " > " << angle_threshold << " | " << ret_matches.size() << std::endl;
+
             if (ret_matches.size() > min_num_neighbors) {
                 connectDiscontinuousTrajectory(ret_matches, poses, i);
                 trajectory_clusters.emplace_back(ret_matches);
