@@ -207,6 +207,9 @@ inline void extractClusters(std::vector<bool>& clustered, my_kd_tree_t & index,
 
                     Eigen::Vector3f curr_dir    = curr_point - prev_point;
                     Eigen::Vector3f revisit_dir = revisit_point - prev_revisit_point;
+
+                    if (curr_dir.norm() < 1e-1 || revisit_dir.norm() < 1e-1) continue;
+
                     float angle = RAD2DEG(acos(curr_dir.dot(revisit_dir) / (curr_dir.norm() * revisit_dir.norm())));
 
                     if (angle < 90.0 - angle_threshold || angle > 90.0 + angle_threshold) {
