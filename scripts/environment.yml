@@ -1,0 +1,16 @@
+name: erasor2
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.8
+  - numpy>=1.18.0
+  - matplotlib>=3.3.0
+  - scikit-learn>=0.24.0
+  - pip
+  - pip:
+    - open3d>=0.15.0
+    - pypcd-py3>=0.1.0
+    - hdbscan>=0.8.28
+    - tqdm>=4.62.0
+    - tabulate>=0.8.9
