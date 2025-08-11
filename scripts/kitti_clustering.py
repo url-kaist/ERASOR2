@@ -3,39 +3,58 @@ import argparse
 import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
+import pypatchworkpp
 from pcd_preprocess import clusters_hdbscan
 from pathlib import Path
 from tqdm import tqdm
 
 vis = o3d.visualization.Visualizer()
+
 if __name__ == "__main__":
-    save_ground_labels = False
-    save_instance_labels = True
-    use_pre_extracted_ground_label = True
     version = "V2" # "V1": Ground is considered as '9', "V2": Ground is considered as '1'
     if (version == "V1"):
         GROUND_LABEL = 9
     else:
         GROUND_LABEL = 1
 
-    odometry_sequences = []
-    for s in range(22):
-        odometry_sequences.append(str(s).zfill(2))
-
-    # NOTE(hlim): For SemanticKITTI
-    ABS_DATA_DIR = "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
-    ABS_SAVE_DIR = "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
-
-    # NOTE(hlim): For HeLiMOS dataset
-    # ABS_DATA_DIR = "/home/shapelim/Documents/KAIST05/deskewed_LiDAR"
-    # ABS_SAVE_DIR = "/home/shapelim/Documents/KAIST05/deskewed_LiDAR"
-
     parser = argparse.ArgumentParser(description="Convert KITTI dataset to ROS bag file the easy way!")
-    # parser.add_argument("--dir", nargs="?", default = os.getcwd(), help="base directory of the dataset, if no directory passed the deafult is current working directory")
-    parser.add_argument("-s", "--seq", default="Merged", help="sequence of the odometry dataset (between 00 - 21), option is only for ODOMETRY datasets.")
+    parser.add_argument("-s", "--seq", default="Merged", help="sequence of the dataset. For HeLiMOS: 'Merged', For SemanticKITTI: '00', '01', '02', ..., '21'")
     parser.add_argument("-i", "--init_stamp", default=0, type=int)
     parser.add_argument("-e", "--end_stamp", default=12477, type=int)
+    parser.add_argument("--save-ground-labels", action="store_true", help="save ground labels to file")
+    parser.add_argument("--save-instance-labels", action="store_true", help="save instance labels to file")
+    parser.add_argument("--use-pre-extracted-ground-label", action="store_true", help="use pre-extracted ground labels instead of pypatchworkpp")
     args = parser.parse_args()
+    
+    # Determine dataset type and set appropriate paths
+    if args.seq == "Merged":
+        # HeLiMOS dataset
+        ABS_DATA_DIR = "/home/shapelim/Documents/KAIST05/deskewed_LiDAR"
+        ABS_SAVE_DIR = "/home/shapelim/Documents/KAIST05/deskewed_LiDAR"
+        dataset_type = "HeLiMOS"
+    else:
+        # SemanticKITTI dataset - validate sequence format
+        valid_seqs = [f"{i:02d}" for i in range(22)]  # 00 to 21
+        if args.seq not in valid_seqs:
+            print(f"Error: Invalid sequence '{args.seq}' for SemanticKITTI. Valid sequences are: {', '.join(valid_seqs)}")
+            exit(1)
+        
+        ABS_DATA_DIR = "/media/shapelim/UX9803/erasor2_test_benchmark/sequences"
+        ABS_SAVE_DIR = "/media/shapelim/UX9803/erasor2_test_benchmark/sequences"
+        dataset_type = "SemanticKITTI"
+    
+    print(f"Using {dataset_type} dataset with sequence: {args.seq}")
+    
+    # Use argparse values
+    save_ground_labels = args.save_ground_labels
+    save_instance_labels = args.save_instance_labels
+    use_pre_extracted_ground_label = args.use_pre_extracted_ground_label
+    
+    # Initialize Patchwork++ if not using pre-extracted ground labels
+    if not use_pre_extracted_ground_label:
+        params = pypatchworkpp.Parameters()
+        params.verbose = False
+        PatchworkPLUSPLUS = pypatchworkpp.patchworkpp(params)
 
     cloud_dir = ABS_DATA_DIR + "/" + args.seq + "/velodyne"
     ground_label_dir = ABS_DATA_DIR + "/" + args.seq + "/patchwork"
@@ -58,6 +77,11 @@ if __name__ == "__main__":
             ground_labels = np.fromfile(ground_file, dtype=np.uint32)
             ground_labels.reshape((-1))
             ground_inliers = list(np.where(ground_labels == GROUND_LABEL)[0])
+        else:
+            # Use pypatchworkpp for ground segmentation
+            PatchworkPLUSPLUS.estimateGround(scan)
+            ground_indices = PatchworkPLUSPLUS.getGroundIndices()
+            ground_inliers = list(ground_indices)
 
         ##################
         # if (save_ground_labels):
@@ -73,6 +97,7 @@ if __name__ == "__main__":
         # f = open("/home/shapelim/hdbscan_time.txt", 'a')
         # f.write("%f\n"% (time.time() - start_time))
         # f.close()
+
         labels = np.ones((num_pts, 1)) * -1
         mask = np.ones(num_pts, dtype=bool)
         mask[ground_inliers] = False
@@ -107,6 +132,7 @@ if __name__ == "__main__":
         if (save_instance_labels):
             output_fname = output_dir + "/" + str(i).zfill(6) + ".label"
             sem = np.zeros_like(pred).astype(np.float32)
+            # NOTE(hlim): Ground points in the label file are eventually assigned to -1
             ins = pred.astype(int) + 1
             pred_eval = sem + (ins << 16)
             pred_eval.astype(np.uint32).tofile(output_fname)

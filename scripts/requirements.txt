@@ -4,7 +4,7 @@ matplotlib>=3.3.0
 
 # Point cloud processing
 open3d>=0.15.0
-pypcd-py3>=0.1.0
+# pypcd-py3>=0.1.0
 
 # Machine learning and clustering
 scikit-learn>=0.24.0
@@ -15,3 +15,6 @@ tqdm>=4.62.0
 pathlib2>=2.3.7
 tabulate>=0.8.9
 argparse
+
+# Patchwork++
+pypatchworkpp
