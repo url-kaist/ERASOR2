@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(erasor2)
+cmake_policy(SET CMP0048 NEW)
+project(erasor2 VERSION 0.1.0)
 set(CMAKE_BUILD_TYPE Release)
 add_compile_options(-std=c++17)
 
