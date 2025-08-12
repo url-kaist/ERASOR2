@@ -4,6 +4,7 @@ viz_interval: 10
 is_large_scale: true
 
 dataloader:
+    run_traj_clustering: false
     dataset_name: "SemanticKITTI"
     abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
     cloud_dir: ""
@@ -16,6 +17,8 @@ dataloader:
     accum_interval: 1
     voxel_size: 0.2
     map_voxel_size: 0.2
+
+    expansion_range: 0 # It is only needed for HeLiPR
 
 erasor2:
     grid_resolution: 2.0
