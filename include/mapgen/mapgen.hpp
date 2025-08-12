@@ -1,6 +1,7 @@
 #ifndef ERASOR2_MAPGEN_H
 #define ERASOR2_MAPGEN_H
 
+#include <filesystem>
 #include "rosparam_server.hpp"
 #include <math.h>
 
@@ -117,6 +118,11 @@ public:
             *cloud_accum = *cloud_map_;
         }
 
+        
+        std::filesystem::path dir = std::filesystem::path(raw_map_path).parent_path();
+        if (!dir.empty() && !std::filesystem::exists(dir)) {
+            std::filesystem::create_directories(dir);
+        }
         pcl::io::savePCDFileASCII(raw_map_path, *cloud_accum);
 
         pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_map(new pcl::PointCloud<pcl::PointXYZI>);
