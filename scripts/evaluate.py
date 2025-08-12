@@ -149,8 +149,6 @@ def evaluate(gt_xyz, gt_int_u32, est_xyz, est_int_u32, voxelsize=0.2):
     """
     num_gt = count_static_and_dynamic(gt_int_u32)
     num_estimate = count_static_and_dynamic(est_int_u32)
-    print(num_gt)
-    print(num_estimate)
 
     nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(est_xyz)
     dists, indices = nbrs.kneighbors(gt_xyz)
@@ -172,12 +170,14 @@ def evaluate(gt_xyz, gt_int_u32, est_xyz, est_int_u32, voxelsize=0.2):
     if (pr + rr) > 0:
         f1 = 2 * (pr/100) * (rr/100) / ((pr/100) + (rr/100))
 
-    printed_data = gt_data + est_data + [f"{pr:.3f}", f"{rr:.3f}", f"{f1:.4f}"]
-    print(tabulate([printed_data],
-                   headers=['# stat. pts', '# dyn. pts', '%',
-                            '# est. stat. pts', '# est. dyn. pts', '%',
-                            'Preservation', 'Rejection', 'F1'],
-                   tablefmt='orgtbl'))
+    # printed_data = gt_data + est_data + [f"{pr:.3f}", f"{rr:.3f}", f"{f1:.4f}"]
+    # print(tabulate([printed_data],
+    #                headers=['# stat. pts', '# dyn. pts', '%',
+    #                         '# est. stat. pts', '# est. dyn. pts', '%',
+    #                         'Preservation', 'Rejection', 'F1'],
+    #                tablefmt='orgtbl'))
+    # For KETI's evaluation
+    print(f"\033[1;32mFinal <removal rate> is: {rr:.3f}%\033[0m")
 
 # ---------- main ----------
 def main():
