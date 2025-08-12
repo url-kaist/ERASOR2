@@ -44,6 +44,43 @@ Edit configuration files in `config/` directory:
 
 ## Running ERASOR2
 
+### For Demo in Harmonic Space
+
+1. After setup your own conda env, extract `*.label` files:
+
+```
+conda create -n erasor2 python=3.10 
+conda activate erasor2
+cd scripts
+pip3 install -r requirements.txt
+python3 kitti_clustering.py --seq "05" --init_stamp 2350 --end_stamp 2670 --save-instance-labels --save-ground-labels 
+```
+
+2. Generate ground truth map cloud
+
+```
+roslaunch erasor2 mapgen.launch seq:="05" start_frame:=2350 end_frame:=2670
+```
+
+3. Then, run ERASOR2 taking `*.label` files as inputs
+
+
+```
+roslaunch erasor2 run_erasor2.launch target_seq:="seq_05_for_keti"
+```
+
+4. Then, evaluate the results as follows:
+
+```
+python3 scripts/evaluate.py --gt /media/shapelim/UX9803/erasor2_test_benchmark/outputs/05_2350_to_2670_w_interval_2_voxel_0_2.pcd --est "/media/shapelim/UX9803/erasor2_test_benchmark/outputs/05_0_frame_2350_to_2670_estimated.pcd
+```
+
+5. Visualization
+
+```
+roslaunch erasor2 compare_map.launch
+```
+
 ### Basic Usage
 
 ```bash
