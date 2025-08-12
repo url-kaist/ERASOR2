@@ -1,4 +1,5 @@
 #include "tools/erasor_utils.hpp"
+#include <filesystem>
 #include <pcl/registration/gicp.h>
 
 void loadAndParse(const string &abs_pcd_path, sensor_msgs::PointCloud2 &static_cloud_msg,
@@ -166,15 +167,54 @@ int main(int argc, char **argv) {
     pcl::PointCloud<pcl::PointXYZI>::Ptr est_scan2map(new pcl::PointCloud<pcl::PointXYZI>);
 
     std::cout << "\033[1;32mLoading all clouds...\033[0m" << std::endl;
-    erasor_utils::load_pcd(raw_path, raw_cloud);
-    erasor_utils::load_pcd(octomap_path, est_octomap);
-    erasor_utils::load_pcd(pplremover_path, est_pplremover);
-    erasor_utils::load_pcd(removert_path, est_removert);
-    erasor_utils::load_pcd(auto_mos_path, est_auto_mos);
-    erasor_utils::load_pcd(erasor_path, est_erasor);
-    erasor_utils::load_pcd(erasor2_path, est_erasor2);
-    erasor_utils::load_pcd(four_d_mos_path, est_4dmos);
-//    erasor_utils::load_pcd(scan2map_path, est_scan2map);
+    if (std::filesystem::exists(raw_path)) {
+        erasor_utils::load_pcd(raw_path, raw_cloud);
+    } else {
+        ROS_WARN_STREAM("File not found: " << raw_path);
+    }
+
+    if (std::filesystem::exists(octomap_path)) {
+        erasor_utils::load_pcd(octomap_path, est_octomap);
+    } else {
+        ROS_WARN_STREAM("File not found: " << octomap_path);
+    }
+
+    if (std::filesystem::exists(pplremover_path)) {
+        erasor_utils::load_pcd(pplremover_path, est_pplremover);
+    } else {
+        ROS_WARN_STREAM("File not found: " << pplremover_path);
+    }
+
+    if (std::filesystem::exists(removert_path)) {
+        erasor_utils::load_pcd(removert_path, est_removert);
+    } else {
+        ROS_WARN_STREAM("File not found: " << removert_path);
+    }
+
+    if (std::filesystem::exists(auto_mos_path)) {
+        erasor_utils::load_pcd(auto_mos_path, est_auto_mos);
+    } else {
+        ROS_WARN_STREAM("File not found: " << auto_mos_path);
+    }
+
+    if (std::filesystem::exists(erasor_path)) {
+        erasor_utils::load_pcd(erasor_path, est_erasor);
+    } else {
+        ROS_WARN_STREAM("File not found: " << erasor_path);
+    }
+
+    if (std::filesystem::exists(erasor2_path)) {
+        erasor_utils::load_pcd(erasor2_path, est_erasor2);
+    } else {
+        ROS_WARN_STREAM("File not found: " << erasor2_path);
+    }
+
+    if (std::filesystem::exists(four_d_mos_path)) {
+        erasor_utils::load_pcd(four_d_mos_path, est_4dmos);
+    } else {
+        ROS_WARN_STREAM("File not found: " << four_d_mos_path);
+    }
+
     std::cout << "\033[1;32mLoad complete \033[0m" << std::endl;
 
     // TN: remained static points
