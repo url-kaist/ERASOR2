@@ -6,12 +6,12 @@ is_large_scale: true
 dataloader:
     run_traj_clustering: false
     dataset_name: "SemanticKITTI"
-    abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
+    abs_data_dir: "/opt/datasets/sequences"
     cloud_dir: ""
     cloud_format: ""
     pose_path: ""
     sequence: ""
-    abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+    abs_save_dir: "/opt/datasets/outputs"
     
     accum_interval: 2
     voxel_size: 0.2

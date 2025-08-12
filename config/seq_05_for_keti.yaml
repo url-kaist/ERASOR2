@@ -61,8 +61,8 @@ erasor2:
     viz_flag:
         set_scan_and_pose: false
         set_submap: false
-        update: true
-        detect: true
+        update: false
+        detect: false
         over_seg: false
 
     save_map: true

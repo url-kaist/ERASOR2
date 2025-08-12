@@ -1,7 +1,6 @@
 //
 // Created by shapelim on 22.12.22.
 //
-
 #include "dataloader/dataloader.h"
 
 inline size_t DataLoader::size() const {

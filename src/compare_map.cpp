@@ -98,18 +98,18 @@ int main(int argc, char **argv) {
     nodeHandler.param<std::string>("/abs_path", abs_path, "");
     nodeHandler.param<std::string>("/seq", seq, "");
 
-    raw_path = abs_path + "/gt/" + seq + "_voxel_0_2.pcd";
-    octomap_path = abs_path + "/estimate/" + seq + "_octomap.pcd";
-    pplremover_path = abs_path + "/estimate/" + seq + "_pplremover.pcd";
-    removert_path = [&]()-> string {
-        if (seq == "19") return abs_path + "/estimate/" + seq + "_Removert.pcd";
-        return abs_path + "/estimate/" + seq + "_Removert_rv1.pcd";
-    }();
-    // For Tracking 19!! No revert module
-    auto_mos_path = abs_path + "/estimate/" + seq + "_AutoMOS.pcd";
-    erasor_path = abs_path + "/estimate/" + seq + "_ERASOR.pcd";
-    erasor2_path = abs_path + "/estimate/" + seq + "_ERASOR2.pcd";
-    four_d_mos_path = abs_path + "/estimate/" + seq + "_4DMOS.pcd";
+    // raw_path = abs_path + "/gt/" + seq + "_voxel_0_2.pcd";
+    // octomap_path = abs_path + "/estimate/" + seq + "_octomap.pcd";
+    // pplremover_path = abs_path + "/estimate/" + seq + "_pplremover.pcd";
+    // removert_path = [&]()-> string {
+    //     if (seq == "19") return abs_path + "/estimate/" + seq + "_Removert.pcd";
+    //     return abs_path + "/estimate/" + seq + "_Removert_rv1.pcd";
+    // }();
+    // // For Tracking 19!! No revert module
+    // auto_mos_path = abs_path + "/estimate/" + seq + "_AutoMOS.pcd";
+    // erasor_path = abs_path + "/estimate/" + seq + "_ERASOR.pcd";
+    // erasor2_path = abs_path + "/estimate/" + seq + "_ERASOR2.pcd";
+    // four_d_mos_path = abs_path + "/estimate/" + seq + "_4DMOS.pcd";
 
     ros::Publisher rawStatPub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/raw/static", 100, true);
     ros::Publisher rawDynaPub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/raw/dynamic", 100, true);
@@ -213,8 +213,8 @@ int main(int argc, char **argv) {
     trans_msg.transform.rotation.y = 0.0;
     trans_msg.transform.rotation.z = 0.0;
     trans_msg.transform.rotation.w = 1.0;
-    trans_msg.header.frame_id = "map";
-    trans_msg.child_frame_id = "base_link";
+    trans_msg.header.frame_id = "world";
+    trans_msg.child_frame_id = "map";
     br.sendTransform(trans_msg);
 
     ros::Rate  loop_rate(1);

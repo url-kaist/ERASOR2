@@ -229,8 +229,8 @@ int main(int argc, char **argv) {
             }
 
             loader->getScanAndPose(idx, *cloud_est_label, pose);
-//            cout << idx << "th pose: " << endl << pose << endl;
-//            cout << idx << "th cloud size: " << cloud_est_label->size() << endl;
+           // cout << idx << "th pose: " << endl << pose << endl;
+           // cout << idx << "th cloud size: " << cloud_est_label->size() << endl;
             loader->rejectNeighboringPoints(*cloud_est_label, erasor2->robot_body_size_, *cloud_est_filtered, *noise);
 //            std::cout << "cloud_est_filtered size: " << cloud_est_filtered->size() << std::endl;
             if (params->run_traj_clustering_ && !params->distinguish_temporal_trajectories_ && params->correct_poses_by_submap_matching_) {
