@@ -203,7 +203,7 @@ void SemanticKITTILoader::loadEstGroundAndInstanceLabels(const int i, std::vecto
     erasor_utils::load_labels(ground_label_name, ground_label);
 
     if (instance_label.size() != ground_label.size()) {
-        throw invalid_argument("[Loading] Something's wrong!");
+        throw invalid_argument("[Loading] Something's wrong! Instance and ground label sizes don't match!");
     }
 
     static bool is_initial = true;
@@ -422,7 +422,7 @@ void HeLiPRLoader::loadEstGroundAndInstanceLabels(const int i, std::vector<uint3
         std::cout << "`ground_label` size: " << ground_label.size() << std::endl;
         std::cout << "`instance_label` name: " << inst_label_name << std::endl;
         std::cout << "`ground_label` name: " << ground_label_name << std::endl;
-        throw invalid_argument("[Loading] Something's wrong!");
+        throw invalid_argument("[Loading] Something's wrong! Instance and ground label sizes don't match!");
     }
 
     static bool is_initial = true;

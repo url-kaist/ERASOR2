@@ -105,7 +105,7 @@ public:
     void saveAccumMap(const std::string &raw_map_path, const std::string &voxelized_map_path) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_accum(new pcl::PointCloud<pcl::PointXYZI>);
         cloud_accum->points.reserve(NUM_MAP_CLOUD_LARGE_ENOUGH);
-        std::cout << "\033[1;32m On saving map cloud...it may take few seconds...\033[0m" << std::endl;
+        std::cout << "\033[1;32mOn saving map cloud...it may take few seconds...\033[0m" << std::endl;
         if (is_large_scale_) {
             // Prvious submaps
             for (const auto &submap: submaps) {

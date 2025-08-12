@@ -270,10 +270,9 @@ public:
 //        pub_ground   = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/ground", 100);
 //        pub_arranged = nh_.advertise<sensor_msgs::PointCloud2>("/erasor2/arranged", 100);
 //
-        std::string home_dir = std::getenv("HOME");
-        abs_data_dir_ = home_dir + abs_data_dir_;
-        abs_save_dir_ = home_dir + abs_save_dir_;
-        pose_path_ = home_dir + pose_path_;
+        abs_data_dir_ = abs_data_dir_;
+        abs_save_dir_ = abs_save_dir_;
+        pose_path_ = pose_path_;
 
         tf_h_of_ground_to_be_zero_(2, 3) = sensor_height_;
         usleep(100);

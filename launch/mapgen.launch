@@ -5,7 +5,10 @@
 <arg name="end_frame" default="9000" />
 <arg name="accum_interval" default="2" />
 
-<rosparam command="load" file="$(find erasor2)/config/helipr_mapgen.yaml" />
+<!-- For SemanticKITTI -->
+<rosparam command="load" file="$(find erasor2)/config/kitti_mapgen.yaml" />
+<!-- For HeLiPR -->
+<!-- <rosparam command="load" file="$(find erasor2)/config/helipr_mapgen.yaml" /> -->
 
 <rosparam param="/dataloader/sequence" subst_value="true">"$(arg seq)"</rosparam>
 <rosparam param="/start_frame" subst_value="true">$(arg start_frame)</rosparam>

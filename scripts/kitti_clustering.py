@@ -10,6 +10,11 @@ from tqdm import tqdm
 
 vis = o3d.visualization.Visualizer()
 
+'''
+Use like this:
+
+python3 kitti_clustering.py --seq "05" --init_stamp 2350 --end_stamp 2670 --save-instance-labels --save-ground-labels
+'''
 if __name__ == "__main__":
     version = "V2" # "V1": Ground is considered as '9', "V2": Ground is considered as '1'
     if (version == "V1"):
@@ -59,6 +64,8 @@ if __name__ == "__main__":
     cloud_dir = ABS_DATA_DIR + "/" + args.seq + "/velodyne"
     ground_label_dir = ABS_DATA_DIR + "/" + args.seq + "/patchwork"
     output_dir = ABS_SAVE_DIR + "/" + args.seq + "/hdbscan"
+    if save_ground_labels:
+        Path(ground_label_dir).mkdir(parents=True, exist_ok=True)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     for i in tqdm(range(args.init_stamp, args.end_stamp + 1)):
@@ -83,13 +90,12 @@ if __name__ == "__main__":
             ground_indices = PatchworkPLUSPLUS.getGroundIndices()
             ground_inliers = list(ground_indices)
 
-        ##################
-        # if (save_ground_labels):
-        #     output_fname = abs_ground_dir + "/" + str(i).zfill(6) + ".label"
-        #     ground_labels = np.zeros(num_pts, dtype=np.uint32)
-        #     ground_labels[ground_inliers] = GROUND_LABEL
-        #     ground_labels.astype(np.uint32).tofile(output_fname)
-        ##################
+            if (save_ground_labels):
+                output_fname = ground_label_dir + "/" + str(i).zfill(6) + ".label"
+                ground_labels = np.zeros(num_pts, dtype=np.uint32)
+                ground_labels[ground_inliers] = GROUND_LABEL
+                ground_labels.astype(np.uint32).tofile(output_fname)
+
         start_time = time.time()
         pcd_ = pcd.select_by_index(ground_inliers, invert=True)
         labels_ = np.expand_dims(clusters_hdbscan(np.asarray(pcd_.points)), axis=-1)
