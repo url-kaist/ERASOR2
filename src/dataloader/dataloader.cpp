@@ -199,8 +199,12 @@ void SemanticKITTILoader::loadEstGroundAndInstanceLabels(const int i, std::vecto
     string inst_label_name = (boost::format("%s/%06d.label") % est_label_dir_ % i).str();
     string ground_label_name = (boost::format("%s/%06d.label") % ground_label_dir_ % i).str();
 
-    erasor_utils::load_labels(inst_label_name, instance_label);
-    erasor_utils::load_labels(ground_label_name, ground_label);
+    if (!erasor_utils::load_labels(inst_label_name, instance_label)) {
+        throw std::invalid_argument("Failed to load instance label: " + inst_label_name);
+    }
+    if (!erasor_utils::load_labels(ground_label_name, ground_label)) {
+        throw std::invalid_argument("Failed to load ground label: " + ground_label_name);
+    }
 
     if (instance_label.size() != ground_label.size()) {
         throw invalid_argument("[Loading] Something's wrong! Instance and ground label sizes don't match!");
@@ -244,17 +248,21 @@ void SemanticKITTILoader::assignLabels(const std::vector<uint32_t> ground_labels
 
 void SemanticKITTILoader::loadGTLabel(const size_t idx, vector<uint32_t> &labels) {
     string        label_name = (boost::format("%s/%06d.label") % gt_label_dir_ % idx).str();
-//    cout << label_name << endl;
-    std::ifstream label_input(label_name, std::ios::binary);
-    if (!label_input.is_open()) {
-        throw invalid_argument("Could not open the label!");
-    }
-    label_input.seekg(0, std::ios::end);
-    uint32_t num_points = label_input.tellg() / sizeof(uint32_t);
-    label_input.seekg(0, std::ios::beg);
+    std::cout << label_name << "\n";
+    if (!fs::exists(label_name)) {
+        throw std::invalid_argument("File does not exist: " + label_name);
+    } else {
+        std::ifstream label_input(label_name, std::ios::binary);
+        if (!label_input.is_open()) {
+            throw invalid_argument("Could not open the label!");
+        }
+        label_input.seekg(0, std::ios::end);
+        uint32_t num_points = label_input.tellg() / sizeof(uint32_t);
+        label_input.seekg(0, std::ios::beg);
 
-    labels.resize(num_points);
-    label_input.read((char *) &labels[0], num_points * sizeof(uint32_t));
+        labels.resize(num_points);
+        label_input.read((char *) &labels[0], num_points * sizeof(uint32_t));
+    }
 }
 
 void SemanticKITTILoader::parseGTLabel(const vector<uint32_t> &labels,
@@ -414,8 +422,12 @@ void HeLiPRLoader::loadEstGroundAndInstanceLabels(const int i, std::vector<uint3
     // std::cout << inst_label_name << std::endl;
     // std::cout << ground_label_name << std::endl;
 
-    erasor_utils::load_labels(inst_label_name, instance_label);
-    erasor_utils::load_labels(ground_label_name, ground_label);
+    if (!erasor_utils::load_labels(inst_label_name, instance_label)) {
+        throw std::invalid_argument("Failed to load instance label: " + inst_label_name);
+    }
+    if (!erasor_utils::load_labels(ground_label_name, ground_label)) {
+        throw std::invalid_argument("Failed to load ground label: " + ground_label_name);
+    }
 
     if (instance_label.size() != ground_label.size()) {
         std::cout << "`instance_label` size: " << instance_label.size() << std::endl;
