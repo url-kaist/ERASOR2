@@ -11,7 +11,7 @@ dataloader:
     pose_path: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/"
     sequence: "Merged"
     abs_save_dir: "/media/se0yeon00/SY_Other/HeliPR/KAIST05/deskewed_LiDAR3/merged_map"
-    
+
     accum_interval: 2
     voxel_size: 0.2
     map_voxel_size: 0.2

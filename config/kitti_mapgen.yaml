@@ -12,7 +12,7 @@ dataloader:
     pose_path: ""
     sequence: ""
     abs_save_dir: "/opt/datasets/outputs"
-    
+
     accum_interval: 2
     voxel_size: 0.2
     map_voxel_size: 0.2

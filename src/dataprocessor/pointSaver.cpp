@@ -1,13 +1,13 @@
-#include "dataprocessor/PointCloudProcessor.h"
 #include <signal.h>
 
+#include "dataprocessor/PointCloudProcessor.h"
+
 void signal_callback_handler(int signum) {
-    cout << "Caught Ctrl + c " << endl;
-    exit(signum);
+  cout << "Caught Ctrl + c " << endl;
+  exit(signum);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   ros::init(argc, argv, "pointcloud_processor");
   ros::NodeHandle nh;
 
@@ -18,23 +18,24 @@ int main(int argc, char **argv)
   std::string trajectoryDir;
 
   nh.param<std::string>("/dataprocessor/dataset_root", absPath, "/home/ericlab");
-  nh.param<std::vector<std::string>>("/dataprocessor/process_lidar_list", process_lidar_list, {"Ouster", "Velodyne", "Livox", "Aeva"});
+  nh.param<std::vector<std::string>>("/dataprocessor/process_lidar_list",
+                                     process_lidar_list,
+                                     {"Ouster", "Velodyne", "Livox", "Aeva"});
   nh.param<std::string>("/dataloader/abs_data_dir", saveDir, "/home/ericlab");
   nh.param<std::string>("/dataprocessor/save_ins_to_LiDAR_root", trajectoryDir, "/home/ericlab");
   nh.param<std::string>("/dataprocessor/saveFormat", saveFormat, "bin");
 
   std::string home_dir = std::getenv("HOME");
-  absPath = home_dir + absPath;
-  saveDir = home_dir + saveDir;
-  trajectoryDir = home_dir + trajectoryDir;
+  absPath              = home_dir + absPath;
+  saveDir              = home_dir + saveDir;
+  trajectoryDir        = home_dir + trajectoryDir;
 
-  for(auto sensorType : process_lidar_list)
-  {
+  for (auto sensorType : process_lidar_list) {
     signal(SIGINT, signal_callback_handler);
     PointCloudProcessor processor(absPath, sensorType, saveDir, trajectoryDir, saveFormat);
     processor.ProcessBinFiles();
   }
-  
+
   // PointCloudProcessor processor(absPath, sensorType, saveDir);
 
   return 0;

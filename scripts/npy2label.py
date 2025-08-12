@@ -1,12 +1,16 @@
-import open3d as o3d
-import numpy as np
-import matplotlib.pyplot as plt
-from pcd_preprocess import clusters_hdbscan
 from pathlib import Path
+
+# import matplotlib.pyplot as plt  # noqa: F401
+import numpy as np
+
+# import open3d as o3d  # noqa: F401
+# from pcd_preprocess import clusters_hdbscan  # noqa: F401
 
 if __name__ == "__main__":
     abs_src_dir = "/media/shapelim/Elements/3DUIS"
-    abs_save_dir = "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
+    abs_save_dir = (
+        "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
+    )
     seq = "00"
     start_frame = 4520
     end_frame = 4530 + 1

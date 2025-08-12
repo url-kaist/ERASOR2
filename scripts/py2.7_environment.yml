@@ -47,4 +47,3 @@ dependencies:
     - typing==3.10.0.0
     - zipp==1.2.0
 prefix: /home/shapelim/anaconda3/envs/erasor_analysis
-

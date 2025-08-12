@@ -1,270 +1,292 @@
-#include "tools/erasor_utils.hpp"
 #include "rosparam_server.hpp"
+#include "tools/erasor_utils.hpp"
 
 using namespace std;
 
 struct DynamicInstance {
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    pcl::PointCloud<pcl::PointXYZI> cloud_;
-    float moving_obj_score_;
-    vector<grid_map::Index> occupied_map_idxes_;
-    vector<float> log_odds_for_each_point_;
-    Eigen::Matrix<float, 4, 1> centroid_;
+  pcl::PointCloud<pcl::PointXYZI> cloud_;
+  float moving_obj_score_;
+  vector<grid_map::Index> occupied_map_idxes_;
+  vector<float> log_odds_for_each_point_;
+  Eigen::Matrix<float, 4, 1> centroid_;
 
-    bool is_close_to_body_frame_ = false;
-    bool is_dynamic_ = false;
+  bool is_close_to_body_frame_ = false;
+  bool is_dynamic_             = false;
 };
 
 struct OverSegmentedInstance {
-    float original_id;
-    float new_id_for_stat_inst;
-    float new_id_for_dyn_inst;
-    DynamicInstance static_inst;
-    DynamicInstance dynamic_inst;
+  float original_id;
+  float new_id_for_stat_inst;
+  float new_id_for_dyn_inst;
+  DynamicInstance static_inst;
+  DynamicInstance dynamic_inst;
 };
 
 struct GridMapInfo {
-    float center_x;
-    float center_y;
-    float resolution;
-    int   width;
-    int   height;
-    // Remainders of x_length / grid_resolution and
-    // y_length / grid_resolution should be zeros, respectively.
-    float x_length;
-    float y_length;
+  float center_x;
+  float center_y;
+  float resolution;
+  int width;
+  int height;
+  // Remainders of x_length / grid_resolution and
+  // y_length / grid_resolution should be zeros, respectively.
+  float x_length;
+  float y_length;
 };
 
 struct ParsedCurrCloud {
-    pcl::PointCloud<pcl::PointXYZRGB> non_ground_;
-    pcl::PointCloud<pcl::PointXYZI> ground_;
-    pcl::PointCloud<pcl::PointXYZI> noise_;
+  pcl::PointCloud<pcl::PointXYZRGB> non_ground_;
+  pcl::PointCloud<pcl::PointXYZI> ground_;
+  pcl::PointCloud<pcl::PointXYZI> noise_;
 };
 
 class ERASOR2 : public RosParamServer {
-public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    ERASOR2();
+  ERASOR2();
 
-    ~ERASOR2();
+  ~ERASOR2();
 
-    bool                                    is_initial_ = true;
-    Eigen::Matrix4f                         new_origin_ = Eigen::Matrix4f::Identity();
-    vector<pcl::PointCloud<pcl::PointXYZI>> pcs_transformed_;
-    vector<pcl::PointCloud<pcl::PointXYZI>> complements_transformed_;
-    vector<pcl::PointCloud<pcl::PointXYZI>> pcs_gt_transformed_;
-    vector<Eigen::Matrix4f>                 poses_submap_;
-    vector<float>                           max_ids_;
+  bool is_initial_            = true;
+  Eigen::Matrix4f new_origin_ = Eigen::Matrix4f::Identity();
+  vector<pcl::PointCloud<pcl::PointXYZI>> pcs_transformed_;
+  vector<pcl::PointCloud<pcl::PointXYZI>> complements_transformed_;
+  vector<pcl::PointCloud<pcl::PointXYZI>> pcs_gt_transformed_;
+  vector<Eigen::Matrix4f> poses_submap_;
+  vector<float> max_ids_;
 
-    // Outputs
-    vector<pcl::PointCloud<pcl::PointXYZI>> noisy_points_transformed_;
-    vector<pcl::PointCloud<pcl::PointXYZI>> static_points_transformed_;
-    vector<pcl::PointCloud<pcl::PointXYZI>> dynamic_points_transformed_;
-    vector<pcl::PointCloud<pcl::PointXYZI>> potential_dynamic_points_transformed_;
+  // Outputs
+  vector<pcl::PointCloud<pcl::PointXYZI>> noisy_points_transformed_;
+  vector<pcl::PointCloud<pcl::PointXYZI>> static_points_transformed_;
+  vector<pcl::PointCloud<pcl::PointXYZI>> dynamic_points_transformed_;
+  vector<pcl::PointCloud<pcl::PointXYZI>> potential_dynamic_points_transformed_;
 
-    vector<vector<pcl::PointCloud<pcl::PointXYZI>>> xygrids_;
-    vector<grid_map::Index>                         idxes_approx_;
-    vector<unordered_map<float, DynamicInstance>>   ids_instances_set_;
+  vector<vector<pcl::PointCloud<pcl::PointXYZI>>> xygrids_;
+  vector<grid_map::Index> idxes_approx_;
+  vector<unordered_map<float, DynamicInstance>> ids_instances_set_;
 
+  // For visualize clusters
+  vector<vector<uint8_t>> colors;
 
-    // For visualize clusters
-    vector<vector<uint8_t>> colors;
+  // For visualize the moving object score
+  vector<vector<pair<Eigen::Matrix<float, 4, 1>, float>>> rejected_objs_set_;
+  vector<vector<pair<Eigen::Matrix<float, 4, 1>, float>>> accepted_objs_set_;
 
-    // For visualize the moving object score
-    vector<vector<pair<Eigen::Matrix<float, 4, 1>, float> >> rejected_objs_set_;
-    vector<vector<pair<Eigen::Matrix<float, 4, 1>, float> >> accepted_objs_set_;
+  // To flush markers. These are used in `publishObjScores`
+  int num_prev_accepted_objs_ = 0;
+  int num_prev_rejected_objs_ = 0;
 
-    // To flush markers. These are used in `publishObjScores`
-    int num_prev_accepted_objs_ = 0;
-    int num_prev_rejected_objs_ = 0;
+  int num_data_ = 0;
+  GridMapInfo grid_map_info_;
+  grid_map::GridMap gridmap_submap_;
 
-    int               num_data_ = 0;
-    GridMapInfo       grid_map_info_;
-    grid_map::GridMap gridmap_submap_;
+  float scan_ratio_;
+  float ratio_num_;
+  float area_per_grid_;
 
-    float scan_ratio_;
-    float ratio_num_;
-    float area_per_grid_;
+  float ID_FOR_DEBUG = 0;
+
+  pcl::PointCloud<pcl::PointXYZI>::Ptr map_noise_;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr map_dynamic_;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr map_accum_;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr map_complement_;
 
-    float ID_FOR_DEBUG = 0;
+  // Final output
+  pcl::PointCloud<pcl::PointXYZI>::Ptr static_map_accum_;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr static_map_voxelized_;
 
-    pcl::PointCloud<pcl::PointXYZI>::Ptr map_noise_;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr map_dynamic_;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr map_accum_;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr map_complement_;
+  void setPriors();
 
-    // Final output
-    pcl::PointCloud<pcl::PointXYZI>::Ptr static_map_accum_;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr static_map_voxelized_;
+  void initializePointClouds();
 
-    void setPriors();
+  /*** Main functions ****/
+  void setScanAndPose(const Eigen::Matrix4f &pose_raw,
+                      const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label);
 
-    void initializePointClouds();
+  void setScanAndPose(const Eigen::Matrix4f &pose_raw,
+                      const pcl::PointCloud<pcl::PointXYZI> &cloud_gt_label,
+                      const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label);
 
-    /*** Main functions ****/
-    void setScanAndPose(const Eigen::Matrix4f &pose_raw,
-                        const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label);
+  void setSubmap();
 
-    void setScanAndPose(const Eigen::Matrix4f &pose_raw,
-                        const pcl::PointCloud<pcl::PointXYZI> &cloud_gt_label,
-                        const pcl::PointCloud<pcl::PointXYZI> &cloud_est_label);
+  void updateSteppableRegion();
+
+  void detectMovingObjects();
+
+  void filterDynamicObjects();
+  void saveDynamicLabels(const string &dynamic_label_root, const vector<size_t> &indices);
+  /***********************/
+
+  void resize();
+
+  ParsedCurrCloud parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &cloud);
+
+  void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
+                          const unordered_map<float, DynamicInstance> &ids_clusters,
+                          std::vector<int> &static_mask);
+
+  void updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
+                       const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
+                       std::vector<int> &static_mask);
+
+  // HT: I don't know why call-by reference causes runtime error...
+  void setDynamicInstance(DynamicInstance &dynamic_cluster, const float pos_x, const float pos_y);
+
+  /*** Functions to tackle the over-segmentation ***/
+  bool isOverSegmented(const DynamicInstance &dynamic_cluster);
+
+  void parseOverSegmentation(const DynamicInstance &over_segmented,
+                             DynamicInstance &static_inst,
+                             DynamicInstance &partial_dynamic_inst,
+                             const float pos_x,
+                             const float pos_y);
+
+  void updateNewParsedInstances(const vector<OverSegmentedInstance> &instances_to_be_updated,
+                                pcl::PointCloud<pcl::PointXYZI> &cloud,
+                                unordered_map<float, DynamicInstance> &ids_clusters);
+
+  /*** Functions to tackle the under-segmentation ***/
+  void accumDynamicCloud(const int k,
+                         const int window_size,
+                         pcl::PointCloud<pcl::PointXYZI> &cloud_accum,
+                         bool use_voxelization = true);
+
+  void accumInstanceWiseDynamicCloud(const int k,
+                                     const int window_size,
+                                     pcl::PointCloud<pcl::PointXYZI> &cloud_accum,
+                                     bool use_voxelization = true);
+
+  void instanceAwareOutlierRemoval(const int k,
+                                   const int window_size,
+                                   const float dist_thr_gain,
+                                   pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+                                   pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
+
+  void windowBasedVolumetricOutlierRemoval(
+      const int k,
+      const int window_size,
+      const float dist_thr_gain,
+      pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+      pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
+
+  void volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &static_points,
+                                const pcl::PointCloud<pcl::PointXYZI> &dynamic_points,
+                                const float dist_thr_gain,
+                                pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
+                                pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
+  /*************************************************/
 
-    void setSubmap();
+  void discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud,
+                                     const std::vector<int> &static_mask,
+                                     pcl::PointCloud<pcl::PointXYZI> &static_points,
+                                     pcl::PointCloud<pcl::PointXYZI> &dynamic_points);
 
-    void updateSteppableRegion();
+  //    void discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI>& cloud, const
+  //    std::vector<int>& dyn_ids,
+  //                              pcl::PointCloud<pcl::PointXYZI>& static_points,
+  //                              pcl::PointCloud<pcl::PointXYZI>& dynamic_points);
 
-    void detectMovingObjects();
+  void saveStaticMap(const string &static_map_path);
 
-    void filterDynamicObjects();
-    void saveDynamicLabels(const string& dynamic_label_root, const vector<size_t> &indices);
-    /***********************/
+  void publishStaticMapResults();
 
-    void resize();
+  void maskNonVoI(const pcl::PointCloud<pcl::PointXYZI> &src,
+                  pcl::PointCloud<pcl::PointXYZI> &cloud_out,
+                  const float min_z_voi,
+                  const float max_z_voi);
 
-    ParsedCurrCloud parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &cloud);
+  // For parseOverSegmentation
+  float getMaxInstanceId(const pcl::PointCloud<pcl::PointXYZI> &src);
 
-    void estimateStaticMask(const pcl::PointCloud<pcl::PointXYZI> &cloud,
-                            const unordered_map<float, DynamicInstance> &ids_clusters,
-                            std::vector<int> &static_mask);
+  GridMapInfo setGridMapParams(const float min_x,
+                               const float min_y,
+                               const float max_x,
+                               const float max_y,
+                               const float grid_resolution);
 
-    void updateNoisyMask(const pcl::PointCloud<pcl::PointXYZI> &src_cloud,
-                         const pcl::PointCloud<pcl::PointXYZI> &noisy_points,
-                         std::vector<int> &static_mask);
+  void voi2xygrid(const pcl::PointCloud<pcl::PointXYZI> &src,
+                  float pos_x,
+                  float pos_y,
+                  float pos_z,
+                  float range,
+                  float resolution,
+                  vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid,
+                  pcl::PointCloud<pcl::PointXYZI> &complement,
+                  std::string format = "gridmap");
 
-    // HT: I don't know why call-by reference causes runtime error...
-    void setDynamicInstance(DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y);
+  void xygrid2cloud(const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid,
+                    pcl::PointCloud<pcl::PointXYZI> &cloud);
 
-    /*** Functions to tackle the over-segmentation ***/
-    bool isOverSegmented(const DynamicInstance& dynamic_cluster);
+  bool isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI> &pc,
+                          const float ratio_num = 0.95,
+                          const int num_min_pts = 3);
 
-    void parseOverSegmentation(const DynamicInstance& over_segmented, DynamicInstance& static_inst,
-                                    DynamicInstance& partial_dynamic_inst, const float pos_x, const float pos_y);
+  bool isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
+                                   const pcl::PointCloud<pcl::PointXYZI> &map_pc,
+                                   const float scan_ratio_threshold,
+                                   const float th_bin_max_h,
+                                   const bool verbose = false);
 
-    void updateNewParsedInstances(const vector<OverSegmentedInstance>& instances_to_be_updated,
-                                       pcl::PointCloud<pcl::PointXYZI> &cloud,
-                                       unordered_map<float, DynamicInstance>& ids_clusters);
+  bool isLikelyToBeSteppableRegionbyBinaryDescriptor(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
+                                                     const pcl::PointCloud<pcl::PointXYZI> &map_pc,
+                                                     const float scan_ratio_threshold,
+                                                     const float min_z_diff_thr,
+                                                     const bool verbose = false);
 
-    /*** Functions to tackle the under-segmentation ***/
-    void accumDynamicCloud(const int k, const int window_size,
-                           pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization=true);
+  void updateLogOdds(const grid_map::Index &idx, const float increment, const int kernel_size = 3);
 
-    void accumInstanceWiseDynamicCloud(const int k, const int window_size,
-                           pcl::PointCloud<pcl::PointXYZI> &cloud_accum, bool use_voxelization=true);
+  grid_map::GridMap setMapcentricGridMap(const GridMapInfo &grid_map_info);
 
+  grid_map::GridMap setEgocentricGridMap(float range,
+                                         const float grid_resolution,
+                                         const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid);
 
-    void instanceAwareOutlierRemoval(const int k, const int window_size,
-                                           const float dist_thr_gain,
-                                           pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
-                                           pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
+  void setOccupiedMapIdxes(DynamicInstance &dynamic_cluster);
 
-    void windowBasedVolumetricOutlierRemoval(const int k, const int window_size,
-                                           const float dist_thr_gain,
-                                           pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
-                                           pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
+  void setMovingInstanceScore(DynamicInstance &dynamic_cluster);
 
-    void volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &static_points,
-                                       const pcl::PointCloud<pcl::PointXYZI> &dynamic_points,
-                                       const float dist_thr_gain,
-                                       pcl::PointCloud<pcl::PointXYZI> &filtered_static_points,
-                                       pcl::PointCloud<pcl::PointXYZI> &potential_dynamic_points);
-    /*************************************************/
+  void logOddsGrid2probGrid();
 
-    void
-    discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud, const std::vector<int> &static_mask,
-                                  pcl::PointCloud<pcl::PointXYZI> &static_points,
-                                  pcl::PointCloud<pcl::PointXYZI> &dynamic_points);
+  void dilateAndErode(grid_map::GridMap &gridmap_submap);
 
-//    void discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI>& cloud, const std::vector<int>& dyn_ids,
-//                              pcl::PointCloud<pcl::PointXYZI>& static_points, pcl::PointCloud<pcl::PointXYZI>& dynamic_points);
+  void erodeGridMap(grid_map::GridMap &gridmap_submap);
 
-    void saveStaticMap(const string &static_map_path);
+  void publishObjScores(const ros::Publisher &publisher,
+                        const vector<pair<Eigen::Matrix<float, 4, 1>, float>> &objs,
+                        const vector<float> color,
+                        int &num_prev_objs);
 
-    void publishStaticMapResults();
+  bool isCloseToBodyFrame(const DynamicInstance &dynamic_cluster,
+                          const float pos_x,
+                          const float pos_y,
+                          const float range_thr);
 
-    void maskNonVoI(const pcl::PointCloud<pcl::PointXYZI> &src, pcl::PointCloud<pcl::PointXYZI> &cloud_out,
-                    const float min_z_voi, const float max_z_voi);
+  bool isSizeSufficientlySmall(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
+                               const float size_thr = 30.0);
 
-    // For parseOverSegmentation
-    float getMaxInstanceId(const pcl::PointCloud<pcl::PointXYZI> &src);
+  void visualizeHardThrRadius(const Eigen::Matrix4f &pose);
 
-    GridMapInfo setGridMapParams(const float min_x, const float min_y,
-                                 const float max_x, const float max_y,
-                                 const float grid_resolution);
+ private:
+  double xy2theta(const double &x, const double &y);
 
-    void voi2xygrid(
-            const pcl::PointCloud<pcl::PointXYZI> &src, float pos_x, float pos_y, float pos_z,
-            float range, float resolution, vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid,
-            pcl::PointCloud<pcl::PointXYZI> &complement, std::string format = "gridmap");
+  double xy2radius(const double &x, const double &y);
 
-    void xygrid2cloud(const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid,
-                      pcl::PointCloud<pcl::PointXYZI> &cloud);
+  double prob2logOdds(double prob);
 
+  double logOdds2prob(double log_odds);
 
-    bool isLikelyToBeGround(const pcl::PointCloud<pcl::PointXYZI>& pc, const float ratio_num = 0.95,
-                            const int num_min_pts = 3);
+  grid_map::Position idx2position(const grid_map::Index &idx);
 
-    bool isLikelyToBeSteppableRegion(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
-                                     const pcl::PointCloud<pcl::PointXYZI> &map_pc,
-                                     const float scan_ratio_threshold, const float th_bin_max_h,
-                                     const bool verbose = false);
+  int globalIdx2LocalIdx(const grid_map::Index &global_idx, const grid_map::Index &center_idx);
 
-    bool isLikelyToBeSteppableRegionbyBinaryDescriptor(const pcl::PointCloud<pcl::PointXYZI> &curr_pc,
-                                          const pcl::PointCloud<pcl::PointXYZI> &map_pc,
-                                          const float scan_ratio_threshold, const float min_z_diff_thr,
-                                          const bool verbose=false);
+  bool isEqual(const grid_map::Index &idx0, const grid_map::Index &idx1);
 
-    void updateLogOdds(const grid_map::Index& idx, const float increment, const int kernel_size=3);
+  bool isInsideTheDynamicInstances(const pcl::PointXYZI &query, const pcl::PointXYZI &target);
 
-    grid_map::GridMap setMapcentricGridMap(const GridMapInfo &grid_map_info);
+  void printClusterInfo(const DynamicInstance &dynamic_cluster);
 
-    grid_map::GridMap setEgocentricGridMap(float range,
-                                           const float grid_resolution,
-                                           const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid);
-
-    void setOccupiedMapIdxes(DynamicInstance& dynamic_cluster);
-
-    void setMovingInstanceScore(DynamicInstance& dynamic_cluster);
-
-    void logOddsGrid2probGrid();
-
-    void dilateAndErode(grid_map::GridMap &gridmap_submap);
-
-    void erodeGridMap(grid_map::GridMap &gridmap_submap);
-
-    void publishObjScores(const ros::Publisher& publisher, const vector<pair<Eigen::Matrix<float, 4, 1>, float> >& objs,
-                               const vector<float> color, int& num_prev_objs);
-
-    bool isCloseToBodyFrame(const DynamicInstance& dynamic_cluster, const float pos_x, const float pos_y,
-                              const float range_thr);
-
-    bool isSizeSufficientlySmall(const pcl::PointCloud<pcl::PointXYZI> &dynamic_cluster,
-                                 const float size_thr=30.0);
-
-    void visualizeHardThrRadius(const Eigen::Matrix4f& pose);
-
-private:
-    double xy2theta(const double &x, const double &y);
-
-    double xy2radius(const double &x, const double &y);
-
-    double prob2logOdds(double prob);
-
-    double logOdds2prob(double log_odds);
-
-    grid_map::Position idx2position(const grid_map::Index& idx);
-
-    int globalIdx2LocalIdx(const grid_map::Index& global_idx,
-                           const grid_map::Index& center_idx);
-
-    bool isEqual(const grid_map::Index& idx0, const grid_map::Index& idx1);
-
-    bool isInsideTheDynamicInstances(const pcl::PointXYZI& query, const pcl::PointXYZI& target);
-
-    void printClusterInfo(const DynamicInstance& dynamic_cluster);
-
-    void publishPose(int k);
+  void publishPose(int k);
 };
-
-

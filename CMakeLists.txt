@@ -58,7 +58,7 @@ include_directories(
 set(erasor2_src
     src/dataloader/dataloader.cpp
     src/erasor2/erasor_utils.cpp
-    
+
 )
 
 add_executable(inheritance_test src/example/inheritance_test.cpp ${erasor2_src})
@@ -129,9 +129,9 @@ set(dataprocessor_src
 add_executable(helipr_to_kitti src/dataprocessor/pointSaver.cpp ${dataprocessor_src})
 
 # Link libraries
-target_link_libraries(helipr_to_kitti 
-  ${catkin_LIBRARIES} 
-  ${PCL_LIBRARIES} 
+target_link_libraries(helipr_to_kitti
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
   ${EIGEN3_LIBRARIES}
 )
 

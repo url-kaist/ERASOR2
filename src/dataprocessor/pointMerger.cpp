@@ -1,24 +1,24 @@
-#include "dataprocessor/PointCloudProcessor.h"
-#include "dataprocessor/utility.h"
 #include <signal.h>
+
 #include <algorithm>
 
-void signal_callback_handler(int signum)
-{
+#include "dataprocessor/PointCloudProcessor.h"
+#include "dataprocessor/utility.h"
+
+void signal_callback_handler(int signum) {
   cout << "Caught Ctrl + c " << endl;
   exit(signum);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   ros::init(argc, argv, "pointcloud_merger");
   ros::NodeHandle nh;
 
-  std::string              absPath;
+  std::string absPath;
   std::vector<std::string> process_lidar_list;
-  std::string              saveDir;
-  std::string              saveFormat;
-  std::string              trajectoryDir;
+  std::string saveDir;
+  std::string saveFormat;
+  std::string trajectoryDir;
 
   nh.param<std::string>("/dataprocessor/dataset_root", absPath, "/home/ericlab");
   nh.param<std::vector<std::string>>("/dataprocessor/process_lidar_list",
@@ -33,9 +33,9 @@ int main(int argc, char **argv)
   PointCloudProcessor AviaProcessor(absPath, "Avia", saveDir, trajectoryDir, saveFormat);
   PointCloudProcessor AevaProcessor(absPath, "Aeva", saveDir, trajectoryDir, saveFormat);
 
-  const auto &ts_o  = OusterProcessor.timestamp_lists_;
-  const auto &ts_v  = VelodyneProcessor.timestamp_lists_;
-  const auto &ts_a  = AviaProcessor.timestamp_lists_;
+  const auto &ts_o = OusterProcessor.timestamp_lists_;
+  const auto &ts_v = VelodyneProcessor.timestamp_lists_;
+  const auto &ts_a = AviaProcessor.timestamp_lists_;
   const auto &ts_e = AevaProcessor.timestamp_lists_;
 
   std::cout << std::fixed << OusterProcessor.timestamp_lists_[0] << std::endl;
@@ -60,24 +60,31 @@ int main(int argc, char **argv)
 
   if (ts_o[0] < ts_v[0] && ts_o[0] < ts_a[0] && ts_o[0] < ts_e[0]) {
     std::cout << std::fixed << "Check Ouster comes first!" << std::endl;
-  } else { std::runtime_error("Currently, only KAIST05 is supported while strongly assuming that the Ouster comes first"); }
+  } else {
+    std::runtime_error(
+        "Currently, only KAIST05 is supported while strongly assuming that the Ouster comes first");
+  }
 
-  double diff_in_sec = 0.08; // why not 0.1? I think 0.1 may wrongly include the next frame, so I just set 0.08
+  double diff_in_sec =
+      0.08;  // why not 0.1? I think 0.1 may wrongly include the next frame, so I just set 0.08
 
   const auto &[minSize, maxSize] = findMinMaxSize(ts_o, ts_v, ts_a, ts_e);
   // Frame wrt Ouster is criteria
   // Please check the timestamp of each frame is within `diff_in_sec`
-  for (int   i                   = 0; i < minSize; ++i) {
-    if (isDifferenceWithin(ts_o[i], ts_v[i], diff_in_sec) && isDifferenceWithin(ts_o[i], ts_a[i], diff_in_sec)
-      && isDifferenceWithin(ts_o[i], ts_e[i], diff_in_sec)) {
+  for (int i = 0; i < minSize; ++i) {
+    if (isDifferenceWithin(ts_o[i], ts_v[i], diff_in_sec) &&
+        isDifferenceWithin(ts_o[i], ts_a[i], diff_in_sec) &&
+        isDifferenceWithin(ts_o[i], ts_e[i], diff_in_sec)) {
       continue;
     } else {
       std::runtime_error("Something's wrong. Timestamp is not matched :(");
     }
   }
 
-  ros::Publisher CloudPublisher = nh.advertise<sensor_msgs::PointCloud2>("/accumulated_cloud", 100, true);
-  ros::Publisher VoxelPublisher = nh.advertise<sensor_msgs::PointCloud2>("/accumulated_voxel", 100, true);
+  ros::Publisher CloudPublisher =
+      nh.advertise<sensor_msgs::PointCloud2>("/accumulated_cloud", 100, true);
+  ros::Publisher VoxelPublisher =
+      nh.advertise<sensor_msgs::PointCloud2>("/accumulated_voxel", 100, true);
 
   string mergedSavePath = saveDir + "/Merged/velodyne/";
   pcl::PCDWriter pcdWriter;
@@ -96,14 +103,16 @@ int main(int argc, char **argv)
     pcl::getMinMax3D(*accumulatedCloud, minPt, maxPt);
     std::cout << "\033[1;32mOuster" << std::endl;
     std::cout << "Min : " << minPt.x << ", " << minPt.y << ", " << minPt.z << std::endl;
-    std::cout << "Min : " << maxPt.x << ", " << maxPt.y << ", " << maxPt.z << "\033[0m" << std::endl;
+    std::cout << "Min : " << maxPt.x << ", " << maxPt.y << ", " << maxPt.z << "\033[0m"
+              << std::endl;
 
     std::cout << "\033[1;33mVelodyne" << std::endl;
     VelodyneProcessor.getTransformedCloud(i, T_o, *transformedCloud);
     *accumulatedCloud += *transformedCloud;
     pcl::getMinMax3D(*transformedCloud, minPt, maxPt);
     std::cout << "Min : " << minPt.x << ", " << minPt.y << ", " << minPt.z << std::endl;
-    std::cout << "Max : " << maxPt.x << ", " << maxPt.y << ", " << maxPt.z << "\033[0m" << std::endl;
+    std::cout << "Max : " << maxPt.x << ", " << maxPt.y << ", " << maxPt.z << "\033[0m"
+              << std::endl;
 
     std::cout << "\033[1;34mAvia" << std::endl;
     AviaProcessor.getTransformedCloud(i, T_o, *transformedCloud);
@@ -111,7 +120,8 @@ int main(int argc, char **argv)
 
     pcl::getMinMax3D(*transformedCloud, minPt, maxPt);
     std::cout << "Min : " << minPt.x << ", " << minPt.y << ", " << minPt.z << std::endl;
-    std::cout << "Max : " << maxPt.x << ", " << maxPt.y << ", " << maxPt.z << "\033[0m" << std::endl;
+    std::cout << "Max : " << maxPt.x << ", " << maxPt.y << ", " << maxPt.z << "\033[0m"
+              << std::endl;
 
     std::cout << "\033[1;35mAeva" << std::endl;
     AevaProcessor.getTransformedCloud(i, T_o, *transformedCloud);
@@ -119,9 +129,10 @@ int main(int argc, char **argv)
 
     pcl::getMinMax3D(*transformedCloud, minPt, maxPt);
     std::cout << "Min : " << minPt.x << ", " << minPt.y << ", " << minPt.z << std::endl;
-    std::cout << "Max : " << maxPt.x << ", " << maxPt.y << ", " << maxPt.z << "\033[0m" << std::endl;
+    std::cout << "Max : " << maxPt.x << ", " << maxPt.y << ", " << maxPt.z << "\033[0m"
+              << std::endl;
 
-    pcl::VoxelGrid<pcl::PointXYZI>       sor;
+    pcl::VoxelGrid<pcl::PointXYZI> sor;
     pcl::PointCloud<pcl::PointXYZI>::Ptr sampledCloud(new pcl::PointCloud<pcl::PointXYZI>);
     sor.setInputCloud(accumulatedCloud);
     sor.setLeafSize(0.1, 0.1, 0.1);

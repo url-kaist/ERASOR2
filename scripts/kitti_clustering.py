@@ -1,36 +1,56 @@
-import time
 import argparse
-import open3d as o3d
-import numpy as np
+import time
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
+import open3d as o3d
 import pypatchworkpp
 from pcd_preprocess import clusters_hdbscan
-from pathlib import Path
 from tqdm import tqdm
 
 vis = o3d.visualization.Visualizer()
 
-'''
+"""
 Use like this:
 
-python3 kitti_clustering.py --seq "05" --init_stamp 2350 --end_stamp 2670 --save-instance-labels --save-ground-labels
-'''
+python3 kitti_clustering.py --seq "05" --init_stamp 2350 --end_stamp 2670
+--save-instance-labels --save-ground-labels
+"""
 if __name__ == "__main__":
-    version = "V2" # "V1": Ground is considered as '9', "V2": Ground is considered as '1'
-    if (version == "V1"):
+    version = "V2"  # 'V1': Ground is considered as '9', 'V2': Ground is '1'
+    if version == "V1":
         GROUND_LABEL = 9
     else:
         GROUND_LABEL = 1
 
-    parser = argparse.ArgumentParser(description="Convert KITTI dataset to ROS bag file the easy way!")
-    parser.add_argument("-s", "--seq", default="Merged", help="sequence of the dataset. For HeLiMOS: 'Merged', For SemanticKITTI: '00', '01', '02', ..., '21'")
+    parser = argparse.ArgumentParser(
+        description="Convert KITTI dataset to ROS bag file the easy way!"
+    )
+    parser.add_argument(
+        "-s",
+        "--seq",
+        default="Merged",
+        help="sequence of the dataset. For HeLiMOS: 'Merged', "
+        "For SemanticKITTI: '00', '01', '02', ..., '21'",
+    )
     parser.add_argument("-i", "--init_stamp", default=0, type=int)
     parser.add_argument("-e", "--end_stamp", default=12477, type=int)
-    parser.add_argument("--save-ground-labels", action="store_true", help="save ground labels to file")
-    parser.add_argument("--save-instance-labels", action="store_true", help="save instance labels to file")
-    parser.add_argument("--use-pre-extracted-ground-label", action="store_true", help="use pre-extracted ground labels instead of pypatchworkpp")
+    parser.add_argument(
+        "--save-ground-labels", action="store_true", help="save ground labels to file"
+    )
+    parser.add_argument(
+        "--save-instance-labels",
+        action="store_true",
+        help="save instance labels to file",
+    )
+    parser.add_argument(
+        "--use-pre-extracted-ground-label",
+        action="store_true",
+        help="use pre-extracted ground labels instead of pypatchworkpp",
+    )
     args = parser.parse_args()
-    
+
     # Determine dataset type and set appropriate paths
     if args.seq == "Merged":
         # HeLiMOS dataset
@@ -41,20 +61,23 @@ if __name__ == "__main__":
         # SemanticKITTI dataset - validate sequence format
         valid_seqs = [f"{i:02d}" for i in range(22)]  # 00 to 21
         if args.seq not in valid_seqs:
-            print(f"Error: Invalid sequence '{args.seq}' for SemanticKITTI. Valid sequences are: {', '.join(valid_seqs)}")
+            print(
+                f"Error: Invalid sequence '{args.seq}' for SemanticKITTI. "
+                f"Valid sequences are: {', '.join(valid_seqs)}"
+            )
             exit(1)
-        
+
         ABS_DATA_DIR = "/media/shapelim/UX9803/erasor2_test_benchmark/sequences"
         ABS_SAVE_DIR = "/media/shapelim/UX9803/erasor2_test_benchmark/sequences"
         dataset_type = "SemanticKITTI"
-    
+
     print(f"Using {dataset_type} dataset with sequence: {args.seq}")
-    
+
     # Use argparse values
     save_ground_labels = args.save_ground_labels
     save_instance_labels = args.save_instance_labels
     use_pre_extracted_ground_label = args.use_pre_extracted_ground_label
-    
+
     # Initialize Patchwork++ if not using pre-extracted ground labels
     if not use_pre_extracted_ground_label:
         params = pypatchworkpp.Parameters()
@@ -79,8 +102,8 @@ if __name__ == "__main__":
         pcd.points = o3d.utility.Vector3dVector(scan_xyz)
 
         num_pts = np.asarray(pcd.points).shape[0]
-        if (use_pre_extracted_ground_label):
-            ground_file = f'{ground_label_dir}/{zfilled_idx}.label'
+        if use_pre_extracted_ground_label:
+            ground_file = f"{ground_label_dir}/{zfilled_idx}.label"
             ground_labels = np.fromfile(ground_file, dtype=np.uint32)
             ground_labels.reshape((-1))
             ground_inliers = list(np.where(ground_labels == GROUND_LABEL)[0])
@@ -90,7 +113,7 @@ if __name__ == "__main__":
             ground_indices = PatchworkPLUSPLUS.getGroundIndices()
             ground_inliers = list(ground_indices)
 
-            if (save_ground_labels):
+            if save_ground_labels:
                 output_fname = ground_label_dir + "/" + str(i).zfill(6) + ".label"
                 ground_labels = np.zeros(num_pts, dtype=np.uint32)
                 ground_labels[ground_inliers] = GROUND_LABEL
@@ -111,8 +134,8 @@ if __name__ == "__main__":
         # Only non-ground points are updated
         labels[mask] = labels_
 
-        ############ VISUALIZATION ############
-        # Note that -1 in pred indicates the points are sub-cluster and ground points
+        # VISUALIZATION
+        # Note: -1 in pred indicates sub-cluster and ground points
         points = pcd.points
         pred = labels.reshape(-1)
 
@@ -121,12 +144,14 @@ if __name__ == "__main__":
         colors_pred = np.zeros((len(pred), 4))
         flat_indices = np.unique(pred)
         max_instance = len(flat_indices)
-        colors_instance = plt.get_cmap("prism")(np.arange(len(flat_indices)) / (max_instance if max_instance > 0 else 1))
+        colors_instance = plt.get_cmap("prism")(
+            np.arange(len(flat_indices)) / (max_instance if max_instance > 0 else 1)
+        )
 
         for idx in range(len(flat_indices)):
             colors_pred[pred == idx] = colors_instance[int(idx)]
 
-        colors_pred[pred == -1] = [0., 0., 0., 0.]
+        colors_pred[pred == -1] = [0.0, 0.0, 0.0, 0.0]
 
         pcd.colors = o3d.utility.Vector3dVector(colors_pred[:, :3])
 
@@ -135,10 +160,10 @@ if __name__ == "__main__":
         # It follows SemanticKITTI labels
         # Finally, 0: ground + sub-clustered points
         # > 0: instances
-        if (save_instance_labels):
+        if save_instance_labels:
             output_fname = output_dir + "/" + str(i).zfill(6) + ".label"
             sem = np.zeros_like(pred).astype(np.float32)
-            # NOTE(hlim): Ground points in the label file are eventually assigned to -1
+            # NOTE(hlim): Ground points in label file are assigned to -1
             ins = pred.astype(int) + 1
             pred_eval = sem + (ins << 16)
             pred_eval.astype(np.uint32).tofile(output_fname)

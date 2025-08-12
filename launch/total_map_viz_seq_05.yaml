@@ -1,5 +1,5 @@
 idx: 450
-erasor: 
+erasor:
     max_range: 60.0  # 20 / 15 also good     10/5 For Korea Univ!!
     num_rings: 15    # 35   # 0911_{3, 4} 는 20이었음
     num_sectors: 60 # 108
@@ -22,10 +22,10 @@ erasor:
 MapUpdater:
     initial_count: 0
     data_type: "05"
-    filename: "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/src_0_2/seq05/merge_result.pcd" 
+    filename: "/media/shapelim/UX960NVMe1/kitti_semantic/semantic_KITTI_map/src_0_2/seq05/merge_result.pcd"
     init_registration: false
     env: "outdoor"
-    voxel_size: 0.05 
+    voxel_size: 0.05
     voxelization_interval: 5
     removal_interval: 4
 
@@ -47,7 +47,7 @@ pc2:
     range_min: 0.1
     voxel_size: 0.2 # also used in IcpMatcher
     voxelization_interval: 100
-    
+
 
 NDT:
     is_ndt_on: false
@@ -55,9 +55,6 @@ NDT:
     step_size: 0.1
     resolution: 2.0
     num_iter_max: 30
-    voxel_size: 0.5 
+    voxel_size: 0.5
     voxelization_interval: 10
     score: 10.0
-
-
-

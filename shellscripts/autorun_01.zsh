@@ -10,9 +10,9 @@ do
     rosparam load "/home/shapelim/catkin_ws/src/ERASOR2/config/seq_"$sequence".yaml"
     echo "/home/shapelim/catkin_ws/src/ERASOR2/config/seq_"$sequence".yaml"
 
-    for rp_thr in 0.6 0.7  
+    for rp_thr in 0.6 0.7
     do
-        for gain in 2.0 
+        for gain in 2.0
         do
             for increment in 0.2 0.3
             do
