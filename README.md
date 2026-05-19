@@ -1,197 +1,150 @@
 # ERASOR2
 
+> **`rerun` branch — ROS-free runtime.** The runtime no longer publishes to a
+> ROS master. Visualization is via [rerun.io](https://rerun.io); configuration
+> is loaded from a YAML file. The only ROS-derived dependency that survives is
+> `grid_map_core` / `grid_map_cv` — pure C++ libraries pulled in via catkin
+> for the in-memory 2D grid data structure used by the algorithm.
+
 ## Prerequisites
 
-### System Dependencies
+### System dependencies
 
-- ROS (Melodic/Noetic)
 - PCL (Point Cloud Library)
 - OpenCV
 - OpenMP
-- Catkin workspace
+- yaml-cpp (`libyaml-cpp-dev` on Ubuntu)
+- `grid_map_core`, `grid_map_cv` — currently shipped via catkin packages
+  (`ros-$ROS_DISTRO-grid-map-core`, `ros-$ROS_DISTRO-grid-map-cv`). No
+  `roscore` is needed at runtime.
+- The [rerun viewer](https://rerun.io/docs/getting-started/installing-viewer)
+  if you want a live GUI; otherwise set `rerun.spawn: false` in your config
+  and load the saved `.rrd` file later.
 
-### ROS Package Dependencies
+`rerun_sdk` (the C++ logger SDK) is fetched at configure time by CMake from
+the official GitHub release — no system install required.
 
-```bash
-# Install required ROS packages
-sudo apt-get install ros-$ROS_DISTRO-grid-map-core \
-                     ros-$ROS_DISTRO-grid-map-ros \
-                     ros-$ROS_DISTRO-grid-map-cv \
-                     ros-$ROS_DISTRO-grid-map-msgs \
-                     ros-$ROS_DISTRO-grid-map-rviz-plugin \
-                     ros-$ROS_DISTRO-jsk-recognition-msgs \
-                     ros-$ROS_DISTRO-costmap-2d \
-                     ros-$ROS_DISTRO-pcl-conversions \
-                     ros-$ROS_DISTRO-pcl-ros \
-                     ros-$ROS_DISTRO-cv-bridge \
-                     ros-$ROS_DISTRO-laser-geometry \
-                     ros-$ROS_DISTRO-visualization-msgs
-```
-
-## Build
+### Build
 
 ```bash
-cd /path/to/your/catkin_ws
-catkin_make
+cd /path/to/your/catkin_ws        # workspace must contain ERASOR2/
+catkin build erasor2              # or: catkin_make
 source devel/setup.bash
 ```
 
 ## Configuration
 
-Edit configuration files in `config/` directory:
+Configs are plain YAML in `config/`. Key sections:
 
-- `erasor2.yaml` - Main ERASOR2 parameters
-- `HeLiPR.yaml` - HeLiPR dataset configuration
-- `kitti_mapgen.yaml` - KITTI map generation settings
-- `your_own_env.yaml` - Custom environment settings
+```yaml
+erasor2:
+  grid_resolution: 2.0
+  range_of_interest: 60.0
+  min_z_voi: -4.0
+  max_z_voi: 1.5
+  scan_ratio_threshold: 0.2
+  log_odds: { increment_gain: 1.0, increment: 0.3 }
+  region_proposal_thr: 0.8
+  moving_object_detection: { obj_score_soft_thr: 0.8, obj_score_hard_thr: 20.0,
+                             hard_thr_radius: 20.0 }
+  volumetric_outlier_removal: { window_size: 1, dist_thr_gain: 1.732 }
+  viz_flag: { set_scan_and_pose: false, set_submap: false, update: false,
+              detect: true, over_seg: false }
 
-## Running ERASOR2
+dataloader:
+  dataset_name: SemanticKITTI         # or HeLiPR
+  abs_data_dir: /path/to/dataset
+  sequence: "05"
+  abs_save_dir: /path/to/output
+  start_frame: 2350
+  end_frame: 2670
+  accum_interval: 2
+  voxel_size: 0.05
+  map_voxel_size: 0.2
 
-### For Demo in Harmonic Space
+extrinsic:
+  robot_body_size: 2.7
+  sensor_height: 1.73
+  rotation: [1, 0, 0,  0, 1, 0,  0, 0, 1]
+  translation: [0, 0, 0]
 
-1. After setup your own conda env, extract `*.label` files:
-
-```
-conda create -n erasor2 python=3.10
-conda activate erasor2
-cd scripts
-pip3 install -r requirements.txt
-python3 kitti_clustering.py --seq "05" --init_stamp 2350 --end_stamp 2670 --save-instance-labels --save-ground-labels
-```
-
-2. Generate ground truth map cloud
-
-```
-roslaunch erasor2 mapgen.launch seq:="05" start_frame:=2350 end_frame:=2670
-```
-
-3. Then, run ERASOR2 taking `*.label` files as inputs
-
-```
-roslaunch erasor2 run_erasor2.launch target_seq:="seq_05_for_keti"
-```
-
-4. Then, evaluate the results as follows:
-
-```
-python3 scripts/evaluate.py --gt /media/shapelim/UX9803/erasor2_test_benchmark/outputs/05_2350_to_2670_w_interval_2_voxel_0_2.pcd --est "/media/shapelim/UX9803/erasor2_test_benchmark/outputs/05_0_frame_2350_to_2670_estimated.pcd
-```
-
-5. Visualization
-
-```
-roslaunch erasor2 compare_map.launch
+# NEW — visualization is now driven by rerun, not RViz.
+rerun:
+  enabled: true        # set false to disable all viz
+  spawn: true          # launch the rerun viewer subprocess on init
+  save_path: ""        # if non-empty, write a .rrd recording instead of spawning
 ```
 
-### Basic Usage
+Any key not present in the YAML falls back to the default in
+`include/erasor2/Config.hpp`.
+
+## Running
+
+All binaries take exactly one positional argument: the path to a config YAML.
 
 ```bash
-roslaunch erasor2 run_erasor2.launch target_seq:=<CONFIG_NAME>
+# Static map generation
+mapgen   config/seq_05.yaml
+
+# ERASOR2 — dynamic-object removal & static map building
+run_erasor2 config/seq_05.yaml
+
+# Compare estimates against ground truth (TP/FP/FN/TN per method)
+compare_map config/compare_map.yaml
+
+# Accumulate 4D-MOS labels into a static map
+accum_4dmos config/seq_05.yaml [target_mos_type]
+
+# Fill REMOVERT labels (positional args, no YAML)
+fill_removert_labels <raw.pcd> <removert.pcd>
+
+# HeLiPR pre-processing
+helipr_to_kitti  config/HeLiPR.yaml
+merge_heliclouds config/HeLiPR.yaml
 ```
 
-Available configurations:
+Once the rerun viewer is running, every binary that does visualization will
+log into the same recording session. Frame indices appear on the timeline
+slider; the entity tree mirrors the legacy RViz topic names
+(`erasor2/curr_scan`, `erasor2/static`, `world/path`, `world/body`, …).
 
-- `HeLiPR_kitti` (default)
-- `seq_00`, `seq_01`, `seq_02`, `seq_05`, `seq_07`, `seq_19`
-- `your_own_env`, `your_own_env_ouster`, `your_own_env_vel16`
+## Headless operation
 
-### Map Generation
+If you don't want the viewer to pop up (CI, batch evaluation), point
+`rerun.save_path` at a `.rrd` file:
+
+```yaml
+rerun:
+  enabled: true
+  spawn: false
+  save_path: /tmp/erasor2_run.rrd
+```
+
+Open the `.rrd` later with `rerun /tmp/erasor2_run.rrd`.
+
+## Migration note (legacy users)
+
+`roslaunch erasor2 run_erasor2.launch target_seq:=seq_05` is gone. The
+equivalent now is:
 
 ```bash
-roslaunch erasor2 mapgen.launch seq:=<SEQUENCE_NAME> start_frame:=<START> end_frame:=<END> accum_interval:=<INTERVAL>
+run_erasor2 $(rospack find erasor2)/config/seq_05.yaml   # ROS-aware shell
+run_erasor2 ./config/seq_05.yaml                          # plain shell
 ```
 
-Parameters:
+Old `.launch` files in `launch/` are kept for reference but no longer wired
+into the build. They will be removed in a follow-up cleanup.
 
-- `seq`: Sequence name (default: "Merged")
-- `start_frame`: Starting frame number (default: 8600)
-- `end_frame`: Ending frame number (default: 9000)
-- `accum_interval`: Accumulation interval (default: 2)
-
-### Data Processing
-
-#### Convert HeLiPR to KITTI format
-
-```bash
-roslaunch erasor2 helipr_to_kitti.launch
-```
-
-#### Transform INS to LiDAR frame
-
-```bash
-roslaunch erasor2 transformINStoLiDAR.launch
-```
-
-#### Merge HeLiPR clouds to KITTI
-
-```bash
-roslaunch erasor2 merge_helipr_to_kitti.launch
-```
-
-### Utilities
-
-#### Compare maps
-
-```bash
-roslaunch erasor2 compare_map.launch
-rosrun erasor2 compare_map
-```
-
-#### Accumulate 4D-MOS labels
-
-```bash
-rosrun erasor2 accum_4dmos
-```
-
-#### Fill REMOVERT labels
-
-```bash
-rosrun erasor2 fill_removert_labels
-```
-
-### Visualization
-
-#### Visualize KITTI map
-
-```bash
-roslaunch erasor2 viz_kitti_map.launch
-```
-
-#### Large scale visualization
-
-```bash
-roslaunch erasor2 run_erasor_in_large_scale.launch
-```
-
-## Custom Environment Setup
-
-1. Copy and modify configuration files:
-
-   ```bash
-   cp config/your_own_env.yaml config/my_config.yaml
-   ```
-
-1. Update data paths and sensor parameters in the config file
-
-1. Run with custom config:
-
-   ```bash
-   roslaunch erasor2 run_erasor2.launch target_seq:=my_config
-   ```
-
-## Key Parameters
-
-In your configuration file, adjust:
+## Key parameters
 
 - `grid_resolution`: Grid map resolution
 - `range_of_interest`: Maximum detection range
-- `min_z_voi`, `max_z_voi`: Vertical region of interest
+- `min_z_voi`, `max_z_voi`: Vertical region of interest (in raw cloud frame)
 - `scan_ratio_threshold`: Detection sensitivity (higher = more aggressive)
 
-## Data Format
+## Data format
 
-Ensure your data follows the expected format:
-
-- Point clouds in PCD or bag format
-- Trajectory/poses in appropriate coordinate frame
-- Proper timestamps for synchronization
+- Point clouds in PCD or `.bin` (KITTI binary)
+- Trajectory/poses in the loader's expected format
+- Per-frame instance / ground labels for SemanticKITTI runs (see
+  `scripts/kitti_clustering.py`)

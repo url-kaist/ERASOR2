@@ -14,6 +14,22 @@ build/*
 *bin
 *pcd
 
+# Parity / regression test artifacts (kept on disk for local re-runs, not
+# tracked in git). See tests/README.md for the workflow.
+eval_output/
+eval_output_legacy/
+
+# Local copy of the SemanticKITTI fixture used by the parity check.
+data/
+
+# CI / experiment YAMLs that point at machine-local paths.
+config/seq_05_path2.yaml
+config/seq_05_legacy.yaml
+
+# Python bytecode.
+__pycache__/
+*.pyc
+
 # Created by https://www.gitignore.io/api/c++,code,cmake,eclipse
 # Edit at https://www.gitignore.io/?templates=c++,code,cmake,eclipse
 

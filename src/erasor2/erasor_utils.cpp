@@ -3,54 +3,30 @@
 std::vector<int> DYNAMIC_CLASSES = {251, 252, 253, 254, 255, 256, 257, 258, 259};
 
 namespace erasor_utils {
-geometry_msgs::Pose eigen2geoPose(Eigen::Matrix4f pose) {
-  geometry_msgs::Pose geoPose;
-
-  tf::Matrix3x3 m;
-  m.setValue((double)pose(0, 0),
-             (double)pose(0, 1),
-             (double)pose(0, 2),
-             (double)pose(1, 0),
-             (double)pose(1, 1),
-             (double)pose(1, 2),
-             (double)pose(2, 0),
-             (double)pose(2, 1),
-             (double)pose(2, 2));
-
-  tf::Quaternion q;
-  m.getRotation(q);
-  geoPose.orientation.x = q.getX();
-  geoPose.orientation.y = q.getY();
-  geoPose.orientation.z = q.getZ();
-  geoPose.orientation.w = q.getW();
-
-  geoPose.position.x = pose(0, 3);
-  geoPose.position.y = pose(1, 3);
-  geoPose.position.z = pose(2, 3);
-
+Pose eigen2geoPose(Eigen::Matrix4f pose) {
+  Pose geoPose;
+  Eigen::Matrix3f R = pose.block<3, 3>(0, 0);
+  Eigen::Quaternionf q(R);
+  geoPose.orientation.x = q.x();
+  geoPose.orientation.y = q.y();
+  geoPose.orientation.z = q.z();
+  geoPose.orientation.w = q.w();
+  geoPose.position.x    = pose(0, 3);
+  geoPose.position.y    = pose(1, 3);
+  geoPose.position.z    = pose(2, 3);
   return geoPose;
 }
 
-Eigen::Matrix4f geoPose2eigen(geometry_msgs::Pose geoPose) {
+Eigen::Matrix4f geoPose2eigen(Pose geoPose) {
   Eigen::Matrix4f result = Eigen::Matrix4f::Identity();
-  tf::Quaternion q(
-      geoPose.orientation.x, geoPose.orientation.y, geoPose.orientation.z, geoPose.orientation.w);
-  tf::Matrix3x3 m(q);
-  result(0, 0) = m[0][0];
-  result(0, 1) = m[0][1];
-  result(0, 2) = m[0][2];
-  result(1, 0) = m[1][0];
-  result(1, 1) = m[1][1];
-  result(1, 2) = m[1][2];
-  result(2, 0) = m[2][0];
-  result(2, 1) = m[2][1];
-  result(2, 2) = m[2][2];
-  result(3, 3) = 1;
-
-  result(0, 3) = geoPose.position.x;
-  result(1, 3) = geoPose.position.y;
-  result(2, 3) = geoPose.position.z;
-
+  Eigen::Quaternionf q(static_cast<float>(geoPose.orientation.w),
+                       static_cast<float>(geoPose.orientation.x),
+                       static_cast<float>(geoPose.orientation.y),
+                       static_cast<float>(geoPose.orientation.z));
+  result.block<3, 3>(0, 0) = q.toRotationMatrix();
+  result(0, 3)             = static_cast<float>(geoPose.position.x);
+  result(1, 3)             = static_cast<float>(geoPose.position.y);
+  result(2, 3)             = static_cast<float>(geoPose.position.z);
   return result;
 }
 

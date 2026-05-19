@@ -9,7 +9,6 @@
 #include <pcl/common/common.h>
 
 #include "BsplineSE3.h"
-#include "ros/ros.h"
 #include "visualizer.h"
 
 using namespace ov_core;
