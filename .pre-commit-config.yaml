@@ -51,7 +51,9 @@ repos:
     rev: 0.7.9
     hooks:
       - id: mdformat
-        exclude: 'github/'
+        # .claude/memory/ files use YAML frontmatter (`---` delimited)
+        # which mdformat mistakes for setext headings and destroys.
+        exclude: '^(github/|\.claude/)'
 
   ######################################################################
   # C++ Formatting

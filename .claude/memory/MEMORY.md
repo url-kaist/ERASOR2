@@ -1,0 +1,6 @@
+- [Project profile](project_profile.md) — what ERASOR2 is, who the user is
+- [Migration history](migration_history.md) — what v1.0 did and why
+- [Build environment gotchas](build_env_gotchas.md) — Ubuntu 20.04 + conda libstdc++ + flake8 quirks
+- [Parity workflow](parity_workflow.md) — how to verify algorithm output didn't drift
+- [Fixture & golden locations](fixture_locations.md) — what's on disk vs git
+- [User preferences](user_preferences.md) — collaboration style observed in conversations
