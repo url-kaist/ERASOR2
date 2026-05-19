@@ -1,0 +1,62 @@
+# ERASOR2 algorithm parity gate.
+#
+# Reproduces the seq-05 [2350..2670] end-to-end test we used to verify the
+# rerun migration. The runner builds erasor2 in the project's docker image
+# and asserts the output PCDs are byte-identical to a frozen golden set.
+#
+# Triggers only on changes that can affect algorithm output, so unrelated
+# PRs (docs, scripts, configs without YAML) don't burn runner time.
+#
+# Requires a self-hosted runner with label `erasor2-rig` that has:
+#   - docker daemon access
+#   - dataset at        /home/shapelim/catkin_ws_for_erasor2/data/kitti_semantic/dataset/sequences/05/
+#   - golden PCDs at    /home/shapelim/erasor2_golden/
+#   - conda env         erasor2-3.10  (optional; for the numeric check)
+# Run `tests/scripts/prepare_fixtures.sh` once to populate these.
+
+name: parity
+
+# NOTE: PR trigger intentionally disabled for the v1 ship — the self-hosted
+# `erasor2-rig` runner is not yet registered. To enable, uncomment the
+# `pull_request:` block below once the runner is online (see tests/README.md).
+on:
+  workflow_dispatch:
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - 'src/**'
+  #     - 'include/**'
+  #     - 'CMakeLists.txt'
+  #     - 'config/seq_05*.yaml'
+  #     - 'tests/scripts/**'
+  #     - '.github/workflows/parity.yml'
+
+jobs:
+  parity:
+    runs-on: [self-hosted, erasor2-rig]
+    timeout-minutes: 25
+    env:
+      DOCKER_IMAGE: shapelim/opengl-ubuntu20.04-erasor2:latest
+      ERASOR2_DATA_ROOT: /home/shapelim/catkin_ws_for_erasor2/data/kitti_semantic/dataset/sequences
+      ERASOR2_GOLDEN_DIR: /home/shapelim/erasor2_golden
+      ERASOR2_CONDA_ENV: /home/shapelim/.miniconda3/envs/erasor2-3.10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show runner state
+        run: |
+          docker --version
+          ls -la "$ERASOR2_DATA_ROOT/05/" | head -10
+          ls -la "$ERASOR2_GOLDEN_DIR/" | head -10
+
+      - name: Build + run + cmp
+        run: bash tests/scripts/run_parity.sh
+
+      - name: Upload diff artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-failure-${{ github.run_id }}
+          path: /tmp/erasor2_ci_out/
+          retention-days: 7
+          if-no-files-found: ignore
