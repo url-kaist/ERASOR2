@@ -159,6 +159,71 @@ To reproduce: run `scripts/kitti_clustering.py` to generate the cais /
 hdbscan / patchwork labels, then `python scripts/run_pipeline.py --config config/seq_05.yaml`. The same subset is what the parity-check
 CI workflow asserts byte-identical against (see `tests/README.md`).
 
+## HeLiPR / HeLiMOS
+
+The same binaries handle HeLiPR-style data — set
+`dataloader.dataset_name` to `"HeLiPR"` and point `abs_data_dir` at the
+directory that *contains* the per-sensor trees. The `HeLiPRLoader`
+expects this layout:
+
+```
+<abs_data_dir>/
+└── <sensor>/                  # one of: Avia, Aeva, VLP16, Merged
+    ├── velodyne/              # .bin scans
+    ├── poses.txt              # KITTI-style 3x4 row-major
+    ├── patchwork/             # ground labels (from pypatchworkpp)
+    └── hdbscan/               # instance labels (from clusters_hdbscan)
+```
+
+`Avia`, `Aeva`, and `VLP16` poses are corrected by the per-sensor
+extrinsic baked into `src/dataloader/dataloader.cpp` (`T_OS2_*`).
+`Merged` is assumed to be already in the Ouster frame and uses
+identity.
+
+Example sequence using the HeLiMOS `Merged` stream:
+
+```bash
+# 1. (one-time) per-frame instance + ground labels — same script as KITTI.
+python scripts/kitti_clustering.py --seq Merged --init_stamp 8600 \
+       --end_stamp 8649 --save-instance-labels --save-ground-labels
+
+# 2. mapgen + run_erasor2 against config/helipr_mapgen.yaml.
+mapgen      config/helipr_mapgen.yaml
+run_erasor2 config/helipr_mapgen.yaml
+```
+
+The three shipped HeLiPR-flavored configs (`config/HeLiPR.yaml`,
+`config/HeLiPR_kitti.yaml`, `config/helipr_mapgen.yaml`) all carry
+example paths under `/media/...` from the original dev machines;
+repoint `abs_data_dir` and `abs_save_dir` before running.
+
+Smoke-tested at v1.0 on a 50-frame Merged subset (frames 8600..8649):
+the full mapgen → run_erasor2 → evaluate.py pipeline produced a
+5.58 M-point static map (PR = 99.86 %, RR = 69.2 %, F1 = 0.82). The
+RR number is depressed because few dynamic objects appear in a
+~25-second window; treat that as a smoke-test, not a paper number.
+
+The HeLiPR-specific preprocessing binaries `helipr_to_kitti` and
+`merge_heliclouds` (per-sensor extraction → time-aligned merge into
+the `Merged` stream) take their own YAMLs — see the `dataprocessor:`
+section in `config/HeLiPR_kitti.yaml` for the schema.
+
+## Common gotchas
+
+- **`dataloader.expansion_range` defaults to 20.** `run_erasor2` looks
+  20 frames *before* each cluster's `start_frame` to expand the
+  trajectory submap. If you're running against a partial copy of a
+  dataset (e.g. for CI / smoke testing), either copy 20 frames of
+  padding before `start_frame` or set `expansion_range: 0` in the
+  YAML.
+- **The accumulation loop iterates `[start_frame, end_frame + accum_interval)`.** With `end_frame: 2670` and `accum_interval: 2`,
+  the loop reads frame 2671. Copy at least one extra frame past
+  `end_frame` when using a trimmed dataset.
+- **`mapgen` prints `[pcl::VoxelGrid] Leaf size too small …`** on
+  HeLiMOS-sized maps. Cosmetic — the actual voxelization is delegated
+  to `voxelize_preserving_labels_by_nanoflann`, which doesn't suffer
+  from the integer-index overflow that triggers the PCL warning.
+
 ## Migration from the ROS1 era
 
 `roslaunch erasor2 run_erasor2.launch target_seq:=seq_05` is gone.
