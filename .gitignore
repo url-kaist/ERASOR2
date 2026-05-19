@@ -16,8 +16,7 @@ build/*
 
 # Parity / regression test artifacts (kept on disk for local re-runs, not
 # tracked in git). See tests/README.md for the workflow.
-eval_output/
-eval_output_legacy/
+eval_output*/
 
 # Local copy of the SemanticKITTI fixture used by the parity check.
 data/

@@ -1,0 +1,75 @@
+# Smoke-test config for HeLiPR/HeLiMOS Merged sensor. 50-frame subset
+# pulled into data/helimos/ so the docker mount can see it. Numbers
+# below mirror helipr_mapgen.yaml (paths repointed, range trimmed,
+# rerun disabled).
+start_frame: 8600
+end_frame:   8649
+viz_interval: 10
+is_large_scale: true
+
+dataloader:
+    dataset_name: "HeLiPR"
+    abs_data_dir: "/home/catkin_ws/data/helimos/deskewed_LiDAR"
+    cloud_dir:    ""
+    cloud_format: ""
+    pose_path:    "/home/catkin_ws/data/helimos/deskewed_LiDAR"
+    sequence:     "Merged"
+    abs_save_dir: "/home/catkin_ws/src/ERASOR2/eval_output_helimos"
+    instance_seg_method: "hdbscan"
+
+    accum_interval: 2
+    voxel_size:     0.2
+    map_voxel_size: 0.2
+    expansion_range: 0   # Default 20 would peek 20 frames before start_frame
+                         # — we only copied the [8600, 8652] subset.
+
+erasor2:
+    min_z_voi: -4.0
+    max_z_voi:  1.3
+    scan_ratio_threshold: 0.1
+    min_z_diff_thr: -1.0
+    log_odds:
+        increment_gain: 2.0
+        increment: 0.15
+    ground_likelihood:
+        increment: 0.3
+        decrement: 0.1
+    region_proposal_thr: 0.5
+    minimum_num_pts: 5
+    rejection_ratio: 0
+    grid_resolution: 1.0
+    egocentric_grid_resolution: 0.2
+    range_of_interest: 12.0
+    moving_object_detection:
+        negative_log_odds: -2.0
+        obj_score_soft_thr: 0.8
+        obj_score_hard_thr: 14.0
+        hard_thr_radius: 10.0
+    volumetric_outlier_removal:
+        window_size: 1
+        use_adaptive_voxel_size: true
+        vor_cand_score_thr: 3.0
+        dist_thr_gain: 1.732
+    over_segmentation:
+        minimum_area_thr: 56
+        ratio_of_unknown_prior: 0.25
+    viz_flag:
+        set_scan_and_pose: false
+        set_submap: false
+        update: false
+        detect: false
+        over_seg: false
+    save_map: true
+
+stop_for_each_frame: false
+
+extrinsic:
+    robot_body_size: 2.7
+    sensor_height:   1.73
+    rotation:    [1, 0, 0,  0, 1, 0,  0, 0, 1]
+    translation: [0, 0, 0]
+
+rerun:
+    enabled: false
+    spawn:   false
+    save_path: ""
