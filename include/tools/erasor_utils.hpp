@@ -1,6 +1,16 @@
 #ifndef ERASOR_UTILS_H
 #define ERASOR_UTILS_H
 
+// ROS-free version of the original erasor_utils. The legacy
+// cloud2msg/cloudmsg2cloud helpers used to round-trip pcl ↔
+// sensor_msgs::PointCloud2 only to feed publishers. With rerun the
+// publishers consume pcl::PointCloud directly, so those helpers are gone.
+//
+// `eigen2geoPose` / `geoPose2eigen` are kept as identity-ish stubs that
+// move data via plain Eigen quaternions (no `tf::`, no `geometry_msgs::`).
+// Returning a struct named `Pose` keeps call sites that wrote
+// `pose_stamped.pose = erasor_utils::eigen2geoPose(pose)` source-compatible.
+
 #include "signal.h"
 
 #include <algorithm>
@@ -14,16 +24,11 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
-#include <geometry_msgs/Point.h>
-#include <geometry_msgs/Point32.h>
-#include <geometry_msgs/Polygon.h>
-#include <geometry_msgs/PolygonStamped.h>
-#include <jsk_recognition_msgs/PolygonArray.h>
-#include <nav_msgs/OccupancyGrid.h>
-#include <nav_msgs/Odometry.h>
-#include <nav_msgs/Path.h>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <omp.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/PCLPointCloud2.h>
@@ -43,13 +48,6 @@
 #include <pcl/search/search.h>
 #include <pcl/segmentation/region_growing.h>
 #include <pcl/visualization/pcl_visualizer.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <std_msgs/Float32.h>
-#include <tf/transform_broadcaster.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
 
 #include "nanoflann/nanoflann.hpp"
 #include "nanoflann/nanoflann_utils.hpp"
@@ -80,35 +78,31 @@
 using namespace std;
 
 using num_t = float;
-// construct a kd-tree index:
 
 namespace erasor_utils {
+
+// Drop-in replacement for `geometry_msgs::Pose`. Plain ROS-free struct so
+// the call sites that wrote `pose_stamped.pose = eigen2geoPose(T)` can
+// keep their syntax. Only fields used elsewhere are exposed.
+struct Pose {
+  struct {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+  } position;
+  struct {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    double w = 1.0;
+  } orientation;
+};
+
 using my_kd_tree_t =
     nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<num_t, PointCloud<num_t>>,
                                         PointCloud<num_t>,
                                         3 /* dim */
                                         >;
-
-template <typename T>
-sensor_msgs::PointCloud2 cloud2msg(pcl::PointCloud<T> cloud, std::string frame_id = "map") {
-  sensor_msgs::PointCloud2 cloud_ROS;
-  pcl::toROSMsg(cloud, cloud_ROS);
-  cloud_ROS.header.frame_id = frame_id;
-  return cloud_ROS;
-}
-
-template <typename T>
-pcl::PointCloud<T> cloudmsg2cloud(sensor_msgs::PointCloud2 cloudmsg) {
-  pcl::PointCloud<T> cloudresult;
-  pcl::fromROSMsg(cloudmsg, cloudresult);
-  return cloudresult;
-}
-
-template <typename T>
-void cloudmsg2cloudptr(sensor_msgs::PointCloud2 cloudmsg,
-                       boost::shared_ptr<pcl::PointCloud<T>> cloudPtr) {
-  pcl::fromROSMsg(cloudmsg, *cloudPtr);
-}
 
 template <typename T>
 int load_pcd(std::string pcd_name, boost::shared_ptr<pcl::PointCloud<T>> dst) {
@@ -117,8 +111,6 @@ int load_pcd(std::string pcd_name, boost::shared_ptr<pcl::PointCloud<T>> dst) {
     PCL_ERROR("Couldn't read file!!! \n");
     return (-1);
   }
-  //        std::cout << "Complete!" << std::endl;
-  //        std::cout << "Loaded " << dst->size() << " data points from " << pcd_name << std::endl;
   return 0;
 }
 
@@ -139,13 +131,10 @@ void save_dyn_label(const std::string abs_dir,
                     const pcl::PointCloud<T> &cloud_est_dyn,
                     const pcl::PointCloud<T> &cloud_est_potential_dyn) {
   // Following SemanticKITTI's MOS Label format, Dynamic => 251 | Static => 0
-  // This function is derived from `savelabel` in patchwork
-  // Save the estimate dynamic points into a `.label` file
-
-  const float SQR_EPSILON = 0.1;  // for better gathering of dynamic points
+  const float SQR_EPSILON = 0.1;
 
   int num_cloud_raw = cloud_raw.points.size();
-  std::vector<uint32_t> labels(num_cloud_raw, 0);  // 0: static or points
+  std::vector<uint32_t> labels(num_cloud_raw, 0);
 
   int N_dyn           = cloud_est_dyn.points.size();
   int N_potential_dyn = cloud_est_potential_dyn.points.size();
@@ -163,7 +152,7 @@ void save_dyn_label(const std::string abs_dir,
     cloud.pts[i].y = cloud_est_potential_dyn.points[i].y;
     cloud.pts[i].z = cloud_est_potential_dyn.points[i].z;
   }
-  // construct a kd-tree index:
+
   using my_kd_tree_t =
       nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<num_t, PointCloud<num_t>>,
                                           PointCloud<num_t>,
@@ -184,16 +173,12 @@ void save_dyn_label(const std::string abs_dir,
 
     ret_index.resize(num_results);
     out_dist_sqr.resize(num_results);
-    if (out_dist_sqr[0] < SQR_EPSILON) {  // it is in the same voxel point
-      labels[j] = 251;                    // DYNAMIC_LABEL
+    if (out_dist_sqr[0] < SQR_EPSILON) {
+      labels[j] = 251;
       ++num_valid;
     }
   }
 
-  // Must be equal to the # of above-ground points
-  //    std::cout << "# of valid points: " << num_valid << std::endl;
-
-  //  To follow the KITTI format, # of zeros are set to 6
   const int NUM_ZEROS = 6;
 
   std::string count_str        = std::to_string(frame_num);
@@ -213,7 +198,6 @@ void findCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud,
                          const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
                          vector<int> &correspondences);
 
-// For visualization of TPs and FPs
 void findEmptyCorrespondences(const pcl::PointCloud<pcl::PointXYZI> &query_cloud,
                               const pcl::PointCloud<pcl::PointXYZI> &target_cloud,
                               vector<int> &correspondences,
@@ -238,9 +222,9 @@ void fillGTLabel(const pcl::PointCloud<pcl::PointXYZI> &gt_cloud,
                  pcl::PointCloud<pcl::PointXYZI> &est_cloud,
                  const float margin = 0.02);
 
-geometry_msgs::Pose eigen2geoPose(Eigen::Matrix4f pose);
+Pose eigen2geoPose(Eigen::Matrix4f pose);
 
-Eigen::Matrix4f geoPose2eigen(geometry_msgs::Pose geoPose);
+Eigen::Matrix4f geoPose2eigen(Pose geoPose);
 
 void parseStaticAndDynamic(const pcl::PointCloud<pcl::PointXYZI> &cloud,
                            pcl::PointCloud<pcl::PointXYZI> &dynamic_points,
@@ -248,7 +232,8 @@ void parseStaticAndDynamic(const pcl::PointCloud<pcl::PointXYZI> &cloud,
 
 void voxelize_preserving_labels(pcl::PointCloud<pcl::PointXYZI>::Ptr src,
                                 pcl::PointCloud<pcl::PointXYZI> &dst,
-                                double leaf_size);
+                                double leaf_size,
+                                const bool verbose = false);
 
 void pcl2nanoflann(const pcl::PointCloud<pcl::PointXYZI> &src_cloud, PointCloud<num_t> &cloud);
 
@@ -264,10 +249,6 @@ void count_stat_dyn(const pcl::PointCloud<pcl::PointXYZI> &cloudIn,
 
 void signal_callback_handler(int signum);
 
-visualization_msgs::Marker setVisualMarker(const float voxel_size,
-                                           const float pos_x,
-                                           const float pos_y);
-
 void calcMinMaxXY(const vector<pcl::PointCloud<pcl::PointXYZI>> &pcs,
                   float &min_x,
                   float &min_y,
@@ -281,8 +262,6 @@ void calcMinMaxZWithoutGround(const pcl::PointCloud<pcl::PointXYZI> &pcs,
                               float &max_z);
 
 float calcMeanZOfGround(const pcl::PointCloud<pcl::PointXYZI> &pcs);
-
-//    void calcMinMaxZ(const pcl::PointCloud<pcl::PointXYZI>& pcs, float& min_z, float& max_z);
 
 int getNumGroundPoints(const pcl::PointCloud<pcl::PointXYZI> &pc);
 

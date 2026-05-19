@@ -1,15 +1,14 @@
 #include "tools/erasor_utils.hpp"
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "removert_update");
-  std::cout << "KiTTI MAPVIZ STARTED" << std::endl;
-  ros::NodeHandle nodeHandler;
+  std::cout << "KITTI MAPVIZ STARTED" << std::endl;
 
-  std::string raw_path;
-  std::string removert_path;
-
-  nodeHandler.param<std::string>("/raw_path", raw_path, "");
-  nodeHandler.param<std::string>("/removert_path", removert_path, "");
+  if (argc < 3) {
+    std::cerr << "Usage: fill_removert_labels <raw_path.pcd> <removert_path.pcd>\n";
+    return 1;
+  }
+  std::string raw_path      = argv[1];
+  std::string removert_path = argv[2];
 
   // load dense map
   std::cout << "\033[1;32mLoading dense raw map...\033[0m" << std::endl;

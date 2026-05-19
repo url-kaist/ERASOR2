@@ -1,8 +1,11 @@
 #include "erasor2/erasor2.h"
 
+#include <grid_map_cv/grid_map_cv.hpp>
+#include <opencv2/imgproc.hpp>
+
 using namespace std;
 
-ERASOR2::ERASOR2() {
+ERASOR2::ERASOR2(const erasor2::Config &cfg) : RosParamServer(cfg) {
   cout << "[ERASOR2] Increment gain: " << increment_gain_ << endl;
   cout << "[ERASOR2] Increment: " << increment_ << endl;
 
@@ -144,10 +147,8 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                                // instance id 를 넣어주면 그것도 어떠한 의미가 있겠징!
 
   if (viz_set_scan_and_pose_) {
-    ros::Rate sleep_rate(30);
     vector<pcl::PointCloud<pcl::PointXYZI>> xygrid;
     pcl::PointCloud<pcl::PointXYZI> complement;
-    // std::cout << "[viz set scan and pose] "<<  "Problem 1" << std::endl;
     voi2xygrid(*cloud_est_w_voi_label,
                0.0,
                0.0,
@@ -157,25 +158,15 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                xygrid,
                complement,
                "gridmap");
-    std::cout << "[viz set scan and pose] "
-              << "Problem 2" << std::endl;
     grid_map::GridMap gridmap = setEgocentricGridMap(range_of_interest_, grid_resolution_, xygrid);
-    std::cout << "[viz set scan and pose] "
-              << "Problem 3" << std::endl;
-    auto parsed_cloud = parseCurrCloud(cloud_est_label);
-    std::cout << "[viz set scan and pose] "
-              << "Problem 4" << std::endl;
+    auto parsed_cloud         = parseCurrCloud(cloud_est_label);
 
-    // Viz
-    CurrCloudPublisher.publish(erasor_utils::cloud2msg(cloud_est_label));
-    NonGroundCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.non_ground_));
-    GroundCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.ground_));
-    NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.noise_));
-    grid_map_msgs::GridMap grid_msg;
-    grid_map::GridMapRosConverter::toMessage(gridmap, grid_msg);
-    EgocentricGridPublisher.publish(grid_msg);
-    ros::spinOnce();
-    sleep_rate.sleep();
+    erasor2::viz::setFrame(static_cast<int64_t>(pcs_transformed_.size()));
+    CurrCloudPublisher.publish(cloud_est_label);
+    NonGroundCurrCloudPublisher.publish(parsed_cloud.non_ground_);
+    GroundCurrCloudPublisher.publish(parsed_cloud.ground_);
+    NoiseCurrCloudPublisher.publish(parsed_cloud.noise_);
+    EgocentricGridPublisher.publish(gridmap, "elevation");
     if (stop_for_each_frame_) {
       std::cout << "[Set scan and pose] Waiting for pressing a key" << std::endl;
       cin.ignore();
@@ -238,7 +229,6 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                                // instance id 를 넣어주면 그것도 어떠한 의미가 있겠징!
 
   if (viz_set_scan_and_pose_) {
-    ros::Rate sleep_rate(30);
     vector<pcl::PointCloud<pcl::PointXYZI>> xygrid;
     pcl::PointCloud<pcl::PointXYZI> complement;
     voi2xygrid(*cloud_est_w_voi_label,
@@ -251,19 +241,14 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                complement,
                "gridmap");
     grid_map::GridMap gridmap = setEgocentricGridMap(range_of_interest_, grid_resolution_, xygrid);
+    auto parsed_cloud         = parseCurrCloud(cloud_est_label);
 
-    auto parsed_cloud = parseCurrCloud(cloud_est_label);
-
-    // Viz
-    CurrCloudPublisher.publish(erasor_utils::cloud2msg(cloud_est_label));
-    NonGroundCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.non_ground_));
-    GroundCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.ground_));
-    NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(parsed_cloud.noise_));
-    grid_map_msgs::GridMap grid_msg;
-    grid_map::GridMapRosConverter::toMessage(gridmap, grid_msg);
-    EgocentricGridPublisher.publish(grid_msg);
-    ros::spinOnce();
-    sleep_rate.sleep();
+    erasor2::viz::setFrame(static_cast<int64_t>(pcs_transformed_.size()));
+    CurrCloudPublisher.publish(cloud_est_label);
+    NonGroundCurrCloudPublisher.publish(parsed_cloud.non_ground_);
+    GroundCurrCloudPublisher.publish(parsed_cloud.ground_);
+    NoiseCurrCloudPublisher.publish(parsed_cloud.noise_);
+    EgocentricGridPublisher.publish(gridmap, "elevation");
     if (stop_for_each_frame_) {
       std::cout << "[Set scan and pose] Waiting for pressing a key" << std::endl;
       cin.ignore();
@@ -494,17 +479,12 @@ void ERASOR2::updateSteppableRegion() {
 
       publishPose(k);
 
-      CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
-      CurrVoIPublisher.publish(erasor_utils::cloud2msg(*curr_voi));
-      MapVoIPublisher.publish(erasor_utils::cloud2msg(*map_voi));
+      CurrCloudPublisher.publish(pcs_transformed_[k]);
+      CurrVoIPublisher.publish(*curr_voi);
+      MapVoIPublisher.publish(*map_voi);
 
       logOddsGrid2probGrid();
-      grid_map_msgs::GridMap grid_msg;
-      grid_msg.info.header.stamp    = ros::Time::now();
-      grid_msg.info.header.frame_id = "map";
-      grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
-      GridPublisher.publish(grid_msg);
-      ros::spinOnce();
+      GridPublisher.publish(gridmap_submap_, "prob");
       if (stop_for_each_frame_) {
         std::cout << "[Update] Waiting for pressing a key" << std::endl;
         cin.ignore();
@@ -517,9 +497,7 @@ void ERASOR2::updateSteppableRegion() {
 
 // Re-project ground likelihood to each scan
 void ERASOR2::detectMovingObjects() {
-  grid_map_msgs::GridMap grid_msg;
-  grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
-  GridPublisher.publish(grid_msg);
+  GridPublisher.publish(gridmap_submap_, "prob");
   for (int k = 0; k < num_data_; ++k) {
     cout << "\r[Detect] Detecting moving instances " << k + 1 << " / " << num_data_ << flush;
     vector<float> dyn_cand_ids;  // temp. variable
@@ -628,9 +606,9 @@ void ERASOR2::filterDynamicObjects() {
                << "\033[0m" << endl;
 
           if (viz_over_seg_) {
-            CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
-            DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_instance.cloud_));
-            NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(partial_dynamic_inst.cloud_));
+            CurrCloudPublisher.publish(pcs_transformed_[k]);
+            DynCurrCloudPublisher.publish(dynamic_instance.cloud_);
+            NoiseCurrCloudPublisher.publish(partial_dynamic_inst.cloud_);
             cin.ignore();
           }
 
@@ -716,7 +694,7 @@ void ERASOR2::filterDynamicObjects() {
           inst_colored.emplace_back(pt_colored);
         }
       }
-      DynInstCurrCloudPublisher.publish(erasor_utils::cloud2msg(inst_colored));
+      DynInstCurrCloudPublisher.publish(inst_colored);
 
       cout << pcs_transformed_[k].points.size() << " => "
            << static_points_transformed_[k].points.size() << " / ";
@@ -724,34 +702,25 @@ void ERASOR2::filterDynamicObjects() {
            << noisy_points_transformed_[k].size() << " / ";
       cout << potential_dynamic_points_transformed_[k].points.size() << endl;
 
-      CurrCloudPublisher.publish(erasor_utils::cloud2msg(pcs_transformed_[k]));
-      DynCurrCloudPublisher.publish(erasor_utils::cloud2msg(dynamic_points_transformed_[k]));
+      CurrCloudPublisher.publish(pcs_transformed_[k]);
+      DynCurrCloudPublisher.publish(dynamic_points_transformed_[k]);
 
-      //            RejectedDynCurrCloudPublisher.publish(erasor_utils::cloud2msg(*rejected_dynamic_objs));
-      OutlierCurrCloudPublisher.publish(
-          erasor_utils::cloud2msg(potential_dynamic_points_transformed_[k]));
-      NoiseCurrCloudPublisher.publish(erasor_utils::cloud2msg(noisy_points_transformed_[k]));
+      //            RejectedDynCurrCloudPublisher.publish(*rejected_dynamic_objs);
+      OutlierCurrCloudPublisher.publish(potential_dynamic_points_transformed_[k]);
+      NoiseCurrCloudPublisher.publish(noisy_points_transformed_[k]);
 
       if (dataset_name_ == "SemanticKITTI") {
         pcl::PointCloud<pcl::PointXYZI>::Ptr static_cloud(new pcl::PointCloud<pcl::PointXYZI>);
         pcl::PointCloud<pcl::PointXYZI>::Ptr dynamic_cloud(new pcl::PointCloud<pcl::PointXYZI>);
         erasor_utils::parseStaticAndDynamic(
             static_points_transformed_[k], *dynamic_cloud, *static_cloud);
-        StaticCloudPublisher.publish(erasor_utils::cloud2msg(*static_cloud));
-        DynamicCloudPublisher.publish(erasor_utils::cloud2msg(*dynamic_cloud));
+        StaticCloudPublisher.publish(*static_cloud);
+        DynamicCloudPublisher.publish(*dynamic_cloud);
       }
-      publishObjScores(RejectedMovingObjScorePublisher,
-                       rejected_objs_set_[k],
-                       {1.0, 1.0, 1.0},
-                       num_prev_rejected_objs_);
-      publishObjScores(AcceptedMovingObjScorePublisher,
-                       accepted_objs_set_[k],
-                       {0.0, 1.0, 0.0},
-                       num_prev_accepted_objs_);
+      RejectedMovingObjScorePublisher.publishScores(rejected_objs_set_[k], {1.0f, 1.0f, 1.0f});
+      AcceptedMovingObjScorePublisher.publishScores(accepted_objs_set_[k], {0.0f, 1.0f, 0.0f});
 
-      grid_map_msgs::GridMap grid_msg;
-      grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
-      GridPublisher.publish(grid_msg);
+      GridPublisher.publish(gridmap_submap_, "prob");
 
       visualizeHardThrRadius(poses_submap_[k]);
 
@@ -1183,17 +1152,14 @@ void ERASOR2::publishStaticMapResults() {
   pcl::PointCloud<pcl::PointXYZI>::Ptr static_map_for_viz(new pcl::PointCloud<pcl::PointXYZI>);
   // Because ERASOR2 uses the local origin,
   pcl::transformPointCloud(*static_map_voxelized_, *static_map_for_viz, new_origin_.inverse());
-  MapCloudPublisher.publish(erasor_utils::cloud2msg(*static_map_for_viz));
-  DynMapPublisher.publish(erasor_utils::cloud2msg(*map_dynamic_));
-  NoiseMapPublisher.publish(erasor_utils::cloud2msg(*map_noise_));
-  ros::Rate final_loop_rate(1);
-  while (ros::ok()) {
-    grid_map_msgs::GridMap grid_msg;
-    grid_map::GridMapRosConverter::toMessage(gridmap_submap_, grid_msg);
-    GridPublisher.publish(grid_msg);
-    ros::spinOnce();
-    final_loop_rate.sleep();
-  }
+  MapCloudPublisher.publish(*static_map_for_viz);
+  DynMapPublisher.publish(*map_dynamic_);
+  NoiseMapPublisher.publish(*map_noise_);
+  GridPublisher.publish(gridmap_submap_, "prob");
+  // Legacy code spin-looped here so RViz could keep redrawing the result.
+  // Rerun retains the last log entry indefinitely, so a single publish is
+  // enough — the user can still inspect the final map after the binary
+  // exits.
 }
 
 void ERASOR2::saveStaticMap(const string &static_map_path) {
@@ -1712,9 +1678,9 @@ void ERASOR2::dilateAndErode(grid_map::GridMap &gridmap_submap) {
       gridmap_submap, "erosion", CV_8UC1, min_coefficient, max_coefficient, img);
   std::string save_dir = "/home/shapelim/Pictures/erasor2";
   cv::imwrite(save_dir + "/original.png", img);
-  dilate(img, img_dilated, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 1);
+  cv::dilate(img, img_dilated, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 1);
   cv::imwrite(save_dir + "/dilation.png", img_dilated);
-  erode(img_dilated, img_eroded, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 2);
+  cv::erode(img_dilated, img_eroded, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 2);
   cv::imwrite(save_dir + "/erosion.png", img_eroded);
   grid_map::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(
       img_eroded, "erosion", gridmap_submap, min_coefficient, max_coefficient);
@@ -1732,7 +1698,7 @@ void ERASOR2::erodeGridMap(grid_map::GridMap &gridmap_submap) {
   grid_map::GridMapCvConverter::toImage<unsigned char, 1>(
       gridmap_submap, "log_odds", CV_8UC1, min_coefficient, max_coefficient, img);
 
-  erode(img, img_eroded, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 2);
+  cv::erode(img, img_eroded, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 2);
   grid_map::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(
       img_eroded, "eroded", gridmap_submap, min_coefficient, max_coefficient);
   const float min_coefficient_after = gridmap_submap.get("erroded").minCoeff();
@@ -1740,49 +1706,20 @@ void ERASOR2::erodeGridMap(grid_map::GridMap &gridmap_submap) {
   std::cout << min_coefficient_after << ", " << max_coefficient_after << "\033[0m" << std::endl;
 }
 
-void ERASOR2::publishObjScores(const ros::Publisher &publisher,
+// Legacy `publishObjScores` is no longer needed: the publisher itself now
+// owns the rerun entity path and the score-formatting logic. Both call
+// sites switched to `RejectedMovingObjScorePublisher.publishScores(...)`.
+// Kept as a thin compatibility shim in case external code still references
+// the symbol.
+void ERASOR2::publishObjScores(erasor2::viz::TextArrayPublisher &publisher,
                                const vector<pair<Eigen::Matrix<float, 4, 1>, float>> &objs,
                                const vector<float> color,
                                int &num_prev_objs) {
-  visualization_msgs::MarkerArray marker_arr;
-  visualization_msgs::Marker marker;
-  marker.header.frame_id = "map";
-  marker.header.stamp    = ros::Time::now();
-
-  int num_curr_objs = objs.size();
-  cout << "Total " << num_curr_objs << " objs do exist." << endl;
-  for (int i = 0; i < num_curr_objs; ++i) {
-    const auto &pair          = objs[i];
-    marker.id                 = i;
-    marker.text               = (boost::format("%.02f") % pair.second).str();
-    marker.type               = visualization_msgs::Marker::TEXT_VIEW_FACING;
-    marker.action             = visualization_msgs::Marker::ADD;
-    marker.pose.position.x    = pair.first(0);
-    marker.pose.position.y    = pair.first(1);
-    marker.pose.position.z    = pair.first(2) + 1.0;  // For airborne
-    marker.pose.orientation.w = 1.0;
-    //                    marker.scale.x = 1;
-    //                    marker.scale.y = 0.1;
-    marker.scale.z = 1.25;
-    marker.color.a = 1.0;  // Don't forget to set the alpha!
-    marker.color.r = color[0];
-    marker.color.g = color[1];
-    marker.color.b = color[2];
-    marker_arr.markers.push_back(marker);
-  }
-
-  for (int i = num_curr_objs; i < num_prev_objs; ++i) {
-    visualization_msgs::Marker markers_to_be_removed;
-    markers_to_be_removed.id              = i;
-    markers_to_be_removed.header.frame_id = "map";
-    markers_to_be_removed.header.stamp    = ros::Time::now();
-    markers_to_be_removed.type            = visualization_msgs::Marker::TEXT_VIEW_FACING;
-    markers_to_be_removed.action          = visualization_msgs::Marker::DELETE;
-    marker_arr.markers.push_back(markers_to_be_removed);
-  }
-  publisher.publish(marker_arr);
-
-  num_prev_objs = num_curr_objs;
+  std::array<float, 3> col{color.size() > 0 ? color[0] : 1.0f,
+                           color.size() > 1 ? color[1] : 1.0f,
+                           color.size() > 2 ? color[2] : 1.0f};
+  publisher.publishScores(objs, col);
+  num_prev_objs = static_cast<int>(objs.size());
 }
 
 bool ERASOR2::isCloseToBodyFrame(const DynamicInstance &dynamic_cluster,
@@ -1812,29 +1749,12 @@ bool ERASOR2::isSizeSufficientlySmall(const pcl::PointCloud<pcl::PointXYZI> &dyn
 }
 
 void ERASOR2::visualizeHardThrRadius(const Eigen::Matrix4f &pose) {
-  static float z_diff = max_z_voi_ - min_z_voi_;
-  visualization_msgs::Marker marker;
-  marker.header.frame_id    = "map";
-  marker.header.stamp       = ros::Time::now();
-  marker.id                 = 0;
-  marker.type               = visualization_msgs::Marker::CYLINDER;
-  marker.action             = visualization_msgs::Marker::ADD;
-  marker.pose.position.x    = pose(0, 3);
-  marker.pose.position.y    = pose(1, 3);
-  marker.pose.position.z    = pose(2, 3);
-  marker.pose.orientation.x = 0.0;
-  marker.pose.orientation.y = 0.0;
-  marker.pose.orientation.z = 0.0;
-  marker.pose.orientation.w = 1.0;
-  marker.scale.x            = hard_thr_radius_ * 2;
-  marker.scale.y            = hard_thr_radius_ * 2;
-  marker.scale.z            = z_diff;
-  marker.color.a            = 0.3;  // Don't forget to set the alpha!
-  marker.color.r            = 0.0;
-  marker.color.g            = 1.0;
-  marker.color.b            = 0.0;
-
-  AdaptiveRangePublisher.publish(marker);
+  // Legacy code drew a translucent cylinder marker; rerun has no native
+  // cylinder, so we emit a circle line strip at the body height. The Z
+  // extent (max_z_voi_ - min_z_voi_) is no longer represented; we only
+  // care about the radius for visual sanity-checking.
+  Eigen::Vector3f center(pose(0, 3), pose(1, 3), pose(2, 3));
+  erasor2::viz::logCircle(AdaptiveRangePublisher.path(), center, hard_thr_radius_);
 }
 
 void ERASOR2::printClusterInfo(const DynamicInstance &dynamic_cluster) {
@@ -1883,23 +1803,8 @@ void ERASOR2::printClusterInfo(const DynamicInstance &dynamic_cluster) {
 }
 
 void ERASOR2::publishPose(int k) {
-  geometry_msgs::PoseStamped pose;
-  pose.header.stamp    = ros::Time::now();
-  pose.header.frame_id = "map";
-  pose.pose            = erasor_utils::eigen2geoPose(poses_submap_[k]);
-  PosePublisher.publish(pose);
-
-  static tf2_ros::TransformBroadcaster br;
-  geometry_msgs::TransformStamped trans_msg;
-  trans_msg.header.stamp            = ros::Time::now();
-  trans_msg.transform.translation.x = pose.pose.position.x;
-  trans_msg.transform.translation.y = pose.pose.position.y;
-  trans_msg.transform.translation.z = pose.pose.position.z;
-  trans_msg.transform.rotation.x    = pose.pose.orientation.x;
-  trans_msg.transform.rotation.y    = pose.pose.orientation.y;
-  trans_msg.transform.rotation.z    = pose.pose.orientation.z;
-  trans_msg.transform.rotation.w    = pose.pose.orientation.w;
-  trans_msg.header.frame_id         = "map";
-  trans_msg.child_frame_id          = "body";
-  br.sendTransform(trans_msg);
+  // tf2 broadcaster is gone; rerun's Transform3D under "world/body"
+  // serves the same purpose (parents subsequent body-frame logs).
+  erasor2::viz::setFrame(static_cast<int64_t>(k));
+  PosePublisher.publish(poses_submap_[k]);
 }

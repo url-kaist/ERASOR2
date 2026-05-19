@@ -6,6 +6,8 @@
 #include <pcl/point_types.h>
 #include <pcl/registration/gicp.h>
 
+#include "erasor2/Config.hpp"
+#include "erasor2/RerunLogger.hpp"
 #include "erasor2/erasor2.h"
 
 #include "dataloader/dataloader.h"
@@ -36,11 +38,17 @@ vector<Eigen::Vector3f> getPoses(const DataLoader &loader,
 }
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "erasor2_main");
-  ros::NodeHandle nh;
+  if (argc < 2) {
+    std::cerr << "Usage: run_erasor2 <config.yaml>\n";
+    return 1;
+  }
+  const auto cfg = erasor2::Config::fromYaml(argv[1]);
+  if (cfg.rerun_enabled) {
+    erasor2::viz::init("erasor2", cfg.rerun_spawn, cfg.rerun_save_path);
+  }
 
   std::cout << "ERASOR2 started" << std::endl;
-  unique_ptr<RosParamServer> params(new RosParamServer());
+  unique_ptr<RosParamServer> params(new RosParamServer(cfg));
   std::cout << "Set ERASOR2 complete" << std::endl;
 
   std::unique_ptr<DataLoader> loader;
@@ -89,19 +97,9 @@ int main(int argc, char **argv) {
     std::cout << "\033[1;32m" << frames_clusters.size() << " clusters are found\033[0m"
               << std::endl;
 
-    // You can see the results by using `rviz/clustering_viz.rviz`
-    // 혹시 모를 논문에 viz를 하기 위해서 넣어 둠,,,
-    ros::Publisher pub_raw_traj  = nh.advertise<sensor_msgs::PointCloud2>("unclustered", 100, true);
-    ros::Publisher pub_clustered = nh.advertise<sensor_msgs::PointCloud2>("clustered", 100, true);
-    sensor_msgs::PointCloud2 output, cluster_output;
-    pcl::toROSMsg(unclustered, output);
-    pcl::toROSMsg(clustered, cluster_output);
-    output.header.frame_id         = "map";
-    cluster_output.header.frame_id = "map";
-    for (int i = 0; i < 5; ++i) {
-      pub_raw_traj.publish(output);
-      pub_clustered.publish(cluster_output);
-    }
+    // Log clustered/unclustered trajectories to rerun for paper viz.
+    erasor2::viz::logCloud("trajectory/unclustered", unclustered);
+    erasor2::viz::logCloud("trajectory/clustered", clustered);
   } else {
     frames_clusters.clear();
     vector<size_t> indices_tmp;
@@ -218,7 +216,7 @@ int main(int argc, char **argv) {
       }
     }
 
-    unique_ptr<ERASOR2> erasor2(new ERASOR2());
+    unique_ptr<ERASOR2> erasor2(new ERASOR2(cfg));
     for (const auto &idx : expanded_frames) {
       signal(SIGINT, erasor_utils::signal_callback_handler);
       //            if (idx % 10 == 0) {

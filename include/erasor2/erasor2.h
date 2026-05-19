@@ -46,7 +46,7 @@ class ERASOR2 : public RosParamServer {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  ERASOR2();
+  explicit ERASOR2(const erasor2::Config &cfg);
 
   ~ERASOR2();
 
@@ -254,7 +254,7 @@ class ERASOR2 : public RosParamServer {
 
   void erodeGridMap(grid_map::GridMap &gridmap_submap);
 
-  void publishObjScores(const ros::Publisher &publisher,
+  void publishObjScores(erasor2::viz::TextArrayPublisher &publisher,
                         const vector<pair<Eigen::Matrix<float, 4, 1>, float>> &objs,
                         const vector<float> color,
                         int &num_prev_objs);

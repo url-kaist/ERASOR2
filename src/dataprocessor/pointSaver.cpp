@@ -1,29 +1,39 @@
 #include <signal.h>
 
+#include <yaml-cpp/yaml.h>
+
 #include "dataprocessor/PointCloudProcessor.h"
 
-void signal_callback_handler(int signum) {
-  cout << "Caught Ctrl + c " << endl;
-  exit(signum);
+static void signal_callback_handler(int signum) {
+  std::cout << "Caught Ctrl + c " << std::endl;
+  std::exit(signum);
 }
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "pointcloud_processor");
-  ros::NodeHandle nh;
+  if (argc < 2) {
+    std::cerr << "Usage: helipr_to_kitti <config.yaml>\n";
+    return 1;
+  }
+  YAML::Node root = YAML::LoadFile(argv[1]);
 
-  std::string absPath;
-  std::vector<std::string> process_lidar_list;
-  std::string saveDir;
-  std::string saveFormat;
-  std::string trajectoryDir;
+  auto get_str = [&](std::initializer_list<const char *> keys, const std::string &fallback) {
+    YAML::Node n = root;
+    for (auto k : keys) {
+      if (!n || !n.IsMap() || !n[k]) return fallback;
+      n = n[k];
+    }
+    return n.as<std::string>(fallback);
+  };
 
-  nh.param<std::string>("/dataprocessor/dataset_root", absPath, "/home/ericlab");
-  nh.param<std::vector<std::string>>("/dataprocessor/process_lidar_list",
-                                     process_lidar_list,
-                                     {"Ouster", "Velodyne", "Livox", "Aeva"});
-  nh.param<std::string>("/dataloader/abs_data_dir", saveDir, "/home/ericlab");
-  nh.param<std::string>("/dataprocessor/save_ins_to_LiDAR_root", trajectoryDir, "/home/ericlab");
-  nh.param<std::string>("/dataprocessor/saveFormat", saveFormat, "bin");
+  std::string absPath       = get_str({"dataprocessor", "dataset_root"}, "/home/ericlab");
+  std::string saveDir       = get_str({"dataloader", "abs_data_dir"}, "/home/ericlab");
+  std::string trajectoryDir = get_str({"dataprocessor", "save_ins_to_LiDAR_root"}, "/home/ericlab");
+  std::string saveFormat    = get_str({"dataprocessor", "saveFormat"}, "bin");
+
+  std::vector<std::string> process_lidar_list{"Ouster", "Velodyne", "Livox", "Aeva"};
+  if (auto dp = root["dataprocessor"]; dp && dp["process_lidar_list"]) {
+    process_lidar_list = dp["process_lidar_list"].as<std::vector<std::string>>();
+  }
 
   std::string home_dir = std::getenv("HOME");
   absPath              = home_dir + absPath;

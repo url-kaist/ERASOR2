@@ -2,6 +2,8 @@
 // Created by shapelim on 21. 10. 18..
 //
 
+#include "erasor2/Config.hpp"
+
 #include "dataloader/dataloader.h"
 #include "rosparam_server.hpp"
 #include "tools/erasor_utils.hpp"
@@ -152,14 +154,17 @@ int loadCloud(const string &cloud_dir, size_t idx, pcl::PointCloud<T> &cloud) {
 }
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "erasor2_main");
-  ros::NodeHandle nh;
-  string target_mos_type = "benedikt_4dmos_labels";  // "benedikt_scan2map_labels";
-  nh.param<string>("/target_mos_type", target_mos_type, "");
+  if (argc < 2) {
+    std::cerr << "Usage: accum_4dmos <config.yaml> [target_mos_type]\n";
+    return 1;
+  }
+  string target_mos_type =
+      (argc >= 3) ? std::string(argv[2]) : std::string("benedikt_4dmos_labels");
 
   std::cout << "4D MOS mapping started" << std::endl;
 
-  unique_ptr<RosParamServer> params(new RosParamServer());
+  const auto cfg = erasor2::Config::fromYaml(argv[1]);
+  unique_ptr<RosParamServer> params(new RosParamServer(cfg));
 
   cout << "From " << params->start_frame_ << " to " << params->end_frame_ << endl;
   cout << params->robot_body_size_ << endl;

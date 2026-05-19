@@ -1,12 +1,21 @@
+#include "erasor2/Config.hpp"
+#include "erasor2/RerunLogger.hpp"
+
 #include "dataloader/dataloader.h"
 #include "mapgen/mapgen.hpp"
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "mapgen");
-  ros::NodeHandle nh;
+  if (argc < 2) {
+    std::cerr << "Usage: mapgen <config.yaml>\n";
+    return 1;
+  }
+  const auto cfg = erasor2::Config::fromYaml(argv[1]);
+  if (cfg.rerun_enabled) {
+    erasor2::viz::init("erasor2_mapgen", cfg.rerun_spawn, cfg.rerun_save_path);
+  }
 
   std::cout << "Mapgen started" << std::endl;
-  unique_ptr<Mapgen> mapgen(new Mapgen());
+  unique_ptr<Mapgen> mapgen(new Mapgen(cfg));
   std::cout << "Set Mapgen complete" << std::endl;
 
   std::unique_ptr<DataLoader> loader;

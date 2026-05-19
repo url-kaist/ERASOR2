@@ -26,7 +26,7 @@ class Mapgen : public RosParamServer {
 
   std::string save_path_;
 
-  Mapgen() {
+  explicit Mapgen(const erasor2::Config &cfg) : RosParamServer(cfg) {
     cloud_curr_wrt_world_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     cloud_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
 
@@ -42,14 +42,10 @@ class Mapgen : public RosParamServer {
   ~Mapgen() {}
 
   void accumPointCloud(const pcl::PointCloud<pcl::PointXYZI> &cloud, const Eigen::Matrix4f &pose) {
-    // 1. Set pose
-    geometry_msgs::PoseStamped pose_stamped;
-    pose_stamped.header.stamp    = ros::Time::now();
-    pose_stamped.header.frame_id = "/map";
-    pose_stamped.pose            = erasor_utils::eigen2geoPose(pose);
-
-    nav_path_.header = pose_stamped.header;
-    nav_path_.poses.emplace_back(pose_stamped);
+    // 1. Append the current pose to the path. Path used to be a
+    // nav_msgs::Path of geometry_msgs::PoseStamped; rerun consumes a plain
+    // sequence of Matrix4f and renders it as a 3D line strip.
+    nav_path_.emplace_back(pose);
 
     // NOTE: `tf_h_of_ground_to_be_zero_` is not necessary, but we follow the legacy of ERASOR 1.0
     pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_transformed(new pcl::PointCloud<pcl::PointXYZI>);
@@ -85,23 +81,12 @@ class Mapgen : public RosParamServer {
     }
 
     if ((count_ % viz_interval_) == 0) {
-      CurrCloudPublisher.publish(erasor_utils::cloud2msg(*cloud_curr_wrt_world_));
-      MapCloudPublisher.publish(erasor_utils::cloud2msg(*cloud_map_));
+      erasor2::viz::setFrame(count_);
+      CurrCloudPublisher.publish(*cloud_curr_wrt_world_);
+      MapCloudPublisher.publish(*cloud_map_);
       PathPublisher.publish(nav_path_);
-
-      static tf2_ros::TransformBroadcaster br;
-      geometry_msgs::TransformStamped trans_msg;
-      trans_msg.header.stamp            = ros::Time::now();
-      trans_msg.transform.translation.x = pose_stamped.pose.position.x;
-      trans_msg.transform.translation.y = pose_stamped.pose.position.y;
-      trans_msg.transform.translation.z = pose_stamped.pose.position.z;
-      trans_msg.transform.rotation.x    = pose_stamped.pose.orientation.x;
-      trans_msg.transform.rotation.y    = pose_stamped.pose.orientation.y;
-      trans_msg.transform.rotation.z    = pose_stamped.pose.orientation.z;
-      trans_msg.transform.rotation.w    = pose_stamped.pose.orientation.w;
-      trans_msg.header.frame_id         = "map";
-      trans_msg.child_frame_id          = "body";
-      br.sendTransform(trans_msg);
+      // tf2 'world → body' becomes a rerun Transform3D under world/body.
+      PosePublisher.publish(pose);
     }
     ++count_;
   }
