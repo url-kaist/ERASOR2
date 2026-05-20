@@ -52,6 +52,26 @@ REQUIRED)` errors with `target "VTK::mpi" was not found` unless
 24.04. Workaround: add `find_package(MPI QUIET)` before
 `find_package(PCL)` if it becomes a recurring problem.
 
+**PCL ≥ 1.11 changed `pcl::PointCloud<T>::Ptr` from `boost::shared_ptr`
+to `std::shared_ptr`.** Ubuntu 22.04 ships PCL 1.12, Ubuntu 20.04 ships
+PCL 1.10. Any function template signature written as
+`boost::shared_ptr<pcl::PointCloud<T>>` will fail template-argument
+deduction on 22.04 because callers pass `Ptr` (now a `std::shared_ptr`).
+Fix in `include/tools/erasor_utils.hpp` is two overloads side-by-side
+(`boost::shared_ptr<...>` + `std::shared_ptr<...>`), since the two
+types are unrelated and exactly one matches per distro.
+
+Same release also stopped pulling in `<chrono>` transitively — the
+`std::chrono::system_clock` calls in `voxelize_preserving_labels_by_nanoflann`
+need an explicit `#include <chrono>`.
+
+- **Why:** PCL 1.11 modernized to C++14 smart pointers. Hit during
+  the 22.04 port on 2026-05-20.
+- **How to apply:** any new template that takes a PCL cloud pointer
+  must accept either `typename pcl::PointCloud<T>::Ptr` (with `T`
+  spelled out at the call site) or provide both boost+std overloads.
+  Don't hard-code `boost::shared_ptr`.
+
 **mdformat destroys YAML frontmatter** in `.claude/memory/*.md`. The
 pre-commit-config has `exclude: '^(github/|\.claude/)'` to prevent this
 — if you add new memory paths, extend the exclude pattern.

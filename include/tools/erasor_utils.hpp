@@ -14,6 +14,7 @@
 #include "signal.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
@@ -106,6 +107,19 @@ using my_kd_tree_t =
 
 template <typename T>
 int load_pcd(std::string pcd_name, boost::shared_ptr<pcl::PointCloud<T>> dst) {
+  std::cout << "Loading point cloud..." << std::endl;
+  if (pcl::io::loadPCDFile<T>(pcd_name, *dst) == -1) {
+    PCL_ERROR("Couldn't read file!!! \n");
+    return (-1);
+  }
+  return 0;
+}
+
+// PCL >= 1.11 (Ubuntu 22.04) makes `pcl::PointCloud<T>::Ptr` a
+// `std::shared_ptr`; PCL 1.10 (Ubuntu 20.04) uses `boost::shared_ptr`.
+// Keep both overloads so call sites stay source-compatible across distros.
+template <typename T>
+int load_pcd(std::string pcd_name, std::shared_ptr<pcl::PointCloud<T>> dst) {
   std::cout << "Loading point cloud..." << std::endl;
   if (pcl::io::loadPCDFile<T>(pcd_name, *dst) == -1) {
     PCL_ERROR("Couldn't read file!!! \n");

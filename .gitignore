@@ -10,6 +10,7 @@ vscode/
 .cmake/*
 
 build/*
+build-2004/*
 
 *bin
 *pcd
