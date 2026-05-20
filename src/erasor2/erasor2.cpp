@@ -1100,6 +1100,15 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
       throw invalid_argument("A wrong mask status is set!");
     }
   }
+  // Keep PCL width/height in sync with the points we just appended; PCL's
+  // transformPointCloud computes `height = size / width` and will SIGFPE if
+  // width is left at 0.
+  filtered_static_points.width =
+      static_cast<std::uint32_t>(filtered_static_points.points.size());
+  filtered_static_points.height = filtered_static_points.points.empty() ? 0 : 1;
+  potential_dynamic_points.width =
+      static_cast<std::uint32_t>(potential_dynamic_points.points.size());
+  potential_dynamic_points.height = potential_dynamic_points.points.empty() ? 0 : 1;
   cout << "\033[1;32mTotal " << potential_dynamic_points.size() << " points are filtered\033[0m"
        << endl;
 }
@@ -1125,6 +1134,13 @@ void ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI
 
     ++count;
   }
+  // Keep width/height in sync with points so downstream PCL routines
+  // (e.g. pcl::transformPointCloud computes height = size / width) do not
+  // divide by zero.
+  static_points.width   = static_cast<std::uint32_t>(static_points.points.size());
+  static_points.height  = static_points.points.empty() ? 0 : 1;
+  dynamic_points.width  = static_cast<std::uint32_t>(dynamic_points.points.size());
+  dynamic_points.height = dynamic_points.points.empty() ? 0 : 1;
 }
 
 // void
@@ -1169,6 +1185,10 @@ void ERASOR2::saveStaticMap(const string &static_map_path) {
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_world_frame(new pcl::PointCloud<pcl::PointXYZI>);
   for (int i = 0; i < num_data_; ++i) {
     const auto &cloud = static_points_transformed_[i];
+    // pcl::transformPointCloud divides by `width` internally; an
+    // unpopulated slot has width=0 and triggers SIGFPE. Empty in, empty
+    // out is a no-op for the accumulator, so just skip.
+    if (cloud.empty()) continue;
     pcl::transformPointCloud(cloud, *cloud_world_frame, new_origin_);
     (*static_map_accum_) += (*cloud_world_frame);
   }
