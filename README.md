@@ -103,6 +103,49 @@ seq-05 parity check. Visualization runs through
 
 </details>
 
+---
+
+### Python (preprocessing + evaluation)
+
+The C++ binaries consume per-frame instance + ground labels and
+PCD outputs that are produced by a handful of Python helpers
+(open3d, pypatchworkpp, HDBSCAN). The conda recipe is shipped in
+the repo:
+
+```bash
+conda env create -f scripts/environment.yml   # creates env "erasor2"
+conda activate erasor2
+```
+
+Once the env is active, `scripts/run_pipeline.py` autodetects it and
+chains preprocessing → mapgen → run_erasor2 → evaluate in one shot
+(see [:rocket: How to run](#rocket-how-to-run)).
+
+<details>
+  <summary><strong>Q. open3d import crashes with <code>CXXABI_1.3.15 not found</code>.</strong></summary>
+
+Ubuntu 20.04's system `libstdc++` only goes up to `CXXABI_1.3.14`;
+open3d ≥ 0.18 needs `1.3.15`, which lives in the conda env's own
+`libstdc++`. Preload it:
+
+```bash
+export LD_PRELOAD="$CONDA_PREFIX/lib/libstdc++.so.6"
+```
+
+`scripts/run_pipeline.py --conda-env <path>` sets this automatically.
+
+</details>
+
+<details>
+  <summary><strong>Q. Why not pure pip?</strong></summary>
+
+`pypatchworkpp` and `open3d` both ship native wheels that need a
+recent glibc / libstdc++; mixing them with a system Python on
+Ubuntu 20.04 routinely produces ABI mismatches. Conda isolates the
+toolchain end-to-end, which is what `run_pipeline.py` expects.
+
+</details>
+
 ______________________________________________________________________
 
 ## :rocket: How to run

@@ -14,3 +14,4 @@ dependencies:
     - hdbscan>=0.8.28
     - tqdm>=4.62.0
     - tabulate>=0.8.9
+    - pypatchworkpp
