@@ -372,28 +372,16 @@ ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &c
       parsed_cloud.non_ground_.emplace_back(pt_new);
     }
   }
-  std::cout << "[Debug] max_idx: " << max_idx << std::endl;
-  std::cout << "[Debug] cloud.size(): " << cloud.size() << std::endl;
-  std::cout << "[Debug] tmp_idxes.size(): " << tmp_idxes.size() << std::endl;
-
-  std::cout << "[Debug] parsed_cloud.non_ground_.size(): " << parsed_cloud.non_ground_.size()
-            << std::endl;
-  std::cout << "[Debug] parsed_cloud.ground_.size(): " << parsed_cloud.ground_.size() << std::endl;
-  std::cout << "[Debug] parsed_cloud.noise_.size(): " << parsed_cloud.noise_.size() << std::endl;
-
   colors.clear();
   for (int i = 0; i < max_idx; ++i) {  // ! 240112 modified max_idx + 1 -> max_idx + 2
     colors.emplace_back(erasor_utils::getRandomColor());
   }
-  // std::cout << "[Debug] colors.size(): " << colors.size() << std::endl;
   int ccc = 0;
   for (auto &pt : parsed_cloud.non_ground_) {
     int idx_tmp = int(tmp_idxes[ccc]);
     // For defensive programming
     // ToDo. Fix this weird overflow issue
     while (idx_tmp >= colors.size()) {
-      std::cout << "[Debug] \033[1;33mOverflow happens: idx_tmp: " << idx_tmp << " vs "
-                << colors.size() << std::endl;
       colors.emplace_back(erasor_utils::getRandomColor());
     }
     pt.r = colors[idx_tmp][0];
@@ -1495,18 +1483,7 @@ bool ERASOR2::isLikelyToBeSteppableRegionbyBinaryDescriptor(
                        map_mean_ground_z);  // 스캔과 맵의 평균 ground 높이중에 더 낮은 것을 고르고
   float highest_z = max(curr_max_z, map_max_z);
 
-  std::cout << "\033[1;33m"
-            << "curr_mean_ground_z: " << curr_mean_ground_z << " | ";
-  std::cout << "\033[1;33m"
-            << "map_mean_ground_z: " << map_mean_ground_z << "\033[0m" << std::endl;
-  std::cout << "\033[1;33m"
-            << "curr_max_z: " << curr_max_z << " | ";
-  std::cout << "\033[1;33m"
-            << "map_max_z: " << map_max_z << "\033[0m" << std::endl;
-  std::cout << "\033[1;33m"
-            << "lowest_z: " << lowest_z << " highest_z: " << highest_z << "\033[0m" << std::endl;
   if (highest_z == numeric_limits<float>::lowest() || highest_z < lowest_z) {
-    std::cout << "\033[1;33mThere are no points of our interest\033[0m" << std::endl;
     return false;
   }
   float binary_scan_ratio = 1.0;

@@ -63,15 +63,23 @@ erasor2:
         dist_thr_gain: 1.732 # The larger, the more aggressive
 
     viz_flag:
-        set_scan_and_pose: false
+        # Flip these on to stream per-step results to rerun while running:
+        #   set_scan_and_pose : raw scan + ground/non-ground/noise split
+        #   update            : VoI + submap occupancy grid each frame
+        #   detect            : per-frame dynamic / static / noise candidates
+        #   over_seg          : over-segmented object instances (colorised)
+        #   set_submap        : reserved; no publish hooks yet
+        set_scan_and_pose: true
         set_submap: false
-        update: false
-        detect: false
-        over_seg: false
+        update: true
+        detect: true
+        over_seg: true
 
     save_map: true
 
-stop_for_each_frame: true
+# When true, the binary blocks on cin.ignore() between frames so you can
+# inspect the rerun viewer interactively. Keep false for unattended runs.
+stop_for_each_frame: false
 
 extrinsic:
     robot_body_size: 2.7

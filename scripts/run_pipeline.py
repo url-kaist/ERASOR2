@@ -42,6 +42,27 @@ def load_cfg(path):
         return yaml.safe_load(f)
 
 
+def reap_orphan_rerun_viewers():
+    """Kill any stale rerun viewer holding port 9876 from a previous run.
+
+    The C++ binaries call `g_rec->spawn()` which checks whether the rerun
+    grpc port is already listening; if it is, the binary just connects to
+    the existing viewer rather than launching a new GUI. When a previous
+    run's viewer window was closed but the process lingered, the user sees
+    no window at all even though logging "works". Reaping here keeps the
+    common case (one viewer per pipeline run) frictionless.
+    """
+    try:
+        subprocess.run(
+            ["pkill", "-f", "rerun_sdk/rerun_cli/rerun"],
+            check=False,
+        )
+    except FileNotFoundError:
+        # pkill missing (e.g. on a stripped container); user can clean up
+        # manually if needed.
+        pass
+
+
 def needs_preprocess(data_dir, seq, start, end):
     seq_dir = Path(data_dir) / seq
     n_needed = end - start + 1
@@ -90,6 +111,8 @@ def main():
         help="path to conda env with open3d/sklearn/hdbscan (e.g. ~/.miniconda3/envs/erasor2-3.10)",
     )
     args = p.parse_args()
+
+    reap_orphan_rerun_viewers()
 
     cfg = load_cfg(args.config)
     dl = cfg["dataloader"]
