@@ -81,7 +81,7 @@ GITHUB_WORKSPACE=$PWD tests/scripts/run_parity.sh
 ```
 
 Expect ~3 min on first run (cold rerun_sdk fetch), ~1 min on subsequent
-runs (the `erasor2_ci_build` docker volume caches catkin output).
+runs (the `erasor2_ci_build` docker volume caches the CMake build dir).
 
 ## Cost model
 
@@ -90,7 +90,7 @@ Per PR run:
 | phase | time |
 |---|---|
 | docker pull (cached) | 0 s |
-| catkin build (cached) | 5–10 s for small diffs, 70 s for cold |
+| cmake build (cached) | 5–10 s for small diffs, 70 s for cold |
 | mapgen + run_erasor2 | ~3–5 min |
 | cmp + Python numeric | \<5 s |
 

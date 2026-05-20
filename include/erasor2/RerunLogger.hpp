@@ -22,7 +22,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 
-namespace grid_map {
+namespace erasor2 {
 class GridMap;
 }
 
@@ -62,8 +62,8 @@ void logPath(std::string_view path, const std::vector<Eigen::Matrix4f>& poses);
 void logPose(std::string_view path, const Eigen::Matrix4f& pose);
 
 // 2D-grid occupancy / log-odds layer rendered as an image. `layer` is the
-// grid_map layer name to render.
-void logGridMapLayer(std::string_view path, const grid_map::GridMap& gm, const std::string& layer);
+// grid map layer name to render.
+void logGridMapLayer(std::string_view path, const erasor2::GridMap& gm, const std::string& layer);
 
 // Text label at a 3D position. Replaces the visualization_msgs::Marker
 // TEXT_VIEW_FACING entries (object-score floats).
@@ -106,14 +106,14 @@ class Publisher {
   std::string path_;
 };
 
-// Adapter for the few grid_map publishers — needs a layer name. Keeping
+// Adapter for the few grid-map publishers — needs a layer name. Keeping
 // it separate avoids the implicit conversion footgun where a 2D layer
 // gets logged through the cloud overload.
 class GridMapPublisher {
  public:
   GridMapPublisher() = default;
   explicit GridMapPublisher(std::string path) : path_(std::move(path)) {}
-  void publish(const grid_map::GridMap& gm, const std::string& layer = "elevation") const {
+  void publish(const erasor2::GridMap& gm, const std::string& layer = "elevation") const {
     logGridMapLayer(path_, gm, layer);
   }
 

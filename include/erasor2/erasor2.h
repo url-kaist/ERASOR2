@@ -8,7 +8,7 @@ struct DynamicInstance {
 
   pcl::PointCloud<pcl::PointXYZI> cloud_;
   float moving_obj_score_;
-  vector<grid_map::Index> occupied_map_idxes_;
+  vector<erasor2::Index> occupied_map_idxes_;
   vector<float> log_odds_for_each_point_;
   Eigen::Matrix<float, 4, 1> centroid_;
 
@@ -65,7 +65,7 @@ class ERASOR2 : public RosParamServer {
   vector<pcl::PointCloud<pcl::PointXYZI>> potential_dynamic_points_transformed_;
 
   vector<vector<pcl::PointCloud<pcl::PointXYZI>>> xygrids_;
-  vector<grid_map::Index> idxes_approx_;
+  vector<erasor2::Index> idxes_approx_;
   vector<unordered_map<float, DynamicInstance>> ids_instances_set_;
 
   // For visualize clusters
@@ -81,7 +81,7 @@ class ERASOR2 : public RosParamServer {
 
   int num_data_ = 0;
   GridMapInfo grid_map_info_;
-  grid_map::GridMap gridmap_submap_;
+  erasor2::GridMap gridmap_submap_;
 
   float scan_ratio_;
   float ratio_num_;
@@ -236,13 +236,13 @@ class ERASOR2 : public RosParamServer {
                                                      const float min_z_diff_thr,
                                                      const bool verbose = false);
 
-  void updateLogOdds(const grid_map::Index &idx, const float increment, const int kernel_size = 3);
+  void updateLogOdds(const erasor2::Index &idx, const float increment, const int kernel_size = 3);
 
-  grid_map::GridMap setMapcentricGridMap(const GridMapInfo &grid_map_info);
+  erasor2::GridMap setMapcentricGridMap(const GridMapInfo &grid_map_info);
 
-  grid_map::GridMap setEgocentricGridMap(float range,
-                                         const float grid_resolution,
-                                         const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid);
+  erasor2::GridMap setEgocentricGridMap(float range,
+                                        const float grid_resolution,
+                                        const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid);
 
   void setOccupiedMapIdxes(DynamicInstance &dynamic_cluster);
 
@@ -250,9 +250,9 @@ class ERASOR2 : public RosParamServer {
 
   void logOddsGrid2probGrid();
 
-  void dilateAndErode(grid_map::GridMap &gridmap_submap);
+  void dilateAndErode(erasor2::GridMap &gridmap_submap);
 
-  void erodeGridMap(grid_map::GridMap &gridmap_submap);
+  void erodeGridMap(erasor2::GridMap &gridmap_submap);
 
   void publishObjScores(erasor2::viz::TextArrayPublisher &publisher,
                         const vector<pair<Eigen::Matrix<float, 4, 1>, float>> &objs,
@@ -278,11 +278,11 @@ class ERASOR2 : public RosParamServer {
 
   double logOdds2prob(double log_odds);
 
-  grid_map::Position idx2position(const grid_map::Index &idx);
+  erasor2::Position idx2position(const erasor2::Index &idx);
 
-  int globalIdx2LocalIdx(const grid_map::Index &global_idx, const grid_map::Index &center_idx);
+  int globalIdx2LocalIdx(const erasor2::Index &global_idx, const erasor2::Index &center_idx);
 
-  bool isEqual(const grid_map::Index &idx0, const grid_map::Index &idx1);
+  bool isEqual(const erasor2::Index &idx0, const erasor2::Index &idx1);
 
   bool isInsideTheDynamicInstances(const pcl::PointXYZI &query, const pcl::PointXYZI &target);
 

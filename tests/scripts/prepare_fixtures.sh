@@ -130,19 +130,11 @@ docker run --rm \
   -v "$TMP_OUT:/ci_out" \
   "$DOCKER_IMAGE" \
   bash -c '
-    set -eo pipefail
-    source /opt/ros/noetic/setup.bash
-    set -u
-    mkdir -p /tmp/golden_ws/src
-    rm -f /tmp/golden_ws/src/ERASOR2
-    ln -s /ci_src /tmp/golden_ws/src/ERASOR2
-    cd /tmp/golden_ws
-    catkin build erasor2 --no-status 2>&1 | tail -5
-    set +u
-    source devel/setup.bash
-    set -u
-    rosrun erasor2 mapgen      /ci_out/seq_05_golden.yaml
-    rosrun erasor2 run_erasor2 /ci_out/seq_05_golden.yaml
+    set -euo pipefail
+    cmake -B /tmp/golden_build -S /ci_src
+    cmake --build /tmp/golden_build -j"$(nproc)"
+    /tmp/golden_build/mapgen      /ci_out/seq_05_golden.yaml
+    /tmp/golden_build/run_erasor2 /ci_out/seq_05_golden.yaml
   '
 
 cp "$TMP_OUT/$GT_NAME"  "$ERASOR2_GOLDEN_DIR/"

@@ -10,7 +10,7 @@ Typical invocation:
 
     python3 scripts/run_pipeline.py \\
         --config       config/seq_05.yaml \\
-        --workspace    /home/catkin_ws \\
+        --build-dir    ./build \\
         --preprocess                       # only on first run for a seq
 """
 import argparse
@@ -57,9 +57,12 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--config", required=True, help="path to seq_*.yaml")
     p.add_argument(
-        "--workspace",
-        default=os.environ.get("CATKIN_WS", "/home/catkin_ws"),
-        help="catkin_ws root that contains devel/setup.bash",
+        "--build-dir",
+        default=os.environ.get(
+            "ERASOR2_BUILD_DIR",
+            str(Path(__file__).resolve().parent.parent / "build"),
+        ),
+        help="cmake build dir containing the mapgen / run_erasor2 binaries",
     )
     p.add_argument(
         "--preprocess",
@@ -128,16 +131,15 @@ def main():
             env=env,
         )
 
-    # 2. Resolve binaries from the catkin workspace --------------------------
-    devel = Path(args.workspace) / "devel" / "lib" / "erasor2"
-    mapgen_bin = devel / "mapgen"
-    erasor_bin = devel / "run_erasor2"
+    # 2. Resolve binaries from the cmake build dir --------------------------
+    bdir = Path(args.build_dir)
+    mapgen_bin = bdir / "mapgen"
+    erasor_bin = bdir / "run_erasor2"
     for b in (mapgen_bin, erasor_bin):
         if not b.exists():
             sys.exit(
-                "Binary not found: {}.\nDid you run `catkin build erasor2` first?".format(
-                    b
-                )
+                "Binary not found: {}.\nDid you run "
+                "`cmake -B {} -S . && cmake --build {} -j` first?".format(b, bdir, bdir)
             )
 
     # 3. mapgen --------------------------------------------------------------

@@ -5,7 +5,7 @@
 #
 # Expects these env vars (the workflow sets them; defaults work for a
 # manual local run on the same machine):
-#   DOCKER_IMAGE         docker image with ROS noetic + PCL + grid_map_*
+#   DOCKER_IMAGE         docker image with PCL + Eigen + OpenCV + yaml-cpp
 #   ERASOR2_DATA_ROOT    .../kitti_semantic/dataset/sequences   (has 05/)
 #   ERASOR2_GOLDEN_DIR   dir with the two reference .pcd files
 #   ERASOR2_CONDA_ENV    optional; conda env with open3d+sklearn
@@ -116,33 +116,23 @@ rerun:
 EOF
 
 # --- build + run inside the project docker image ------------------------
-# Cache the catkin build dir across runs via a named docker volume so
-# incremental PRs don't pay the full 70-second cold build + rerun_sdk
-# download. The cache is invalidated automatically by CMake when CMakeLists
-# changes; manual `docker volume rm erasor2_ci_build` resets it.
+# Cache the CMake build dir across runs via a named docker volume so
+# incremental PRs don't pay the full cold build + rerun_sdk download. The
+# cache is invalidated automatically when CMakeLists changes; manual
+# `docker volume rm erasor2_ci_build` resets it.
 echo "[parity] Running docker build + run_erasor2..."
 docker run --rm \
   -v "$SRC_DIR:/ci_src:ro" \
   -v "$ERASOR2_DATA_ROOT:/ci_data/sequences:ro" \
   -v "$RUN_OUT:/ci_out" \
-  -v "erasor2_ci_build:/tmp/ci_ws" \
+  -v "erasor2_ci_build:/ci_build" \
   "$DOCKER_IMAGE" \
   bash -c '
-    set -eo pipefail
-    source /opt/ros/noetic/setup.bash
-    set -u
-    mkdir -p /tmp/ci_ws/src
-    # If the symlink already exists from a cached run, replace it so it
-    # points at the new checkout (otherwise catkin reuses stale paths).
-    rm -f /tmp/ci_ws/src/ERASOR2
-    ln -s /ci_src /tmp/ci_ws/src/ERASOR2
-    cd /tmp/ci_ws
-    catkin build erasor2 --no-status 2>&1 | tail -5
-    set +u
-    source devel/setup.bash
-    set -u
-    rosrun erasor2 mapgen      /ci_out/seq_05_ci.yaml
-    rosrun erasor2 run_erasor2 /ci_out/seq_05_ci.yaml
+    set -euo pipefail
+    cmake -B /ci_build -S /ci_src
+    cmake --build /ci_build -j"$(nproc)"
+    /ci_build/mapgen      /ci_out/seq_05_ci.yaml
+    /ci_build/run_erasor2 /ci_out/seq_05_ci.yaml
   '
 
 # --- strict byte-identical check ---------------------------------------

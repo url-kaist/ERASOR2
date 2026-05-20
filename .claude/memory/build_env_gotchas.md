@@ -35,19 +35,22 @@ explicit. [runtime/explicit] [5]`. Mark new ctors `explicit`.
 - **Why:** pre-commit hook enforces Google C++ style.
 - **How to apply:** any new C++ class with a single-parameter ctor.
 
-**`source /opt/ros/noetic/setup.bash` under `set -u`** trips on
-unbound `ROS_DISTRO`. Wrap with `set +u; source ...; set -u` or run the
-ROS sourcing before flipping `set -u` on.
-
 **suma_pose.txt vs poses_suma.txt.** The C++ dataloader reads
 `<seq>/suma_pose.txt`. The SemanticKITTI distribution ships
 `poses_suma.txt`. Copy or symlink to the dataloader-expected name when
 populating fixtures.
 
-**Catkin build dir cached across CI runs** via the
+**CMake build dir cached across CI runs** via the
 `erasor2_ci_build` docker named volume. To force a fresh build, run
 `docker volume rm erasor2_ci_build`. Useful when a build appears to use
 stale headers after large CMakeLists edits.
+
+**Ubuntu 24.04 host PCL has stale `VTK::mpi` import.** `find_package(PCL
+REQUIRED)` errors with `target "VTK::mpi" was not found` unless
+`MPI::MPI_C` is already defined. Does not affect the docker (Ubuntu
+20.04 + PCL 1.10) — only matters if someone tries to build natively on
+24.04. Workaround: add `find_package(MPI QUIET)` before
+`find_package(PCL)` if it becomes a recurring problem.
 
 **mdformat destroys YAML frontmatter** in `.claude/memory/*.md`. The
 pre-commit-config has `exclude: '^(github/|\.claude/)'` to prevent this

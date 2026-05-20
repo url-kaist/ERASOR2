@@ -1,7 +1,8 @@
 #include "erasor2/erasor2.h"
 
-#include <grid_map_cv/grid_map_cv.hpp>
 #include <opencv2/imgproc.hpp>
+
+#include "erasor2/grid_map.hpp"
 
 using namespace std;
 
@@ -45,17 +46,17 @@ double ERASOR2::prob2logOdds(double prob) {
 
 double ERASOR2::logOdds2prob(double log_odds) { return (tanh(log_odds / 2) + 1) / 2; }
 
-grid_map::Position ERASOR2::idx2position(const grid_map::Index &idx) {
+erasor2::Position ERASOR2::idx2position(const erasor2::Index &idx) {
   int w_pc = idx(0);
   int h_pc = idx(1);
 
-  grid_map::Position pos;
+  erasor2::Position pos;
   pos(0) = grid_map_info_.x_length / 2 + grid_map_info_.center_x - w_pc * grid_map_info_.resolution;
   pos(1) = grid_map_info_.y_length / 2 + grid_map_info_.center_y - h_pc * grid_map_info_.resolution;
   return pos;
 }
 
-bool ERASOR2::isEqual(const grid_map::Index &idx0, const grid_map::Index &idx1) {
+bool ERASOR2::isEqual(const erasor2::Index &idx0, const erasor2::Index &idx1) {
   if (idx0(0) == idx1(0) && idx0(1) == idx1(1)) {
     return true;
   } else {
@@ -77,8 +78,8 @@ bool ERASOR2::isInsideTheDynamicInstances(const pcl::PointXYZI &query,
   }
 }
 
-int ERASOR2::globalIdx2LocalIdx(const grid_map::Index &global_idx,
-                                const grid_map::Index &center_idx) {
+int ERASOR2::globalIdx2LocalIdx(const erasor2::Index &global_idx,
+                                const erasor2::Index &center_idx) {
   int w_diff = global_idx(0) - (center_idx(0) - neighboring_width_ / 2);
   int h_diff = global_idx(1) - (center_idx(1) - neighboring_height_ / 2);
   return w_diff + h_diff * neighboring_width_;
@@ -158,8 +159,8 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                xygrid,
                complement,
                "gridmap");
-    grid_map::GridMap gridmap = setEgocentricGridMap(range_of_interest_, grid_resolution_, xygrid);
-    auto parsed_cloud         = parseCurrCloud(cloud_est_label);
+    erasor2::GridMap gridmap = setEgocentricGridMap(range_of_interest_, grid_resolution_, xygrid);
+    auto parsed_cloud        = parseCurrCloud(cloud_est_label);
 
     erasor2::viz::setFrame(static_cast<int64_t>(pcs_transformed_.size()));
     CurrCloudPublisher.publish(cloud_est_label);
@@ -240,8 +241,8 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
                xygrid,
                complement,
                "gridmap");
-    grid_map::GridMap gridmap = setEgocentricGridMap(range_of_interest_, grid_resolution_, xygrid);
-    auto parsed_cloud         = parseCurrCloud(cloud_est_label);
+    erasor2::GridMap gridmap = setEgocentricGridMap(range_of_interest_, grid_resolution_, xygrid);
+    auto parsed_cloud        = parseCurrCloud(cloud_est_label);
 
     erasor2::viz::setFrame(static_cast<int64_t>(pcs_transformed_.size()));
     CurrCloudPublisher.publish(cloud_est_label);
@@ -303,9 +304,9 @@ void ERASOR2::setSubmap() {
   // Note that sometimes all the (pose, scan) pairs are not used for updating steppable regions
   // But for detecting moving instances, all scans may be employed
   for (int k = 0; k < num_data_; ++k) {
-    grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));
+    erasor2::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));
     gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]);
-    grid_map::Position pos_approx = idx2position(idxes_approx_[k]);
+    erasor2::Position pos_approx = idx2position(idxes_approx_[k]);
 
     pcl::PointCloud<pcl::PointXYZI> complement;
     //        std::cout << poses_submap[k] << std::endl;
@@ -401,14 +402,14 @@ void ERASOR2::updateSteppableRegion() {
   for (int k = 0; k < num_data_; k += update_interval_) {
     cout << "\r[ERASOR2] Updating " << k + 1 << " / " << num_data_ << flush;
     gridmap_submap_["elevation"].setConstant(NOT_UPDATED);
-    //        grid_map::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));//
+    //        erasor2::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));//
     //        new_origin_ 을 기준으로 삼아서 pose 를 저장해놓은 것에서 저 떄의 로봇 x, y 좌표의 위치
     //        뽑아오기 gridmap_submap_.getIndex(pos_xy, idxes_approx_[k]); // 현재 로봇 위치를
     //        기준으로 gridmap 에서의 인덱스를 뽑아서 idxes_approx_ 안에 넣어준다.
 
-    int w_pc                      = idxes_approx_[k](0);
-    int h_pc                      = idxes_approx_[k](1);
-    grid_map::Position pos_approx = idx2position(idxes_approx_[k]);
+    int w_pc                     = idxes_approx_[k](0);
+    int h_pc                     = idxes_approx_[k](1);
+    erasor2::Position pos_approx = idx2position(idxes_approx_[k]);
 
     pcl::PointCloud<pcl::PointXYZI> complement;
     //        std::cout << poses_submap[k] << std::endl;
@@ -426,7 +427,7 @@ void ERASOR2::updateSteppableRegion() {
                *dummy);
 
     // Assume that range of interest is square
-    grid_map::Index idx;
+    erasor2::Index idx;
     int count = 0;
     for (int h = h_pc - neighboring_height_ / 2; h < h_pc + neighboring_height_ / 2;
          ++h) {  // 현재 로봇의 위치를 기점으로 약 10m 의 영역을 관측함.
@@ -507,7 +508,7 @@ void ERASOR2::detectMovingObjects() {
     int w_pc = idxes_approx_[k](0);
     int h_pc = idxes_approx_[k](1);
 
-    grid_map::Index idx;
+    erasor2::Index idx;
     int count = 0;
     // Detect dynamic objects' ids per scan
     for (int h = h_pc - neighboring_height_ / 2; h < h_pc + neighboring_height_ / 2; ++h) {
@@ -839,7 +840,7 @@ void ERASOR2::instanceAwareOutlierRemoval(
   // 2. Set region of interest
   int lower_bound = k - window_size / 2;
   int upper_bound = k + (window_size + 1) / 2;
-  vector<grid_map::Index> regions_of_interest;
+  vector<erasor2::Index> regions_of_interest;
 
   regions_of_interest.reserve(64);  // heuristic
   for (int i = max(0, lower_bound); i < min(num_data_, upper_bound); ++i) {
@@ -865,9 +866,9 @@ void ERASOR2::instanceAwareOutlierRemoval(
   cout << "A" << endl;
 
   // 3. Set the static points that potentially contain dynamic points
-  int w_pc                      = idxes_approx_[k](0);
-  int h_pc                      = idxes_approx_[k](1);
-  grid_map::Position pos_approx = idx2position(idxes_approx_[k]);
+  int w_pc                     = idxes_approx_[k](0);
+  int h_pc                     = idxes_approx_[k](1);
+  erasor2::Position pos_approx = idx2position(idxes_approx_[k]);
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr complement(new pcl::PointCloud<pcl::PointXYZI>);
   vector<pcl::PointCloud<pcl::PointXYZI>> xygrid;
@@ -975,8 +976,8 @@ void ERASOR2::parseOverSegmentation(const DynamicInstance &over_segmented,
   partial_dynamic_inst.cloud_.reserve(200);
 
   for (const auto &pt : over_segmented.cloud_) {
-    grid_map::Position p_tmp(pt.x, pt.y);
-    grid_map::Index idx_tmp;
+    erasor2::Position p_tmp(pt.x, pt.y);
+    erasor2::Index idx_tmp;
     gridmap_submap_.getIndex(p_tmp, idx_tmp);
     if ((gridmap_submap_.at("log_odds", idx_tmp)) > obj_score_hard_thr_) {
       partial_dynamic_inst.cloud_.emplace_back(pt);
@@ -1060,8 +1061,8 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
     adaptive_radii.resize(dynamic_points.size());
     for (int i = 0; i < dynamic_points.size(); ++i) {
       const auto &pt = dynamic_points[i];
-      grid_map::Position p_tmp(pt.x, pt.y);
-      grid_map::Index idx_tmp;
+      erasor2::Position p_tmp(pt.x, pt.y);
+      erasor2::Index idx_tmp;
       gridmap_submap_.getIndex(p_tmp, idx_tmp);
       bool is_in = idx_tmp(0) < grid_map_info_.width && idx_tmp(0) > -1 &&
                    idx_tmp(1) < grid_map_info_.height && idx_tmp(1) > -1;
@@ -1275,17 +1276,17 @@ GridMapInfo ERASOR2::setGridMapParams(const float min_x,
   return grid_map_info;
 }
 
-grid_map::GridMap ERASOR2::setMapcentricGridMap(const GridMapInfo &grid_map_info) {
-  grid_map::GridMap gridmap({"elevation", "status", "prob", "log_odds", "erosion"});
+erasor2::GridMap ERASOR2::setMapcentricGridMap(const GridMapInfo &grid_map_info) {
+  erasor2::GridMap gridmap({"elevation", "status", "prob", "log_odds", "erosion"});
   gridmap.setFrameId("map");
-  gridmap.setGeometry(grid_map::Length(grid_map_info.x_length, grid_map_info.y_length),
+  gridmap.setGeometry(erasor2::Length(grid_map_info.x_length, grid_map_info.y_length),
                       grid_map_info.resolution);
   gridmap["elevation"].setConstant(NOT_UPDATED);
   gridmap["status"].setConstant(NOT_OBSERVED);
   gridmap["prob"].setConstant(0);
   gridmap["log_odds"].setConstant(0);
   gridmap["erosion"].setConstant(0);
-  gridmap.setPosition(grid_map::Position(grid_map_info.center_x, grid_map_info.center_y));
+  gridmap.setPosition(erasor2::Position(grid_map_info.center_x, grid_map_info.center_y));
   return gridmap;
 }
 
@@ -1547,7 +1548,7 @@ bool ERASOR2::isLikelyToBeSteppableRegionbyBinaryDescriptor(
   }
 }
 
-void ERASOR2::updateLogOdds(const grid_map::Index &idx,
+void ERASOR2::updateLogOdds(const erasor2::Index &idx,
                             const float increment,
                             const int kernel_size) {
   gridmap_submap_.at("log_odds", idx) += increment;  // 원래 0에서 시작함
@@ -1578,20 +1579,20 @@ void ERASOR2::updateLogOdds(const grid_map::Index &idx,
   }
 }
 
-grid_map::GridMap ERASOR2::setEgocentricGridMap(
+erasor2::GridMap ERASOR2::setEgocentricGridMap(
     float range,
     const float grid_resolution,
     const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid) {
-  grid_map::GridMap gridmap({"elevation", "log_odds"});
+  erasor2::GridMap gridmap({"elevation", "log_odds"});
   gridmap.setFrameId("map");
-  gridmap.setGeometry(grid_map::Length(2 * range, 2 * range), grid_resolution);
+  gridmap.setGeometry(erasor2::Length(2 * range, 2 * range), grid_resolution);
   gridmap["elevation"].setConstant(NOT_UPDATED);
   gridmap["log_odds"].setConstant(NOT_OBSERVED);
 
   const int width  = static_cast<int>(2.00000001 * range / grid_resolution);
   const int height = static_cast<int>(2.00000001 * range / grid_resolution);
 
-  grid_map::Index idx;
+  erasor2::Index idx;
   for (int u = 0; u < width; ++u) {
     for (int v = 0; v < height; ++v) {
       int i = u + width * v;
@@ -1608,13 +1609,13 @@ grid_map::GridMap ERASOR2::setEgocentricGridMap(
 void ERASOR2::setOccupiedMapIdxes(DynamicInstance &dynamic_cluster) {
   auto &occupied_map_idxes = dynamic_cluster.occupied_map_idxes_;
   auto &log_odds           = dynamic_cluster.log_odds_for_each_point_;
-  //    vector<grid_map::Index> occupied_map_idxes;
+  //    vector<erasor2::Index> occupied_map_idxes;
   occupied_map_idxes.reserve(10);  // heuristic
   log_odds.resize(dynamic_cluster.cloud_.size());
   for (int i = 0; i < dynamic_cluster.cloud_.size(); ++i) {
     const pcl::PointXYZI &dyn_pt = dynamic_cluster.cloud_[i];
-    grid_map::Position p_tmp(dyn_pt.x, dyn_pt.y);
-    grid_map::Index idx_tmp;
+    erasor2::Position p_tmp(dyn_pt.x, dyn_pt.y);
+    erasor2::Index idx_tmp;
     gridmap_submap_.getIndex(p_tmp, idx_tmp);
     if (idx_tmp(0) > grid_map_info_.width || idx_tmp(0) < 0 || idx_tmp(1) > grid_map_info_.height ||
         idx_tmp(1) < 0) {
@@ -1634,7 +1635,7 @@ void ERASOR2::setOccupiedMapIdxes(DynamicInstance &dynamic_cluster) {
       occupied_map_idxes.push_back(idx_tmp);
     } else {
       bool is_first = true;
-      for (const grid_map::Index &occupied_region : occupied_map_idxes) {
+      for (const erasor2::Index &occupied_region : occupied_map_idxes) {
         // Means already idx_tmp is updated
         if (isEqual(idx_tmp, occupied_region)) {
           is_first = false;
@@ -1657,7 +1658,7 @@ void ERASOR2::setMovingInstanceScore(DynamicInstance &dynamic_cluster) {
 }
 
 void ERASOR2::logOddsGrid2probGrid() {
-  grid_map::Index idx;
+  erasor2::Index idx;
   for (int h = 0; h < grid_map_info_.height; ++h) {
     for (int w = 0; w < grid_map_info_.width; ++w) {
       idx(0)                          = w;
@@ -1667,14 +1668,14 @@ void ERASOR2::logOddsGrid2probGrid() {
   }
 }
 
-void ERASOR2::dilateAndErode(grid_map::GridMap &gridmap_submap) {
+void ERASOR2::dilateAndErode(erasor2::GridMap &gridmap_submap) {
   // Noise filtering?
   cv::Mat img, img_eroded, img_dilated;
   gridmap_submap["erosion"]   = gridmap_submap["log_odds"];
   const float min_coefficient = gridmap_submap.get("erosion").minCoeff();
   const float max_coefficient = gridmap_submap.get("erosion").maxCoeff();
   std::cout << min_coefficient << ", " << max_coefficient << std::endl;
-  grid_map::GridMapCvConverter::toImage<unsigned char, 1>(
+  erasor2::GridMapCvConverter::toImage<unsigned char, 1>(
       gridmap_submap, "erosion", CV_8UC1, min_coefficient, max_coefficient, img);
   std::string save_dir = "/home/shapelim/Pictures/erasor2";
   cv::imwrite(save_dir + "/original.png", img);
@@ -1682,24 +1683,24 @@ void ERASOR2::dilateAndErode(grid_map::GridMap &gridmap_submap) {
   cv::imwrite(save_dir + "/dilation.png", img_dilated);
   cv::erode(img_dilated, img_eroded, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 2);
   cv::imwrite(save_dir + "/erosion.png", img_eroded);
-  grid_map::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(
+  erasor2::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(
       img_eroded, "erosion", gridmap_submap, min_coefficient, max_coefficient);
   const float min_coefficient_after = gridmap_submap.get("erosion").minCoeff();
   const float max_coefficient_after = gridmap_submap.get("erosion").maxCoeff();
   std::cout << min_coefficient_after << ", " << max_coefficient_after << std::endl;
 }
 
-void ERASOR2::erodeGridMap(grid_map::GridMap &gridmap_submap) {
+void ERASOR2::erodeGridMap(erasor2::GridMap &gridmap_submap) {
   // Noise filtering?
   cv::Mat img, img_eroded, img_dilated;
   const float min_coefficient = gridmap_submap.get("log_odds").minCoeff();
   const float max_coefficient = gridmap_submap.get("log_odds").maxCoeff();
   std::cout << "\033[1;34m" << min_coefficient << ", " << max_coefficient << std::endl;
-  grid_map::GridMapCvConverter::toImage<unsigned char, 1>(
+  erasor2::GridMapCvConverter::toImage<unsigned char, 1>(
       gridmap_submap, "log_odds", CV_8UC1, min_coefficient, max_coefficient, img);
 
   cv::erode(img, img_eroded, cv::Mat::ones(cv::Size(3, 3), CV_8UC1), cv::Point(-1, -1), 2);
-  grid_map::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(
+  erasor2::GridMapCvConverter::addLayerFromImage<unsigned char, 1>(
       img_eroded, "eroded", gridmap_submap, min_coefficient, max_coefficient);
   const float min_coefficient_after = gridmap_submap.get("erroded").minCoeff();
   const float max_coefficient_after = gridmap_submap.get("erroded").maxCoeff();
@@ -1758,11 +1759,11 @@ void ERASOR2::visualizeHardThrRadius(const Eigen::Matrix4f &pose) {
 }
 
 void ERASOR2::printClusterInfo(const DynamicInstance &dynamic_cluster) {
-  vector<grid_map::Index> occupied_map_idxes_ = dynamic_cluster.occupied_map_idxes_;
-  int min_x                                   = numeric_limits<int>::max();
-  int max_x                                   = 0;
-  int min_y                                   = numeric_limits<int>::max();
-  int max_y                                   = 0;
+  vector<erasor2::Index> occupied_map_idxes_ = dynamic_cluster.occupied_map_idxes_;
+  int min_x                                  = numeric_limits<int>::max();
+  int max_x                                  = 0;
+  int min_y                                  = numeric_limits<int>::max();
+  int max_y                                  = 0;
   for (const auto &idx : occupied_map_idxes_) {
     min_x = min(min_x, idx(0));
     max_x = max(max_x, idx(0));

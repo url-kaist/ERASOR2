@@ -1,11 +1,10 @@
 # ERASOR2
 
-ERASOR2 removes dynamic objects from accumulated LiDAR maps. **As of v1.0
-the runtime no longer requires a ROS master.** Configuration is loaded
-from YAML; visualization is logged to [rerun.io](https://rerun.io). The
-only ROS-derived dependencies that remain are `grid_map_core` and
-`grid_map_cv` — pure C++/Eigen libraries that happen to ship as catkin
-packages.
+ERASOR2 removes dynamic objects from accumulated LiDAR maps. **As of
+v1.1 the codebase is pure C++** — no ROS, no catkin, no grid_map
+package. Build with plain CMake on any Linux distro (or macOS) that has
+PCL + Eigen + OpenCV + yaml-cpp. Configuration is loaded from YAML;
+visualization is logged to [rerun.io](https://rerun.io).
 
 If you're coming from the ROS1 era and looking for `roslaunch` + RViz —
 see the [migration note](#migration-from-the-ros1-era) below.
@@ -15,11 +14,10 @@ ______________________________________________________________________
 ## Quick start
 
 ```bash
-# 1. Build (inside the project's docker image, or any Ubuntu 20.04
-#    host with PCL 1.10 + libyaml-cpp-dev + ros-noetic-grid-map-{core,cv}).
-cd /home/catkin_ws        # workspace must contain src/ERASOR2/
-catkin build erasor2
-source devel/setup.bash
+# 1. Build. Any host with PCL >= 1.7, Eigen3, OpenCV, OpenMP,
+#    libyaml-cpp-dev, libboost-system-dev, libboost-filesystem-dev.
+cmake -B build -S .
+cmake --build build -j
 
 # 2. Generate dynamic / ground per-frame labels for your sequence
 #    (uses scripts/kitti_clustering.py inside a conda env with open3d +
@@ -33,12 +31,11 @@ python scripts/run_pipeline.py --config config/seq_05.yaml \
 ```
 
 The Python wrapper just orchestrates the C++ binaries via `subprocess`
-plus the existing `evaluate.py`; you can also invoke the binaries
-directly:
+plus the existing `evaluate.py`; you can also invoke them directly:
 
 ```bash
-mapgen      config/seq_05.yaml
-run_erasor2 config/seq_05.yaml
+./build/mapgen      config/seq_05.yaml
+./build/run_erasor2 config/seq_05.yaml
 python scripts/evaluate.py --gt <abs_save_dir>/<gt>.pcd \
                            --est <abs_save_dir>/<est>.pcd
 ```
@@ -47,16 +44,17 @@ python scripts/evaluate.py --gt <abs_save_dir>/<gt>.pcd \
 
 | Layer | Component | Notes |
 |---|---|---|
-| Build | PCL ≥ 1.7, OpenCV, OpenMP, Eigen3, Boost | All standard Ubuntu packages |
+| Build | PCL ≥ 1.7, OpenCV, OpenMP, Eigen3, Boost | All standard distro packages |
 | Build | `libyaml-cpp-dev` | Replaces rosparam |
-| Build | `ros-$ROS_DISTRO-grid-map-core`, `…-grid-map-cv` | C++ only, no roscore at runtime |
 | Build | `rerun_sdk` 0.21 | **Fetched by CMake** at configure time — no system install |
 | Runtime (optional) | [rerun viewer](https://rerun.io/docs/getting-started/installing-viewer) | Only if you want a live GUI; otherwise set `rerun.spawn: false` and inspect the saved `.rrd` later |
 | Preprocessing / eval | conda env from `scripts/environment.yml` | open3d + pypatchworkpp + hdbscan + sklearn |
 
-A pre-built docker image is published as
-`shapelim/opengl-ubuntu20.04-erasor2:latest` if you'd rather not install
-the system layer yourself.
+No catkin or ROS install is needed at any stage — `grid_map_core` /
+`grid_map_cv` were replaced by a self-contained `erasor2::GridMap`
+(`include/erasor2/grid_map.hpp`) in v1.1. A pre-built docker image is
+still published as `shapelim/opengl-ubuntu20.04-erasor2:latest` if you'd
+rather not install the system layer yourself.
 
 ## Configuration
 
@@ -104,7 +102,7 @@ extrinsic:
   rotation:    [1, 0, 0,  0, 1, 0,  0, 0, 1]
   translation: [0, 0, 0]
 
-# NEW since v1.0 — visualization sink.
+# Visualization sink (introduced in v1.0).
 rerun:
   enabled:   true   # set false to make every log call a no-op
   spawn:     true   # launch the rerun viewer subprocess on init
@@ -230,11 +228,15 @@ section in `config/HeLiPR_kitti.yaml` for the schema.
 Equivalent:
 
 ```bash
-run_erasor2 ./config/seq_05.yaml
+./build/run_erasor2 ./config/seq_05.yaml
 ```
 
-The `launch/` directory is kept for historical reference only and is
-not wired into the build.
+The `launch/` and `rviz/` directories are kept for historical reference
+only and are not wired into the build. The 2D grid abstraction that used
+to come from `ros-noetic-grid-map-*` lives in
+`include/erasor2/grid_map.hpp` as of v1.1 — a ~150 LOC subset of the
+upstream `grid_map_core` API mirrored to match it bit-for-bit on the
+seq-05 parity check.
 
 ## Repository layout
 

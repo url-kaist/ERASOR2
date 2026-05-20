@@ -21,12 +21,12 @@
 
 #include <Eigen/Core>
 #include <boost/format.hpp>
-#include <grid_map_core/grid_map_core.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
 #include "erasor2/Config.hpp"
 #include "erasor2/RerunLogger.hpp"
+#include "erasor2/grid_map.hpp"
 
 #include "tools/erasor_utils.hpp"
 

@@ -5,8 +5,9 @@
 #include <memory>
 #include <mutex>
 
-#include <grid_map_core/grid_map_core.hpp>
 #include <rerun.hpp>
+
+#include "erasor2/grid_map.hpp"
 
 namespace erasor2::viz {
 
@@ -108,7 +109,7 @@ void logPose(std::string_view path, const Eigen::Matrix4f& pose) {
   g_rec->log(std::string(path), rerun::Transform3D(t, rq));
 }
 
-void logGridMapLayer(std::string_view path, const grid_map::GridMap& gm, const std::string& layer) {
+void logGridMapLayer(std::string_view path, const erasor2::GridMap& gm, const std::string& layer) {
   if (!isEnabled() || !gm.exists(layer)) return;
   const auto& M  = gm.get(layer);  // Eigen::MatrixXf, row-major in grid coords
   const int rows = static_cast<int>(M.rows());

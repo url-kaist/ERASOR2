@@ -7,18 +7,18 @@ Keep it under ~150 lines. Anything longer goes in `.claude/memory/`.
 
 - ERASOR2: removes dynamic objects from accumulated LiDAR maps.
 - C++17 / Eigen / PCL 1.10 / OpenCV / OpenMP.
-- **ROS-free at runtime since v1.0** — yaml-cpp replaces rosparam,
-  [rerun.io](https://rerun.io) replaces RViz/tf2/publishers.
-- Builds with `catkin build` (workspace must contain `src/ERASOR2/`);
-  only `grid_map_core` / `grid_map_cv` remain as catkin deps.
+- **ROS-free at runtime since v1.0**, **catkin-free since v1.1** —
+  yaml-cpp replaces rosparam, [rerun.io](https://rerun.io) replaces
+  RViz/tf2/publishers, `erasor2::GridMap` (`include/erasor2/grid_map.hpp`)
+  replaces `grid_map_core` + `grid_map_cv`.
+- Builds with plain CMake; no catkin workspace needed.
 - Seven binaries: `mapgen`, `run_erasor2`, `compare_map`, `accum_4dmos`,
   `fill_removert_labels`, `helipr_to_kitti`, `merge_heliclouds`.
 
 ## Build & run
 
 ```bash
-# Inside the project docker image (shapelim/opengl-ubuntu20.04-erasor2:latest)
-cd /home/catkin_ws && catkin build erasor2 && source devel/setup.bash
+cmake -B build -S . && cmake --build build -j
 
 # Full pipeline (preprocessing → mapgen → run_erasor2 → evaluate):
 python scripts/run_pipeline.py --config config/seq_05.yaml \
@@ -27,6 +27,7 @@ python scripts/run_pipeline.py --config config/seq_05.yaml \
 
 The pre-built docker container on the original dev machine is named
 `erasor2_dev` and mounts `~/catkin_ws_for_erasor2` → `/home/catkin_ws`.
+The workspace name is historical — nothing in the build needs catkin.
 
 ## Test data + golden artifacts
 
