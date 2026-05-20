@@ -7,8 +7,16 @@
 using namespace std;
 
 ERASOR2::ERASOR2(const erasor2::Config &cfg) : RosParamServer(cfg) {
-  cout << "[ERASOR2] Increment gain: " << increment_gain_ << endl;
-  cout << "[ERASOR2] Increment: " << increment_ << endl;
+  const std::string rule(60, '-');
+  cout << "\033[1;36m" << rule << "\n"
+       << "[erasor2] configuration\n"
+       << rule << "\033[0m\n"
+       << "  sequence        : " << sequence_ << "\n"
+       << "  increment       : " << increment_ << "\n"
+       << "  increment gain  : " << increment_gain_ << "\n"
+       << "  voxel size      : " << voxel_size_ << "\n";
+  printExtrinsic();
+  cout << "\033[1;36m" << rule << "\033[0m" << endl;
 
   if (increment_gain_ < 1.0) {
     throw invalid_argument("[ERASOR2] `increment_gain_` should be larger than 1.0!");
@@ -1547,13 +1555,6 @@ bool ERASOR2::isLikelyToBeSteppableRegionbyBinaryDescriptor(
 
   scan_ratio_ = min(map_h_diff / curr_h_diff, curr_h_diff / map_h_diff);
 
-  std::cout << "\033[1;34m"
-            << "scan ratrio: " << scan_ratio_ << "\033[0m" << std::endl;
-  std::cout << "\033[1;34m"
-            << "binary scan ratrio: " << binary_scan_ratio << "\033[0m" << std::endl;
-  if (scan_ratio_ < scan_ratio_threshold && binary_scan_ratio < scan_ratio_threshold)
-    std::cout << "\033[1;32m===> HERE!\033[0m" << std::endl;
-  std::cout << "------------------------------------------------------------" << std::endl;
   // To reduce false positives
   if (map_h_diff < min_z_diff_thr || curr_mean_ground_z - map_min_z > min_z_diff_thr * 1.5) {
     return false;

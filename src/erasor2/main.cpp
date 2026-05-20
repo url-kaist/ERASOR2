@@ -47,9 +47,7 @@ int main(int argc, char **argv) {
     erasor2::viz::init("erasor2", cfg.rerun_spawn, cfg.rerun_save_path);
   }
 
-  std::cout << "ERASOR2 started" << std::endl;
   unique_ptr<RosParamServer> params(new RosParamServer(cfg));
-  std::cout << "Set ERASOR2 complete" << std::endl;
 
   std::unique_ptr<DataLoader> loader;
   string dataset_name = params->dataset_name_;
@@ -63,9 +61,6 @@ int main(int argc, char **argv) {
         params->abs_data_dir_, params->sequence_, params->instance_seg_method_));
   }
 
-  cout << "Set dataloader complete" << endl;
-  cout << "From " << params->start_frame_ << " to " << params->end_frame_ << endl;
-  cout << params->robot_body_size_ << endl;
 
   int start_frame = params->start_frame_;
   int end_frame   = params->end_frame_;

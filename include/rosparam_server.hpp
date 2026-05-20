@@ -234,8 +234,9 @@ class RosParamServer {
     extrinsic_                 = cfg.extrinsic;
     tf_h_of_ground_to_be_zero_ = cfg.tf_h_of_ground_to_be_zero;
 
-    std::cout << "Extrinsic - Rot\n" << ext_rot_ << "\n";
-    std::cout << "Extrinsic - Trans\n" << ext_trans_ << "\n";
+    // Extrinsic is printed by each derived ctor (Mapgen / ERASOR2) as part
+    // of its configuration banner via printExtrinsic(), so it lines up with
+    // the rest of the per-binary block instead of leading it.
 
     // Hook up the rerun publisher shims with their entity paths. Names
     // mirror the original ROS topic names so the rerun viewer tree is
@@ -268,6 +269,14 @@ class RosParamServer {
   }
 
   ~RosParamServer() {}
+
+  // Render the rotation/translation in one labeled block so callers can
+  // drop it inside their own configuration banner.
+  void printExtrinsic(std::ostream &os = std::cout) const {
+    Eigen::IOFormat row_fmt(4, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
+    os << "  extrinsic R     : " << ext_rot_.format(row_fmt) << "\n"
+       << "  extrinsic t     : " << ext_trans_.transpose().format(row_fmt) << "\n";
+  }
 };
 
 #endif  // ERASOR2_ROSPARAM_SERVER_H

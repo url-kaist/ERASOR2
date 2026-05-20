@@ -5,7 +5,7 @@ import numpy as np
 import open3d as o3d
 from sklearn.neighbors import NearestNeighbors
 
-# from tabulate import tabulate  # unused import
+from tabulate import tabulate
 from tqdm import tqdm
 
 DYNAMIC_CLASSES = [252, 253, 254, 255, 256, 257, 259]
@@ -173,7 +173,7 @@ def evaluate(gt_xyz, gt_int_u32, est_xyz, est_int_u32, voxelsize=0.2):
     Computes preservation, rejection, and F1-score.
     """
     num_gt = count_static_and_dynamic(gt_int_u32)
-    # num_estimate = count_static_and_dynamic(est_int_u32)  # noqa: F841
+    num_estimate = count_static_and_dynamic(est_int_u32)
 
     nbrs = NearestNeighbors(n_neighbors=1, algorithm="kd_tree").fit(est_xyz)
     dists, indices = nbrs.kneighbors(gt_xyz)
@@ -188,39 +188,49 @@ def evaluate(gt_xyz, gt_int_u32, est_xyz, est_int_u32, voxelsize=0.2):
         gt_xyz, gt_int_u32, est_xyz, est_int_u32, dists, indices, voxelsize
     )
 
-    # gt_data = [num_gt["static"], num_gt["dynamic"], f"{num_gt['percentage']:.3f}"]
-    # est_data = [
-    #     num_estimate["static"],
-    #     num_estimate["dynamic"],
-    #     f"{num_estimate['percentage']:.3f}",
-    # ]
+    gt_data = [
+        num_gt["static"],
+        num_gt["dynamic"],
+        "{:.3f}".format(num_gt["percentage"]),
+    ]
+    est_data = [
+        num_estimate["static"],
+        num_estimate["dynamic"],
+        "{:.3f}".format(num_estimate["percentage"]),
+    ]
 
-    # precision = float(num_gt["dynamic"] - num_estimate["dynamic"]) / float(
-    #     num_gt["total"] - num_estimate["total"] + 1e-11
-    # )
-    # recall = float(num_gt["dynamic"] - num_estimate["dynamic"]) / float(
-    #     num_gt["dynamic"] + 1e-11
-    # )
-
-    # pr = (float(num_static_preserved) /
-    #       float(max(num_gt['static'], 1)) * 100.0)  # noqa: F841
+    pr = float(num_static_preserved) / float(max(num_gt["static"], 1)) * 100.0
     rr = (
         float(num_gt["dynamic"] - num_dynamic_preserved)
-        / (float(max(num_gt["dynamic"], 1)))
+        / float(max(num_gt["dynamic"], 1))
         * 100.0
     )
-    # f1 = 0.0
-    # if (pr + rr) > 0:
-    #     f1 = 2 * (pr / 100) * (rr / 100) / ((pr / 100) + (rr / 100))
+    f1 = 0.0
+    if (pr + rr) > 0:
+        f1 = 2 * (pr / 100) * (rr / 100) / ((pr / 100) + (rr / 100))
 
-    # printed_data = gt_data + est_data + [f"{pr:.3f}", f"{rr:.3f}", f"{f1:.4f}"]
-    # print(tabulate([printed_data],
-    #                headers=['# stat. pts', '# dyn. pts', '%',
-    #                         '# est. stat. pts', '# est. dyn. pts', '%',
-    #                         'Preservation', 'Rejection', 'F1'],
-    #                tablefmt='orgtbl'))
-    # For KETI's evaluation
-    print(f"\033[1;32mFinal <removal rate> is: {rr:.3f}%\033[0m")
+    printed_data = gt_data + est_data + [
+        "{:.3f}".format(pr),
+        "{:.3f}".format(rr),
+        "{:.4f}".format(f1),
+    ]
+    print(
+        tabulate(
+            [printed_data],
+            headers=[
+                "# stat. pts",
+                "# dyn. pts",
+                "%",
+                "# est. stat. pts",
+                "# est. dyn. pts",
+                "%",
+                "Preservation",
+                "Rejection",
+                "F1",
+            ],
+            tablefmt="orgtbl",
+        )
+    )
 
 
 # ---------- main ----------

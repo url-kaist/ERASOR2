@@ -30,13 +30,17 @@ class Mapgen : public RosParamServer {
     cloud_curr_wrt_world_.reset(new pcl::PointCloud<pcl::PointXYZI>);
     cloud_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
 
-    std::cout << "\033[1;32m";
-    std::cout << "[MAPGEN]: Voxelization size - " << voxel_size_ << std::endl;
-    std::cout << "[MAPGEN]: Target seq -  " << sequence_ << std::endl;
-    std::cout << "[MAPGEN]: From " << start_frame_ << " to " << end_frame_ << std::endl;
-    std::cout << "[MAPGEN]: Accum. interval " << accum_interval_ << std::endl;
-    std::cout << "[MAPGEN]: Is the map large-scale? " << (is_large_scale_ ? "Yes" : "No")
-              << "\033[0m" << std::endl;
+    const std::string rule(60, '-');
+    std::cout << "\033[1;36m" << rule << "\n"
+              << "[mapgen] configuration\n"
+              << rule << "\033[0m\n"
+              << "  sequence        : " << sequence_ << "\n"
+              << "  frame range     : " << start_frame_ << ".." << end_frame_ << "\n"
+              << "  accum. interval : " << accum_interval_ << "\n"
+              << "  voxel size      : " << voxel_size_ << "\n"
+              << "  large-scale     : " << (is_large_scale_ ? "yes" : "no") << "\n";
+    printExtrinsic();
+    std::cout << "\033[1;36m" << rule << "\033[0m" << std::endl;
   }
 
   ~Mapgen() {}

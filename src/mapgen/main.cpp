@@ -14,9 +14,7 @@ int main(int argc, char **argv) {
     erasor2::viz::init("erasor2_mapgen", cfg.rerun_spawn, cfg.rerun_save_path);
   }
 
-  std::cout << "Mapgen started" << std::endl;
   unique_ptr<Mapgen> mapgen(new Mapgen(cfg));
-  std::cout << "Set Mapgen complete" << std::endl;
 
   std::unique_ptr<DataLoader> loader;
   string dataset_name = mapgen->dataset_name_;
@@ -27,10 +25,6 @@ int main(int argc, char **argv) {
     loader = std::move(
         std::make_unique<HeLiPRLoader>(mapgen->abs_data_dir_, mapgen->sequence_, "hdbscan"));
   }
-
-  std::cout << "Set dataloader complete" << std::endl;
-  std::cout << "From " << mapgen->start_frame_ << " to " << mapgen->end_frame_ << std::endl;
-  std::cout << mapgen->robot_body_size_ << endl;
 
   int start_frame    = mapgen->start_frame_;
   int end_frame      = mapgen->end_frame_;
