@@ -33,11 +33,17 @@ pip install -r ../requirements.txt
 Performs clustering on KITTI dataset point clouds using HDBSCAN.
 
 ```bash
-python kitti_clustering.py -s 00 -i 0 -e 100
+python kitti_clustering.py --kitti_dir /home/url/datasets/kitti -s 00 -i 0 -e 100
 ```
 
 **Arguments:**
 
+- `--kitti_dir`: Dataset root (required). For SemanticKITTI this is the
+  directory ABOVE `dataset/`, so `<kitti_dir>/dataset/sequences/<seq>/velodyne/`
+  exists. For HeLiMOS it's the directory containing sequence subfolders.
+- `--save_dir`: Sequence directory to write `hdbscan/` + `patchwork/` into.
+  If omitted, labels are saved inside the same sequence directory that holds
+  `velodyne/` and `labels/`.
 - `-s, --seq`: Sequence name (default: "Merged")
 - `-i, --init_stamp`: Initial frame number (default: 0)
 - `-e, --end_stamp`: End frame number (default: 12477)

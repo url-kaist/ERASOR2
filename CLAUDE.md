@@ -67,9 +67,14 @@ another machine (the `erasor2_transfer.tar.gz` bundle).
   system one. Set `LD_PRELOAD=$CONDA_ENV/lib/libstdc++.so.6` before
   invoking Python scripts that import open3d. Ubuntu 22.04's system
   libstdc++ is fresh enough; no `LD_PRELOAD` needed there.
-- **kitti_clustering.py paths are hard-coded**. Either edit
-  `ABS_DATA_DIR` / `ABS_SAVE_DIR` at the top of the file in-place, or
-  use `prepare_fixtures.sh` which `sed`s them temporarily.
+- **kitti_clustering.py paths come from `--kitti_dir` / `--save_dir`**.
+  `--kitti_dir` is the directory ABOVE `dataset/` for SemanticKITTI (so
+  `<kitti_dir>/dataset/sequences/<seq>/velodyne/` exists); for HeLiMOS
+  it's the directory containing the sequence subfolders directly.
+  `--save_dir` is the sequence directory to write `hdbscan/` + `patchwork/`
+  into; if omitted, labels go inside the sequence dir alongside `velodyne/`.
+  `run_pipeline.py` derives `kitti_dir` from the yaml's `abs_data_dir`
+  (two parents up).
 
 ## When you change algorithm code
 

@@ -113,12 +113,15 @@ def main():
         ld_preload = "{}/lib/libstdc++.so.6".format(args.conda_env)
         if args.conda_env and Path(ld_preload).exists():
             env["LD_PRELOAD"] = ld_preload
-        # kitti_clustering.py hard-codes ABS_DATA_DIR; the user must have
-        # already pointed it at the right tree (or use prepare_fixtures.sh).
+        # abs_data_dir points at <kitti_dir>/dataset/sequences; the script
+        # wants <kitti_dir>.
+        kitti_dir = str(Path(data_dir).parent.parent)
         run(
             [
                 py,
                 str(repo_root / "scripts" / "kitti_clustering.py"),
+                "--kitti_dir",
+                kitti_dir,
                 "--seq",
                 str(seq),
                 "--init_stamp",

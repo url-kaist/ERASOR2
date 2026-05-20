@@ -49,18 +49,14 @@ fi
 if [[ ! -d "$DST/hdbscan" || $(ls "$DST/hdbscan" 2>/dev/null | wc -l) -lt $((END-START+1)) ]]; then
     echo "[prepare] Running kitti_clustering.py (open3d + pypatchworkpp + hdbscan)..."
     SCRIPT="$WORKSPACE_ROOT/src/ERASOR2/scripts/kitti_clustering.py"
-    cp "$SCRIPT" "$SCRIPT.orig"
-    sed -i -E "s|ABS_DATA_DIR = \"/media/shapelim/UX9803/erasor2_test_benchmark/sequences\"|ABS_DATA_DIR = \"$ERASOR2_DATA_ROOT\"|;
-               s|ABS_SAVE_DIR = \"/media/shapelim/UX9803/erasor2_test_benchmark/sequences\"|ABS_SAVE_DIR = \"$ERASOR2_DATA_ROOT\"|" "$SCRIPT"
-    trap 'mv "$SCRIPT.orig" "$SCRIPT"' EXIT
-    cd "$(dirname "$SCRIPT")"
+    # ERASOR2_DATA_ROOT points at <kitti_dir>/dataset/sequences; the script
+    # expects --kitti_dir to be <kitti_dir> (two levels up).
+    KITTI_DIR="$(dirname "$(dirname "$ERASOR2_DATA_ROOT")")"
     LD_PRELOAD="$ERASOR2_CONDA_ENV/lib/libstdc++.so.6" \
       "$ERASOR2_CONDA_ENV/bin/python" "$SCRIPT" \
+      --kitti_dir "$KITTI_DIR" \
       --seq "$SEQ" --init_stamp "$START" --end_stamp "$END" \
       --save-instance-labels --save-ground-labels
-    cd -
-    mv "$SCRIPT.orig" "$SCRIPT"
-    trap - EXIT
 else
     echo "[prepare] Instance/ground labels already populated; skipping"
 fi

@@ -157,7 +157,10 @@ chains the C++ binaries end-to-end.
 
 ```bash
 # 1. Per-frame instance + ground labels (conda env w/ open3d + pypatchworkpp).
+#    --kitti_dir is the directory ABOVE 'dataset/', so that
+#    <kitti_dir>/dataset/sequences/05/velodyne/ exists.
 python scripts/kitti_clustering.py \
+    --kitti_dir /home/url/datasets/kitti \
     --seq 05 --init_stamp 2350 --end_stamp 2670 \
     --save-instance-labels --save-ground-labels
 
@@ -166,6 +169,18 @@ python scripts/run_pipeline.py \
     --config config/seq_05.yaml \
     --conda-env ~/.miniconda3/envs/erasor2-3.10
 ```
+
+> [!WARNING]
+> **Always eyeball the HDBSCAN instance segmentation before running the
+> full pipeline.** The clustering quality varies sequence-to-sequence
+> and frame-to-frame; bad clusters (over-segmented dynamic objects,
+> merged car-plus-ground blobs, missed pedestrians) will silently
+> degrade ERASOR2's PR/RR/F1. Open a few `*.label` files from
+> `<save_dir>/dataset/sequences/<seq>/hdbscan/` in your viewer of
+> choice (or drop `--save-instance-labels` and let
+> `kitti_clustering.py` pop up an Open3D window per frame) and verify
+> that distinct objects get distinct colors before trusting the
+> downstream numbers.
 
 The wrapper just orchestrates the C++ binaries via `subprocess`; you
 can also invoke them directly:
@@ -287,7 +302,10 @@ extrinsic baked into `src/dataloader/dataloader.cpp` (`T_OS2_*`).
 
 ```bash
 # Per-frame labels (same script as KITTI; just change --seq).
+# For HeLiMOS, --kitti_dir is the directory directly containing the
+# sequence folders (e.g. .../HeLiMOS/KAIST05/deskewed_LiDAR/).
 python scripts/kitti_clustering.py \
+    --kitti_dir /home/url/datasets/HeLiMOS/KAIST05/deskewed_LiDAR \
     --seq Merged --init_stamp 8600 --end_stamp 8649 \
     --save-instance-labels --save-ground-labels
 
@@ -295,6 +313,13 @@ python scripts/kitti_clustering.py \
 ./build/mapgen      config/helipr_mapgen.yaml
 ./build/run_erasor2 config/helipr_mapgen.yaml
 ```
+
+> [!WARNING]
+> Same as the KITTI flow: visually inspect a sample of the HDBSCAN
+> instance labels before trusting the downstream metrics. HeLiPR sensors
+> have very different point densities (Avia/Aeva are far sparser than
+> Ouster/Velodyne), so clustering hyperparameters that look fine on one
+> sensor may over- or under-segment on another.
 
 The three shipped HeLiPR configs (`config/HeLiPR.yaml`,
 `config/HeLiPR_kitti.yaml`, `config/helipr_mapgen.yaml`) carry example

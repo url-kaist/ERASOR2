@@ -14,8 +14,10 @@ vis = o3d.visualization.Visualizer()
 """
 Use like this:
 
-python3 kitti_clustering.py --seq "05" --init_stamp 2350 --end_stamp 2670
---save-instance-labels --save-ground-labels
+python3 kitti_clustering.py \
+    --kitti_dir /home/url/datasets/kitti \
+    --seq "05" --init_stamp 2350 --end_stamp 2670 \
+    --save-instance-labels --save-ground-labels
 """
 if __name__ == "__main__":
     version = "V2"  # 'V1': Ground is considered as '9', 'V2': Ground is '1'
@@ -25,7 +27,25 @@ if __name__ == "__main__":
         GROUND_LABEL = 1
 
     parser = argparse.ArgumentParser(
-        description="Convert KITTI dataset to ROS bag file the easy way!"
+        description="Run Patchwork++ ground segmentation + HDBSCAN instance "
+        "clustering over SemanticKITTI / HeLiMOS frames."
+    )
+    parser.add_argument(
+        "--kitti_dir",
+        required=True,
+        help="Dataset root. For SemanticKITTI, this is the directory ABOVE "
+        "'dataset/' (e.g. /home/url/datasets/kitti, so that "
+        "<kitti_dir>/dataset/sequences/<seq>/velodyne/ exists). For HeLiMOS, "
+        "this is the directory directly containing the sequence subfolders.",
+    )
+    parser.add_argument(
+        "--save_dir",
+        default=None,
+        help="Sequence directory to write hdbscan/ + patchwork/ into. If "
+        "omitted, labels are written inside the same sequence directory that "
+        "holds 'velodyne/' and 'labels/' (i.e. "
+        "<kitti_dir>/dataset/sequences/<seq>/ for SemanticKITTI, or "
+        "<kitti_dir>/<seq>/ for HeLiMOS).",
     )
     parser.add_argument(
         "-s",
@@ -51,27 +71,37 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Determine dataset type and set appropriate paths
+    kitti_dir = args.kitti_dir.rstrip("/")
+
+    # Determine dataset type and resolve the per-sequence base directory that
+    # holds velodyne/ (and labels/). SemanticKITTI lives under
+    # <root>/dataset/sequences/<seq>/; HeLiMOS lives directly under <root>/<seq>/.
     if args.seq == "Merged":
-        # HeLiMOS dataset
-        ABS_DATA_DIR = "/home/shapelim/Documents/KAIST05/deskewed_LiDAR"
-        ABS_SAVE_DIR = "/home/shapelim/Documents/KAIST05/deskewed_LiDAR"
         dataset_type = "HeLiMOS"
+        data_base = kitti_dir + "/" + args.seq
     else:
         # SemanticKITTI dataset - validate sequence format
-        valid_seqs = [f"{i:02d}" for i in range(22)]  # 00 to 21
+        valid_seqs = ["{:02d}".format(i) for i in range(22)]  # 00 to 21
         if args.seq not in valid_seqs:
             print(
-                f"Error: Invalid sequence '{args.seq}' for SemanticKITTI. "
-                f"Valid sequences are: {', '.join(valid_seqs)}"
+                "Error: Invalid sequence '{}' for SemanticKITTI. "
+                "Valid sequences are: {}".format(args.seq, ", ".join(valid_seqs))
             )
             exit(1)
 
-        ABS_DATA_DIR = "/media/shapelim/UX9803/erasor2_test_benchmark/sequences"
-        ABS_SAVE_DIR = "/media/shapelim/UX9803/erasor2_test_benchmark/sequences"
         dataset_type = "SemanticKITTI"
+        data_base = kitti_dir + "/dataset/sequences/" + args.seq
 
-    print(f"Using {dataset_type} dataset with sequence: {args.seq}")
+    # Default: write the new labels next to velodyne/ and labels/ inside the
+    # sequence dir. If --save_dir is given, treat it as the sequence dir to
+    # write into directly.
+    save_base = args.save_dir.rstrip("/") if args.save_dir else data_base
+
+    print(
+        "Using {} dataset with sequence: {} (input: {}, output: {})".format(
+            dataset_type, args.seq, data_base, save_base
+        )
+    )
 
     # Use argparse values
     save_ground_labels = args.save_ground_labels
@@ -84,9 +114,9 @@ if __name__ == "__main__":
         params.verbose = False
         PatchworkPLUSPLUS = pypatchworkpp.patchworkpp(params)
 
-    cloud_dir = ABS_DATA_DIR + "/" + args.seq + "/velodyne"
-    ground_label_dir = ABS_DATA_DIR + "/" + args.seq + "/patchwork"
-    output_dir = ABS_SAVE_DIR + "/" + args.seq + "/hdbscan"
+    cloud_dir = data_base + "/velodyne"
+    ground_label_dir = save_base + "/patchwork"
+    output_dir = save_base + "/hdbscan"
     if save_ground_labels:
         Path(ground_label_dir).mkdir(parents=True, exist_ok=True)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
