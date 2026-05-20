@@ -1,66 +1,145 @@
-# ERASOR2
-
-ERASOR2 removes dynamic objects from accumulated LiDAR maps. **As of
-v1.1 the codebase is pure C++** — no ROS, no catkin, no grid_map
-package. Build with plain CMake on any Linux distro (or macOS) that has
-PCL + Eigen + OpenCV + yaml-cpp. Configuration is loaded from YAML;
-visualization is logged to [rerun.io](https://rerun.io).
-
-If you're coming from the ROS1 era and looking for `roslaunch` + RViz —
-see the [migration note](#migration-from-the-ros1-era) below.
+<div align="center">
+    <h1>ERASOR2</h1>
+    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/-C++-blue?logo=cplusplus" /></a>
+    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/Python-3670A0?logo=python&logoColor=ffdd54" /></a>
+    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/Ubuntu-20.04%20%7C%2022.04-E95420?logo=ubuntu&logoColor=white" /></a>
+    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/CMake-064F8C?logo=cmake&logoColor=white" /></a>
+    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/license-GPLv3-green" /></a>
+    <br />
+    <br />
+  <p><strong><em>Static-map distillation from accumulated LiDAR maps. ROS-free, catkin-free, just CMake.</em></strong></p>
+  <p align="center">
+    <strong>(v1.1, 2026-05-20)</strong> Pure-C++ build — <code>cmake -B build && cmake --build build -j</code> is all it takes
+  </p>
+</div>
 
 ______________________________________________________________________
 
-## Quick start
+## :package: Installation
+
+> ERASOR2 builds from a single `cmake` invocation on any Linux distro
+> (or macOS) with PCL, Eigen, OpenCV, OpenMP, Boost, and yaml-cpp.
+> No catkin workspace, no ROS environment.
+
+### System packages
 
 ```bash
-# 1. Build. Any host with PCL >= 1.7, Eigen3, OpenCV, OpenMP,
-#    libyaml-cpp-dev, libboost-system-dev, libboost-filesystem-dev.
-cmake -B build -S .
-cmake --build build -j
-
-# 2. Generate dynamic / ground per-frame labels for your sequence
-#    (uses scripts/kitti_clustering.py inside a conda env with open3d +
-#    pypatchworkpp; see scripts/environment.yml).
-python scripts/kitti_clustering.py --seq 05 --init_stamp 2350 \
-       --end_stamp 2670 --save-instance-labels --save-ground-labels
-
-# 3. Build the ground-truth map and run ERASOR2 in one shot:
-python scripts/run_pipeline.py --config config/seq_05.yaml \
-       --conda-env ~/.miniconda3/envs/erasor2-3.10
+# Ubuntu 20.04 / 22.04
+sudo apt-get install -y \
+    build-essential cmake \
+    libpcl-dev libeigen3-dev libopencv-dev libomp-dev \
+    libboost-system-dev libboost-filesystem-dev \
+    libyaml-cpp-dev
 ```
 
-The Python wrapper just orchestrates the C++ binaries via `subprocess`
-plus the existing `evaluate.py`; you can also invoke them directly:
+The `rerun_sdk` 0.21 dependency is **fetched by CMake at configure
+time** — no system install needed.
+
+### C++
+
+Run the commands below. That's it.
+
+```bash
+git clone https://github.com/LimHyungTae/ERASOR2.git
+cd ERASOR2
+cmake -B build -S .
+cmake --build build -j
+```
+
+Verified on Ubuntu 20.04 (GCC 9.4 + PCL 1.10) and Ubuntu 22.04
+(GCC 11.4 + PCL 1.12) from the same source tree. Seven binaries are
+produced under `build/`:
+
+| Binary | Purpose |
+|---|---|
+| `mapgen` | Accumulate raw scans into a labelled ground-truth map |
+| `run_erasor2` | Remove dynamic objects → static map + per-frame MOS labels |
+| `compare_map` | Compare multiple estimates against GT (TP/FP/FN/TN) |
+| `accum_4dmos` | Accumulate 4D-MOS predictions into a static map |
+| `fill_removert_labels` | Fill REMOVERT label files (two positional PCD paths) |
+| `helipr_to_kitti`, `merge_heliclouds` | HeLiPR / HeLiMOS preprocessing |
+
+<details>
+  <summary><strong>Q. I don't want to install the system layer myself.</strong></summary>
+
+A pre-built image is published at
+`shapelim/opengl-ubuntu20.04-erasor2:latest`. Mount the repo and build
+inside it:
+
+```bash
+docker run --rm -v "$PWD":/work -w /work \
+    shapelim/opengl-ubuntu20.04-erasor2:latest \
+    bash -c "cmake -B build -S . && cmake --build build -j"
+```
+
+</details>
+
+<details>
+  <summary><strong>Q. Build fails on Ubuntu 24.04 with <code>target "VTK::mpi" was not found</code>.</strong></summary>
+
+Stale `VTK::mpi` import in the 24.04 PCL config. Add
+`find_package(MPI QUIET)` before `find_package(PCL)` in
+`CMakeLists.txt`, or build inside the 20.04 docker.
+
+</details>
+
+<details>
+  <summary><strong>Q. Where are the ROS launch files / RViz configs?</strong></summary>
+
+`roslaunch erasor2 run_erasor2.launch target_seq:=seq_05` is gone since
+v1.0. Equivalent invocation:
+
+```bash
+./build/run_erasor2 ./config/seq_05.yaml
+```
+
+The `launch/` and `rviz/` directories are kept for historical
+reference and are not wired into the build. The 2D grid abstraction
+that used to come from `ros-noetic-grid-map-*` lives in
+`include/erasor2/grid_map.hpp` as of v1.1 — a ~150 LOC subset of the
+upstream `grid_map_core` API mirrored to match it bit-for-bit on the
+seq-05 parity check. Visualization runs through
+[rerun.io](https://rerun.io) instead of RViz / tf2.
+
+</details>
+
+______________________________________________________________________
+
+## :rocket: How to run
+
+ERASOR2 needs three inputs per sequence: raw scans, per-frame
+**instance labels** (HDBSCAN), and per-frame **ground labels**
+(Patchwork). A Python helper generates the labels; a Python driver
+chains the C++ binaries end-to-end.
+
+```bash
+# 1. Per-frame instance + ground labels (conda env w/ open3d + pypatchworkpp).
+python scripts/kitti_clustering.py \
+    --seq 05 --init_stamp 2350 --end_stamp 2670 \
+    --save-instance-labels --save-ground-labels
+
+# 2. Full pipeline: mapgen → run_erasor2 → evaluate.
+python scripts/run_pipeline.py \
+    --config config/seq_05.yaml \
+    --conda-env ~/.miniconda3/envs/erasor2-3.10
+```
+
+The wrapper just orchestrates the C++ binaries via `subprocess`; you
+can also invoke them directly:
 
 ```bash
 ./build/mapgen      config/seq_05.yaml
 ./build/run_erasor2 config/seq_05.yaml
-python scripts/evaluate.py --gt <abs_save_dir>/<gt>.pcd \
-                           --est <abs_save_dir>/<est>.pcd
+python scripts/evaluate.py \
+    --gt  <abs_save_dir>/<gt>.pcd \
+    --est <abs_save_dir>/<est>.pcd
 ```
 
-## Prerequisites
+<details>
+  <summary><strong>YAML schema (highlights)</strong></summary>
 
-| Layer | Component | Notes |
-|---|---|---|
-| Build | PCL ≥ 1.7, OpenCV, OpenMP, Eigen3, Boost | All standard distro packages |
-| Build | `libyaml-cpp-dev` | Replaces rosparam |
-| Build | `rerun_sdk` 0.21 | **Fetched by CMake** at configure time — no system install |
-| Runtime (optional) | [rerun viewer](https://rerun.io/docs/getting-started/installing-viewer) | Only if you want a live GUI; otherwise set `rerun.spawn: false` and inspect the saved `.rrd` later |
-| Preprocessing / eval | conda env from `scripts/environment.yml` | open3d + pypatchworkpp + hdbscan + sklearn |
-
-No catkin or ROS install is needed at any stage — `grid_map_core` /
-`grid_map_cv` were replaced by a self-contained `erasor2::GridMap`
-(`include/erasor2/grid_map.hpp`) in v1.1. A pre-built docker image is
-still published as `shapelim/opengl-ubuntu20.04-erasor2:latest` if you'd
-rather not install the system layer yourself.
-
-## Configuration
-
-Each binary takes one positional argument: the path to a YAML. Any key
-omitted from the YAML falls back to the default in
-`include/erasor2/Config.hpp`. Schema highlights:
+Each binary takes one positional argument: the path to a YAML. Any
+key omitted falls back to the default in `include/erasor2/Config.hpp`.
 
 ```yaml
 start_frame: 2350
@@ -89,11 +168,6 @@ erasor2:
     obj_score_soft_thr: 0.8
     obj_score_hard_thr: 14.0
     hard_thr_radius:    10.0
-  viz_flag:                              # all default to false
-    set_scan_and_pose: false
-    update: false
-    detect: false
-    over_seg: false
   save_map: true
 
 extrinsic:
@@ -102,34 +176,21 @@ extrinsic:
   rotation:    [1, 0, 0,  0, 1, 0,  0, 0, 1]
   translation: [0, 0, 0]
 
-# Visualization sink (introduced in v1.0).
 rerun:
-  enabled:   true   # set false to make every log call a no-op
-  spawn:     true   # launch the rerun viewer subprocess on init
-  save_path: ""     # if non-empty, dump a .rrd recording instead of
-                    # spawning a viewer (useful for CI / headless runs)
+  enabled:   true   # false ⇒ every log call is a no-op
+  spawn:     true   # launch the rerun viewer subprocess
+  save_path: ""     # if non-empty, dump a .rrd instead of spawning
 ```
 
 Per-sequence configs live in `config/` (`seq_05.yaml`, `seq_07.yaml`, …).
 
-## Binaries
+</details>
 
-| Binary | Purpose |
-|---|---|
-| `mapgen` | Accumulate raw scans into a labelled GT map |
-| `run_erasor2` | Remove dynamic objects, produce the static map + per-frame MOS labels |
-| `compare_map` | Compare multiple estimates against ground truth (TP/FP/FN/TN) |
-| `accum_4dmos` | Accumulate 4D-MOS predictions into a static map |
-| `fill_removert_labels` | Fill REMOVERT label files (positional args, no YAML) |
-| `helipr_to_kitti`, `merge_heliclouds` | HeLiPR dataset preprocessing |
+<details>
+  <summary><strong>Headless / batch operation</strong></summary>
 
-All seven take a single YAML config argument, except
-`fill_removert_labels` which takes two positional PCD paths.
-
-## Headless / batch operation
-
-If no viewer is desired (CI, batch evaluation, paper-figure generation),
-point `rerun.save_path` at a `.rrd` file and set `spawn: false`:
+For CI, batch evaluation, or paper-figure generation, point
+`rerun.save_path` at a `.rrd` file and set `spawn: false`:
 
 ```yaml
 rerun:
@@ -139,34 +200,38 @@ rerun:
 ```
 
 Inspect later with `rerun /tmp/erasor2_run.rrd`. Setting
-`rerun.enabled: false` makes every visualization call a no-op (slightly
-faster end-to-end runtime).
+`rerun.enabled: false` makes every visualization call a no-op
+(slightly faster end-to-end).
 
-## Reproducing the paper
+</details>
+
+______________________________________________________________________
+
+## :bar_chart: Reproducing the paper
 
 Reference: SemanticKITTI sequence 05, frames 2350–2670, interval 2,
-voxel 0.2. Expected numbers on this subset:
+voxel 0.2.
 
 | Metric | Value |
 |---|---|
-| Preservation Rate (static recall) | 97.668 % |
-| Removal Rate (dynamic removal) | 98.457 % |
-| F1 | 0.9806 |
+| Preservation Rate (static recall) | **97.668 %** |
+| Removal Rate (dynamic removal) | **98.457 %** |
+| F1 | **0.9806** |
 
-To reproduce: run `scripts/kitti_clustering.py` to generate the cais /
-hdbscan / patchwork labels, then `python scripts/run_pipeline.py --config config/seq_05.yaml`. The same subset is what the parity-check
-CI workflow asserts byte-identical against (see `tests/README.md`).
+The same subset is what the parity-check CI workflow asserts
+byte-identical against; see `tests/README.md`.
 
-## HeLiPR / HeLiMOS
+______________________________________________________________________
+
+## :truck: HeLiPR / HeLiMOS
 
 The same binaries handle HeLiPR-style data — set
-`dataloader.dataset_name` to `"HeLiPR"` and point `abs_data_dir` at the
-directory that *contains* the per-sensor trees. The `HeLiPRLoader`
-expects this layout:
+`dataloader.dataset_name` to `"HeLiPR"` and point `abs_data_dir` at
+the directory that *contains* the per-sensor trees:
 
 ```
 <abs_data_dir>/
-└── <sensor>/                  # one of: Avia, Aeva, VLP16, Merged
+└── <sensor>/                  # Avia, Aeva, VLP16, or Merged
     ├── velodyne/              # .bin scans
     ├── poses.txt              # KITTI-style 3x4 row-major
     ├── patchwork/             # ground labels (from pypatchworkpp)
@@ -175,86 +240,106 @@ expects this layout:
 
 `Avia`, `Aeva`, and `VLP16` poses are corrected by the per-sensor
 extrinsic baked into `src/dataloader/dataloader.cpp` (`T_OS2_*`).
-`Merged` is assumed to be already in the Ouster frame and uses
-identity.
-
-Example sequence using the HeLiMOS `Merged` stream:
+`Merged` is assumed to be in the Ouster frame and uses identity.
 
 ```bash
-# 1. (one-time) per-frame instance + ground labels — same script as KITTI.
-python scripts/kitti_clustering.py --seq Merged --init_stamp 8600 \
-       --end_stamp 8649 --save-instance-labels --save-ground-labels
+# Per-frame labels (same script as KITTI; just change --seq).
+python scripts/kitti_clustering.py \
+    --seq Merged --init_stamp 8600 --end_stamp 8649 \
+    --save-instance-labels --save-ground-labels
 
-# 2. mapgen + run_erasor2 against config/helipr_mapgen.yaml.
-mapgen      config/helipr_mapgen.yaml
-run_erasor2 config/helipr_mapgen.yaml
+# mapgen + run_erasor2 against the HeLiPR config.
+./build/mapgen      config/helipr_mapgen.yaml
+./build/run_erasor2 config/helipr_mapgen.yaml
 ```
 
-The three shipped HeLiPR-flavored configs (`config/HeLiPR.yaml`,
-`config/HeLiPR_kitti.yaml`, `config/helipr_mapgen.yaml`) all carry
-example paths under `/media/...` from the original dev machines;
-repoint `abs_data_dir` and `abs_save_dir` before running.
+The three shipped HeLiPR configs (`config/HeLiPR.yaml`,
+`config/HeLiPR_kitti.yaml`, `config/helipr_mapgen.yaml`) carry example
+paths from the original dev machines under `/media/...`; repoint
+`abs_data_dir` and `abs_save_dir` before running. The HeLiPR-specific
+preprocessing binaries `helipr_to_kitti` and `merge_heliclouds`
+(per-sensor extraction → time-aligned merge into `Merged`) take their
+own YAMLs — see the `dataprocessor:` section in
+`config/HeLiPR_kitti.yaml`.
 
-Smoke-tested at v1.0 on a 50-frame Merged subset (frames 8600..8649):
-the full mapgen → run_erasor2 → evaluate.py pipeline produced a
-5.58 M-point static map (PR = 99.86 %, RR = 69.2 %, F1 = 0.82). The
-RR number is depressed because few dynamic objects appear in a
-~25-second window; treat that as a smoke-test, not a paper number.
+______________________________________________________________________
 
-The HeLiPR-specific preprocessing binaries `helipr_to_kitti` and
-`merge_heliclouds` (per-sensor extraction → time-aligned merge into
-the `Merged` stream) take their own YAMLs — see the `dataprocessor:`
-section in `config/HeLiPR_kitti.yaml` for the schema.
-
-## Common gotchas
+## :warning: Common gotchas
 
 - **`dataloader.expansion_range` defaults to 20.** `run_erasor2` looks
   20 frames *before* each cluster's `start_frame` to expand the
-  trajectory submap. If you're running against a partial copy of a
-  dataset (e.g. for CI / smoke testing), either copy 20 frames of
-  padding before `start_frame` or set `expansion_range: 0` in the
-  YAML.
-- **The accumulation loop iterates `[start_frame, end_frame + accum_interval)`.** With `end_frame: 2670` and `accum_interval: 2`,
-  the loop reads frame 2671. Copy at least one extra frame past
-  `end_frame` when using a trimmed dataset.
+  trajectory submap. For partial copies of a dataset (CI / smoke
+  testing), either copy 20 frames of padding before `start_frame`,
+  or set `expansion_range: 0` in the YAML.
+- **The accumulation loop iterates `[start_frame, end_frame + accum_interval)`.**
+  With `end_frame: 2670` and `accum_interval: 2`, the loop reads frame
+  2671. Copy at least one extra frame past `end_frame` when using a
+  trimmed dataset.
 - **`mapgen` prints `[pcl::VoxelGrid] Leaf size too small …`** on
-  HeLiMOS-sized maps. Cosmetic — the actual voxelization is delegated
-  to `voxelize_preserving_labels_by_nanoflann`, which doesn't suffer
+  HeLiMOS-sized maps. Cosmetic — actual voxelization is delegated to
+  `voxelize_preserving_labels_by_nanoflann`, which doesn't suffer
   from the integer-index overflow that triggers the PCL warning.
 
-## Migration from the ROS1 era
+______________________________________________________________________
 
-`roslaunch erasor2 run_erasor2.launch target_seq:=seq_05` is gone.
-Equivalent:
+## :books: Citation
 
-```bash
-./build/run_erasor2 ./config/seq_05.yaml
+If you use this code in academic work, please cite the ERASOR / ERASOR2
+papers.
+
+<details>
+  <summary><strong>See bibtex lists</strong></summary>
+
+```bibtex
+@article{lim2025erasor2,
+  title   = {{ERASOR2}: Instance-Aware Robust 3D Mapping of the Static World in Dynamic Scenes},
+  author  = {Lim, Hyungtae and others},
+  journal = {IEEE Robotics and Automation Letters},
+  year    = {2025}
+}
 ```
 
-The `launch/` and `rviz/` directories are kept for historical reference
-only and are not wired into the build. The 2D grid abstraction that used
-to come from `ros-noetic-grid-map-*` lives in
-`include/erasor2/grid_map.hpp` as of v1.1 — a ~150 LOC subset of the
-upstream `grid_map_core` API mirrored to match it bit-for-bit on the
-seq-05 parity check.
+```bibtex
+@article{lim2021erasor,
+  title   = {{ERASOR}: Egocentric Ratio of Pseudo Occupancy-based Dynamic Object Removal for Static 3D Point Cloud Map Building},
+  author  = {Lim, Hyungtae and Hwang, Sungwon and Myung, Hyun},
+  journal = {IEEE Robotics and Automation Letters},
+  volume  = {6},
+  number  = {2},
+  pages   = {2272--2279},
+  year    = {2021}
+}
+```
 
-## Repository layout
+</details>
+
+______________________________________________________________________
+
+## :file_folder: Repository layout
 
 ```
 config/             per-sequence YAML configs
-include/            public headers
+include/            public headers (Config, GridMap, rerun logger, utils)
 src/                C++ sources for the seven binaries + shared utils
 scripts/            Python helpers (preprocessing, evaluation, pipeline driver)
 tests/              parity-check CI (workflow disabled until self-hosted runner is registered)
-launch/             [legacy] ROS1 launch files, no longer used by the build
-rviz/               [legacy] RViz configs, replaced by rerun entity tree
+launch/             [legacy] ROS1 launch files, no longer wired into the build
+rviz/               [legacy] RViz configs, replaced by the rerun entity tree
 ```
 
-## Citation
+______________________________________________________________________
 
-If you use this code, please cite the ERASOR / ERASOR2 papers. (See the
-project page on github.com/LimHyungTae/ERASOR2 for the BibTeX entries.)
+## :handshake: Acknowledgements
 
-## License
+ERASOR2 builds on a long line of open-source LiDAR tooling — in
+particular [PCL](https://pointclouds.org),
+[Eigen](https://eigen.tuxfamily.org), [rerun.io](https://rerun.io),
+[pypatchworkpp](https://github.com/url-kaist/patchwork-plusplus), and
+[nanoflann](https://github.com/jlblancoc/nanoflann). The v1.0/v1.1
+transition that removed ROS and catkin from the runtime would not have
+been possible without these dependencies being clean enough to consume
+without a ROS environment.
+
+## :scroll: License
 
 GPLv3 — see the `LICENSE` file.
