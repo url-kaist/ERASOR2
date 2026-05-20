@@ -165,10 +165,21 @@ python scripts/kitti_clustering.py \
     --save-instance-labels --save-ground-labels
 
 # 2. Full pipeline: mapgen → run_erasor2 → evaluate.
+#    Before running, edit `config/seq_05.yaml` and set `abs_data_dir`
+#    (= <kitti_dir>/dataset/sequences) and `abs_save_dir` (where mapgen
+#    and run_erasor2 will write the GT/estimated PCDs) for your machine.
 python scripts/run_pipeline.py \
     --config config/seq_05.yaml \
     --conda-env ~/.miniconda3/envs/erasor2-3.10
 ```
+
+> [!IMPORTANT]
+> Each `config/*.yaml` ships with example paths from the maintainer's
+> machine. Before running anything that takes a `--config`, open the
+> file and update `dataloader.abs_data_dir` + `dataloader.abs_save_dir`
+> (and, for HeLiPR, the per-sensor paths) to point at your own dataset
+> and output locations. `run_pipeline.py` derives `--kitti_dir` for the
+> preprocessing step from `abs_data_dir` automatically (two parents up).
 
 > [!WARNING]
 > **Always eyeball the HDBSCAN instance segmentation before running the
