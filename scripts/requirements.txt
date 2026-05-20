@@ -17,3 +17,6 @@ argparse
 
 # Patchwork++
 pypatchworkpp
+
+# Visualization (matches the C++ rerun bindings the binaries use)
+rerun-sdk>=0.21

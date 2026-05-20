@@ -175,12 +175,34 @@ python scripts/run_pipeline.py \
 > full pipeline.** The clustering quality varies sequence-to-sequence
 > and frame-to-frame; bad clusters (over-segmented dynamic objects,
 > merged car-plus-ground blobs, missed pedestrians) will silently
-> degrade ERASOR2's PR/RR/F1. Open a few `*.label` files from
-> `<save_dir>/dataset/sequences/<seq>/hdbscan/` in your viewer of
-> choice (or drop `--save-instance-labels` and let
-> `kitti_clustering.py` pop up an Open3D window per frame) and verify
-> that distinct objects get distinct colors before trusting the
-> downstream numbers.
+> degrade ERASOR2's PR/RR/F1. Use the visualizer below to scrub the
+> labels frame-by-frame and confirm distinct objects get distinct
+> colors before trusting the downstream numbers.
+
+### Visualizing the clustering output
+
+`scripts/visualize_clustering.py` loads the per-frame velodyne + the
+patchwork ground labels + the hdbscan instance labels and streams them
+into a [rerun](https://rerun.io) viewer on a frame timeline:
+
+- `world/ground` — Patchwork++ ground points (brown)
+- `world/instances` — non-ground points colored by HDBSCAN cluster ID
+
+```bash
+# Spawns the rerun viewer. Use the same args you passed to kitti_clustering.py.
+python scripts/visualize_clustering.py \
+    --kitti_dir /home/url/datasets/kitti \
+    --seq 05 --init_stamp 2350 --end_stamp 2670
+
+# Or save a .rrd you can open later with `rerun /path/to/file.rrd`:
+python scripts/visualize_clustering.py \
+    --kitti_dir /home/url/datasets/kitti \
+    --seq 05 --init_stamp 2350 --end_stamp 2670 \
+    --save cluster_viz.rrd
+```
+
+Drag the timeline slider at the bottom of the viewer to step through
+frames. `--show-raw` adds the uncolored raw scan as a third overlay.
 
 The wrapper just orchestrates the C++ binaries via `subprocess`; you
 can also invoke them directly:

@@ -13,3 +13,4 @@ dependencies:
   - pip:
     - open3d>=0.15.0
     - pypatchworkpp
+    - rerun-sdk>=0.21

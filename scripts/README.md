@@ -48,7 +48,20 @@ python kitti_clustering.py --kitti_dir /home/url/datasets/kitti -s 00 -i 0 -e 10
 - `-i, --init_stamp`: Initial frame number (default: 0)
 - `-e, --end_stamp`: End frame number (default: 12477)
 
-### 2. Analysis Scripts
+### 2. Visualize the clustering output (`visualize_clustering.py`)
+
+Streams the velodyne scan + patchwork ground + hdbscan instance labels
+into a rerun viewer on a per-frame timeline. Same arguments as
+`kitti_clustering.py`. Use `--save out.rrd` to dump to disk instead of
+spawning the viewer; `--show-raw` adds the uncolored scan as a third
+overlay.
+
+```bash
+python visualize_clustering.py --kitti_dir /home/url/datasets/kitti \
+    -s 05 -i 2350 -e 2670
+```
+
+### 3. Analysis Scripts
 
 Point cloud analysis and evaluation tools.
 
