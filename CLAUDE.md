@@ -62,10 +62,11 @@ another machine (the `erasor2_transfer.tar.gz` bundle).
   will catch this — don't forget for new C++ classes.
 - **flake8 misreads f-strings**: `f"x={v:.3f}"` triggers a false E231.
   Use `"x={:.3f}".format(v)` instead, or `# noqa: E231` on the line.
-- **conda env + Ubuntu 20.04 libstdc++**: open3d 0.19 needs
+- **Ubuntu 20.04 libstdc++ + open3d**: on 20.04 only, open3d 0.19 needs
   `CXXABI_1.3.15`, which is in the conda env's libstdc++ but not the
   system one. Set `LD_PRELOAD=$CONDA_ENV/lib/libstdc++.so.6` before
-  invoking Python scripts that import open3d.
+  invoking Python scripts that import open3d. Ubuntu 22.04's system
+  libstdc++ is fresh enough; no `LD_PRELOAD` needed there.
 - **kitti_clustering.py paths are hard-coded**. Either edit
   `ABS_DATA_DIR` / `ABS_SAVE_DIR` at the top of the file in-place, or
   use `prepare_fixtures.sh` which `sed`s them temporarily.

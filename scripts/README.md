@@ -104,10 +104,6 @@ The scripts require the following Python libraries:
 - `scikit-learn>=0.24.0`: Machine learning utilities
 - `hdbscan>=0.8.28`: Hierarchical clustering
 
-### Point Cloud Data
-
-- `pypcd-py3>=0.1.0`: Point Cloud Data format support
-
 ### Utilities
 
 - `tabulate>=0.8.9`: Table formatting
