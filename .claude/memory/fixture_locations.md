@@ -12,7 +12,7 @@ the original dev machine (`shapelim@<original>`):
 |---|---|---|
 | `~/catkin_ws_for_erasor2/data/kitti_semantic/dataset/sequences/05/velodyne/` | 611 MB | 321 .bin scans, frames 2350..2670 |
 | `…/05/labels/` | 154 MB | SemanticKITTI ground-truth labels for the subset |
-| `…/05/{calib,times,suma_pose}.txt` | <1 MB | Calibration + pose files |
+| `…/05/{calib,times,poses_suma_optim}.txt` | <1 MB | Calibration + pose files |
 | `…/05/hdbscan/` | 154 MB | per-frame instance labels (produced by `kitti_clustering.py`) |
 | `…/05/patchwork/` | 154 MB | per-frame ground labels (same) |
 | `~/erasor2_golden/05_2350_to_2670_w_interval_2_voxel_0_2.pcd` | 29 MB | reference GT map |

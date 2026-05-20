@@ -33,7 +33,7 @@ for p in "$ERASOR2_DATA_ROOT/$SEQ/velodyne" \
          "$ERASOR2_DATA_ROOT/$SEQ/labels" \
          "$ERASOR2_DATA_ROOT/$SEQ/hdbscan" \
          "$ERASOR2_DATA_ROOT/$SEQ/patchwork" \
-         "$ERASOR2_DATA_ROOT/$SEQ/suma_pose.txt" \
+         "$ERASOR2_DATA_ROOT/$SEQ/poses_suma_optim.txt" \
          "$ERASOR2_GOLDEN_DIR/$GT_NAME" \
          "$ERASOR2_GOLDEN_DIR/$EST_NAME"; do
   if [[ ! -e "$p" ]]; then

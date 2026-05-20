@@ -35,10 +35,12 @@ explicit. [runtime/explicit] [5]`. Mark new ctors `explicit`.
 - **Why:** pre-commit hook enforces Google C++ style.
 - **How to apply:** any new C++ class with a single-parameter ctor.
 
-**suma_pose.txt vs poses_suma.txt.** The C++ dataloader reads
-`<seq>/suma_pose.txt`. The SemanticKITTI distribution ships
-`poses_suma.txt`. Copy or symlink to the dataloader-expected name when
-populating fixtures.
+**Pose file: `poses_suma_optim.txt`.** The C++ dataloader reads
+`<seq>/poses_suma_optim.txt` (the optimized SuMa poses) for every
+SemanticKITTI sequence except `19`, which reads `kiss_icp_poses.txt`.
+Earlier versions used `suma_pose.txt` and prepare_fixtures.sh did a
+rename; that's gone now. Make sure the optimized file is present
+under each sequence directory.
 
 **CMake build dir cached across CI runs** via the
 `erasor2_ci_build` docker named volume. To force a fresh build, run

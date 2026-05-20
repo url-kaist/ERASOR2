@@ -74,7 +74,7 @@ SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir,
   if (seq_ == "19") {
     pose_path_ = abs_data_dir + "/" + seq + "/kiss_icp_poses.txt";
   } else {
-    pose_path_ = abs_data_dir + "/" + seq + "/suma_pose.txt";
+    pose_path_ = abs_data_dir + "/" + seq + "/poses_suma_optim.txt";
   }
   ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork";
   //    ground_label_dir_ = abs_data_dir + "/" + seq + "/patchwork_filtered";

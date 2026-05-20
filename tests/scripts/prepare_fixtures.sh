@@ -34,7 +34,7 @@ if [[ ! -d "$DST/velodyne" || $(ls "$DST/velodyne" 2>/dev/null | wc -l) -lt $((E
     echo "[prepare] Copying frames $START..$END from $ERASOR2_SRC_KITTI"
     mkdir -p "$DST/velodyne" "$DST/labels"
     cp "$ERASOR2_SRC_KITTI"/{calib.txt,poses.txt,times.txt} "$DST/" 2>/dev/null || true
-    cp "$ERASOR2_SRC_KITTI/poses_suma.txt" "$DST/suma_pose.txt"
+    cp "$ERASOR2_SRC_KITTI/poses_suma_optim.txt" "$DST/poses_suma_optim.txt"
     for i in $(seq "$START" "$END"); do
         f=$(printf "%06d" "$i")
         cp "$ERASOR2_SRC_KITTI/velodyne/$f.bin"   "$DST/velodyne/"
