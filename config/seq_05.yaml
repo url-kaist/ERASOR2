@@ -6,12 +6,16 @@ is_large_scale: true
 dataloader:
     run_traj_clustering: false
     dataset_name: "SemanticKITTI"
-    abs_data_dir: "/media/shapelim/Elements/SemanticKITTI_for_ERASOR2/dataset/sequences"
+    # Edit the two abs_* paths below for your machine.
+    # `abs_data_dir` is <kitti_dir>/dataset/sequences (i.e. directly contains
+    # the per-sequence folders 00/, 01/, ... 21/). `abs_save_dir` is where
+    # mapgen + run_erasor2 write the GT and estimated PCDs.
+    abs_data_dir: "/home/url/datasets/kitti/dataset/sequences"
     cloud_dir: ""
     cloud_format: ""
     pose_path: ""
     sequence: "05"
-    abs_save_dir: "/media/shapelim/UX980/erasor_outputs/SemanticKITTI"
+    abs_save_dir: "/home/url/datasets/erasor2_outputs/SemanticKITTI"
     instance_seg_method: "cais"
 
     accum_interval: 2
