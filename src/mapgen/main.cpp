@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
   for (int i = start_frame; i < end_frame + accum_interval; ++i) {
     signal(SIGINT, erasor_utils::signal_callback_handler);
     if (i % 10 == 0) {
-      std::cout << "[MAPGEN] " << i << "th frame comes!" << std::endl;
+      std::cout << "[MAPGEN] frame " << i << " / " << end_frame << std::endl;
     }
 
     if (accum_interval > 1 && ++cnt / accum_interval >= 1) {
@@ -79,5 +79,6 @@ int main(int argc, char **argv) {
 
   mapgen->saveAccumMap(original_path, map_path);
 
+  erasor2::viz::shutdown();
   return 0;
 }

@@ -35,6 +35,12 @@ void init(const std::string& app_id    = "erasor2",
           bool spawn                   = true,
           const std::string& save_path = "");
 
+// Flush and destroy the global recording stream. Call this once from
+// main() right before returning. Tearing the stream down here instead
+// of during static destruction avoids a rust panic from rerun's runtime
+// when its thread-local storage has already been reaped by exit handlers.
+void shutdown();
+
 // Disable all subsequent log calls. Mirrors the various viz_flag booleans.
 void setEnabled(bool enabled);
 bool isEnabled();

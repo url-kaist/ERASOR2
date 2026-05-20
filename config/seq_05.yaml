@@ -16,7 +16,7 @@ dataloader:
     pose_path: ""
     sequence: "05"
     abs_save_dir: "/home/url/datasets/erasor2_outputs/SemanticKITTI"
-    instance_seg_method: "cais"
+    instance_seg_method: "hdbscan"
 
     accum_interval: 2
     voxel_size: 0.2

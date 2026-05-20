@@ -165,5 +165,6 @@ int main(int argc, char **argv) {
   logMethod("scan2map", s_tp, s_fp, s_fn, s_tn);
 
   std::cout << "[compare_map] Done.\n";
+  erasor2::viz::shutdown();
   return 0;
 }

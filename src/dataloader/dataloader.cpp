@@ -87,12 +87,12 @@ SemanticKITTILoader::SemanticKITTILoader(const string &abs_data_dir,
   }
 
   cloud_format_ = "bin";
-  cout << "\033[1;32m[DataLoader] Data directories are as follows:" << endl;
-  cout << cloud_dir_ << endl;
-  cout << gt_label_dir_ << endl;
-  cout << pose_path_ << endl;
-  cout << ground_label_dir_ << endl;
-  cout << est_label_dir_ << "\033[0m" << endl;
+  cout << "\033[1;32m[DataLoader] Data sources:\n"
+       << "  scans      : " << cloud_dir_ << "\n"
+       << "  gt labels  : " << gt_label_dir_ << "\n"
+       << "  poses      : " << pose_path_ << "\n"
+       << "  ground     : " << ground_label_dir_ << "\n"
+       << "  instances  : " << est_label_dir_ << "\033[0m" << endl;
 
   countNumFrames(cloud_dir_, cloud_format_);
   loadAllPoses(pose_path_, poses_gt_);
@@ -249,7 +249,6 @@ void SemanticKITTILoader::assignLabels(const std::vector<uint32_t> ground_labels
 
 void SemanticKITTILoader::loadGTLabel(const size_t idx, vector<uint32_t> &labels) {
   string label_name = (boost::format("%s/%06d.label") % gt_label_dir_ % idx).str();
-  std::cout << label_name << "\n";
   if (!fs::exists(label_name)) {
     throw std::invalid_argument("File does not exist: " + label_name);
   } else {

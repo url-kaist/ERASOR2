@@ -276,5 +276,6 @@ int main(int argc, char **argv) {
 
     ++cluster_id;
   }
+  erasor2::viz::shutdown();
   return 0;
 }

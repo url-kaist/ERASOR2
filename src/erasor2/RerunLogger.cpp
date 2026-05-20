@@ -40,6 +40,14 @@ void init(const std::string& app_id, bool spawn, const std::string& save_path) {
   });
 }
 
+void shutdown() {
+  g_enabled.store(false);
+  if (g_rec) {
+    g_rec->flush_blocking();
+    g_rec.reset();
+  }
+}
+
 void setEnabled(bool enabled) { g_enabled.store(enabled); }
 bool isEnabled() { return g_enabled.load() && g_rec != nullptr; }
 

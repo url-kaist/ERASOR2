@@ -51,10 +51,6 @@ class Mapgen : public RosParamServer {
     pcl::PointCloud<pcl::PointXYZI>::Ptr ptr_transformed(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::transformPointCloud(cloud, *ptr_transformed, tf_h_of_ground_to_be_zero_);
 
-    std::cout << std::setprecision(3) << std::left << setw(print_width) << setfill(separator)
-              << "=> [Pose] " << pose(0, 3) << ", " << pose(1, 3) << ", " << pose(2, 3)
-              << std::endl;
-
     pcl::PointCloud<pcl::PointXYZI>::Ptr world_transformed(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::transformPointCloud(*ptr_transformed, *world_transformed, pose);
 
