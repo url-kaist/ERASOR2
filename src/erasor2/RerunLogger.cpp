@@ -180,8 +180,15 @@ void TextArrayPublisher::publishScores(
   labels.reserve(objs.size());
   for (const auto& [pos, score] : objs) {
     pts.emplace_back(rerun::Position3D{pos.x(), pos.y(), pos.z()});
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%.2f", score);
+    // `score` is the mean log-odds dyn(S_{k,t}) from Eq. (13) of
+    // Lim et al., RSS 2023. The probability that the instance is
+    // moving is logit^{-1}(score) = 1 / (1 + exp(-score)) -- the
+    // same value that Eq. (15) thresholds against p(p̄_{k,t}). Show
+    // the probability up front for at-a-glance reading and keep the
+    // raw log-odds in parentheses for debugging.
+    const float prob = 1.0f / (1.0f + std::exp(-score));
+    char buf[48];
+    std::snprintf(buf, sizeof(buf), "%.4f (%.2f)", prob, score);
     labels.emplace_back(rerun::Text(buf));
   }
   rerun::Color rc{static_cast<uint8_t>(std::round(color[0] * 255.0f)),
