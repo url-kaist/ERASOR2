@@ -56,14 +56,14 @@ Download SemanticKITTI so the sequence folders live under
 look like this:
 
 ```text
-<kitti_dir>/                         # e.g., /home/url/datasets/kitti
+<kitti_dir>/                         # e.g., /home/<user id>/datasets/kitti
 └── dataset/
     ├── poses/
     └── sequences/
         ├── 00/
         │   ├── velodyne/
         │   ├── labels/
-        │   ├── poses_suma_optim.txt
+        │   ├── **poses_suma_optim.txt** (important)
         │   └── times.txt
         ├── 01/
         ├── 02/
@@ -108,20 +108,69 @@ ______________________________________________________________________
 
 ## :bar_chart: Headline numbers
 
-| Seq | Frames | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
-|:---:|:------:|:-------------------:|:-------------------:|:--------------:|
-| 00  | 4390 &ndash; 4530 | 98.788 / **98.654** | 98.582 / **98.454** | 0.987 / **0.9855** |
-| 01  |  150 &ndash;  250 | 96.879 / **95.743** | 94.629 / **94.027** | 0.957 / **0.9488** |
-| 02  |  860 &ndash;  950 | 98.523 / **99.196** | 99.709 / **99.902** | 0.991 / **0.9955** |
-| 05  | 2350 &ndash; 2670 | 97.582 / **97.670** | 98.992 / **98.412** | 0.983 / **0.9804** |
-| 07  |  630 &ndash;  820 | 98.977 / **96.135** | 98.459 / **98.989** | 0.987 / **0.9754** |
+Some reproduced numbers may differ slightly from the paper after the
+ROS-free refactor, but the overall performance remains consistent with
+the reported HDBSCAN-based results. Because this implementation uses
+HDBSCAN for instance segmentation, compare against the HDBSCAN rows in
+Table III of the paper.
+
+<div align="center">
+  <table>
+    <thead>
+      <tr>
+        <th align="center">Seq</th>
+        <th align="center">Frames</th>
+        <th align="center">PR [%] paper / ours</th>
+        <th align="center">RR [%] paper / ours</th>
+        <th align="center">F1 paper / ours</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td align="center">00</td>
+        <td align="center">4390 &ndash; 4530</td>
+        <td align="center">98.649 / <strong>98.654</strong></td>
+        <td align="center">98.582 / <strong>98.454</strong></td>
+        <td align="center">0.986 / <strong>0.9855</strong></td>
+      </tr>
+      <tr>
+        <td align="center">01</td>
+        <td align="center">150 &ndash; 250</td>
+        <td align="center">93.554 / <strong>95.743</strong></td>
+        <td align="center">94.951 / <strong>94.027</strong></td>
+        <td align="center">0.943 / <strong>0.9488</strong></td>
+      </tr>
+      <tr>
+        <td align="center">02</td>
+        <td align="center">860 &ndash; 950</td>
+        <td align="center">98.339 / <strong>99.196</strong></td>
+        <td align="center">99.709 / <strong>99.902</strong></td>
+        <td align="center">0.990 / <strong>0.9955</strong></td>
+      </tr>
+      <tr>
+        <td align="center">05</td>
+        <td align="center">2350 &ndash; 2670</td>
+        <td align="center">97.473 / <strong>97.670</strong></td>
+        <td align="center">99.113 / <strong>98.412</strong></td>
+        <td align="center">0.983 / <strong>0.9804</strong></td>
+      </tr>
+      <tr>
+        <td align="center">07</td>
+        <td align="center">630 &ndash; 820</td>
+        <td align="center">98.767 / <strong>96.135</strong></td>
+        <td align="center">98.800 / <strong>98.989</strong></td>
+        <td align="center">0.988 / <strong>0.9754</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
 Higher is better on all three metrics:
 
-- **PR (Preservation Rate)** measures static-map recall: how much true
+- **PR (Preservation Rate)** measures how much true
   static structure remains after dynamic-object removal.
-- **RR (Rejection Rate)** measures dynamic removal: how much dynamic
+- **RR (Rejection Rate)** measures how much dynamic
   structure is correctly rejected from the static map.
 - **F1** is the harmonic mean of PR and RR, giving one balanced score
   when preservation and rejection both matter.
