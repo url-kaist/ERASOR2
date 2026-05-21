@@ -23,6 +23,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -46,19 +47,35 @@ def run_one(pipeline_py, cfg_path, build_dir, conda_env, skip_existing):
         # Reuse cached mapgen + erasor2 PCDs if present so reruns are cheap.
         cmd += ["--skip-mapgen", "--skip-erasor2"]
     print("\033[1;36m$ {}\033[0m".format(" ".join(shlex.quote(c) for c in cmd)))
-    completed = subprocess.run(cmd, capture_output=True, text=True)
-    sys.stdout.write(completed.stdout)
-    sys.stderr.write(completed.stderr)
-    if completed.returncode != 0:
-        raise RuntimeError(
-            "{} exited with {}; aborting benchmark.".format(cfg_path, completed.returncode)
-        )
+    # Stream stdout to a tempfile rather than capture in-memory: a full
+    # run_erasor2 invocation produces tens of megabytes of stdout, and
+    # subprocess.run(capture_output=True) can deadlock once the pipe
+    # buffer fills.
+    with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".log") as logf:
+        log_path = logf.name
+    try:
+        with open(log_path, "w") as logf:
+            completed = subprocess.run(
+                cmd, stdout=logf, stderr=subprocess.STDOUT, text=True
+            )
+        if completed.returncode != 0:
+            with open(log_path) as logf:
+                sys.stderr.write(logf.read())
+            raise RuntimeError(
+                "{} exited with {}; aborting benchmark.".format(
+                    cfg_path, completed.returncode
+                )
+            )
+        with open(log_path) as logf:
+            stdout = logf.read()
+    finally:
+        os.unlink(log_path)
 
     # evaluate.py prints a single orgtbl data row that ends with the
     # three numbers we want: "| ... | 97.582 | 98.992 | 0.9830 |".
     # Grab the last pipe-delimited line that ends in a float.
     pr = rr = f1 = float("nan")
-    for line in reversed(completed.stdout.splitlines()):
+    for line in reversed(stdout.splitlines()):
         if "|" not in line:
             continue
         cells = [c.strip() for c in line.split("|") if c.strip()]
