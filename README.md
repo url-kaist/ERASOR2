@@ -125,9 +125,6 @@ ______________________________________________________________________
 If you use this code in academic work, please cite the ERASOR / ERASOR2
 papers.
 
-<details>
-  <summary><strong>See bibtex lists</strong></summary>
-
 ```bibtex
 @article{lim2025erasor2,
   title   = {{ERASOR2}: Instance-Aware Robust 3D Mapping of the Static World in Dynamic Scenes},
@@ -149,10 +146,13 @@ papers.
 }
 ```
 
-</details>
-
-______________________________________________________________________
-
-## :scroll: License
-
-GPLv3 &mdash; see the `LICENSE` file.
+```bibtex
+@inproceedings{lim2024helimos,
+  title        = {{HeLiMOS}: A Dataset for Moving Object Segmentation in 3D Point Clouds from Heterogeneous LiDAR Sensors},
+  author       = {Lim, Hyungtae and Jang, Seoyeon and Mersch, Benedikt and Behley, Jens and Myung, Hyun and Stachniss, Cyrill},
+  booktitle    = {2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  pages        = {14087--14094},
+  year         = {2024},
+  organization = {IEEE}
+}
+```
