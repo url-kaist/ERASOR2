@@ -5,6 +5,8 @@
 
 #include "erasor1/erasor.hpp"
 
+#include "tools/erasor_utils.hpp"
+
 #include <pcl/common/centroid.h>
 
 #include <algorithm>
@@ -315,6 +317,131 @@ void ERASOR::compare_vois_and_revert_ground(int /*frame*/) {
         r_pod_selected[r][theta] = bin_curr;
       } else if (bin_map.is_occupied) {
         r_pod_selected[r][theta] = bin_map;
+      }
+    }
+  }
+}
+
+// Lifted from upstream erasor.cpp:573-595 (ROS-free). Walks a small
+// neighbourhood of `r_pod_selected` looking for any bin currently flagged
+// CURR_IS_HIGHER (a dynamic object). Used by v3 to suppress merge_bins on
+// otherwise-static cells whose dynamic neighbour might be polluting the
+// scan-ratio test.
+bool ERASOR::is_dynamic_obj_close(R_POD& r_pod_selected,
+                                  int    r_target,
+                                  int    theta_target,
+                                  int    r_range,
+                                  int    theta_range) {
+  std::vector<int> theta_candidates;
+  for (int j = theta_target - theta_range; j <= theta_target + theta_range; j++) {
+    // Upstream uses `num_rings` here to wrap theta. Preserve that quirk
+    // bit-for-bit so port numerically matches.
+    if (j < 0) {
+      theta_candidates.push_back(j + num_rings);
+    } else if (j >= num_sectors) {
+      theta_candidates.push_back(j - num_rings);
+    } else {
+      theta_candidates.push_back(j);
+    }
+  }
+  for (int r = std::max(0, r_target - r_range);
+       r <= std::min(r_target + r_range, num_rings - 1);
+       r++) {
+    for (const auto& theta : theta_candidates) {
+      if (r == r_target && theta == theta_target) continue;
+      if (r_pod_selected[r][theta].status == CURR_IS_HIGHER) return true;
+    }
+  }
+  return false;
+}
+
+// Lifted from upstream erasor.cpp:438-571 (ROS-free; jsk PolygonArray and
+// sensor_msgs publishes dropped; the per-bin voxelization swap from
+// `voxelize_preserving_labels` to `voxelize_preserving_labels_by_nanoflann`
+// is the *only* non-mechanical change -- PCL's int-indexed VoxelGrid
+// integer-overflows at fine leaves over a 200m-extent map).
+void ERASOR::compare_vois_and_revert_ground_w_block(int /*frame*/) {
+  ground_viz.points.clear();
+
+  // ----- Pass 1: tag bin status based on scan-ratio test --------------
+  for (int theta = 0; theta < num_sectors; theta++) {
+    for (int r = 0; r < num_rings; r++) {
+      Bin& bin_curr = r_pod_curr[r][theta];
+      Bin& bin_map  = r_pod_map[r][theta];
+
+      if (bin_map.points.empty()) {
+        r_pod_selected[r][theta].status = LITTLE_NUM;
+        continue;
+      }
+
+      if (static_cast<int>(bin_curr.points.size()) < minimum_num_pts) {
+        r_pod_selected[r][theta].status = LITTLE_NUM;
+      } else {
+        double map_h_diff  = bin_map.max_h - bin_map.min_h;
+        double curr_h_diff = bin_curr.max_h - bin_curr.min_h;
+        double scan_ratio  = std::min(map_h_diff / curr_h_diff, curr_h_diff / map_h_diff);
+        if (bin_curr.is_occupied && bin_map.is_occupied) {
+          if (scan_ratio < scan_ratio_threshold) {
+            if (map_h_diff >= curr_h_diff) {
+              r_pod_selected[r][theta].status = MAP_IS_HIGHER;
+            } else if (map_h_diff <= curr_h_diff) {
+              r_pod_selected[r][theta].status = CURR_IS_HIGHER;
+            }
+          } else {
+            r_pod_selected[r][theta].status = MERGE_BINS;
+          }
+        } else if (bin_map.is_occupied) {
+          r_pod_selected[r][theta].status = LITTLE_NUM;
+        }
+      }
+    }
+  }
+
+  // ----- Pass 2: resolve each bin given the flagged statuses ----------
+  for (int theta = 0; theta < num_sectors; theta++) {
+    for (int r = 0; r < num_rings; r++) {
+      Bin& bin_curr = r_pod_curr[r][theta];
+      Bin& bin_map  = r_pod_map[r][theta];
+
+      const double status = r_pod_selected[r][theta].status;
+      if (status == LITTLE_NUM) {
+        r_pod_selected[r][theta]        = bin_map;
+        r_pod_selected[r][theta].status = LITTLE_NUM;
+      } else if (status == MAP_IS_HIGHER) {
+        // Fixed 0.5m height-diff gate (not th_bin_max_h) per upstream v3.
+        if ((bin_map.max_h - bin_map.min_h) > 0.5) {
+          r_pod_selected[r][theta]        = bin_curr;
+          r_pod_selected[r][theta].status = MAP_IS_HIGHER;
+
+          if (!piecewise_ground_.empty()) piecewise_ground_.clear();
+          if (!non_ground_.empty()) non_ground_.clear();
+          extract_ground(bin_map.points, piecewise_ground_, non_ground_);
+          r_pod_selected[r][theta].points += piecewise_ground_;
+
+          // Per-bin voxelize (the key v3 feature that prevents the
+          // merge-bin doubling pathology v2 suffered from).
+          pcl::PointCloud<pcl::PointXYZI>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZI>);
+          *tmp = r_pod_selected[r][theta].points;
+          erasor_utils::voxelize_preserving_labels_by_nanoflann(
+              tmp, r_pod_selected[r][theta].points, map_voxel_size_);
+
+          ground_viz += piecewise_ground_;
+          debug_map_rejected += non_ground_;
+        } else {
+          r_pod_selected[r][theta]        = bin_map;
+          r_pod_selected[r][theta].status = NOT_ASSIGNED;
+        }
+      } else if (status == CURR_IS_HIGHER) {
+        r_pod_selected[r][theta]        = bin_map;
+        r_pod_selected[r][theta].status = CURR_IS_HIGHER;
+      } else if (status == MERGE_BINS) {
+        if (is_dynamic_obj_close(r_pod_selected, r, theta, 1, 1)) {
+          r_pod_selected[r][theta]        = bin_map;
+          r_pod_selected[r][theta].status = BLOCKED;
+        } else {
+          r_pod_selected[r][theta]        = bin_map;
+          r_pod_selected[r][theta].status = MERGE_BINS;
+        }
       }
     }
   }

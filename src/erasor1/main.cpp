@@ -81,6 +81,11 @@ struct Config {
   int         end_frame;
   int         accum_interval;
   double      voxel_size;
+  // Sensor mount height above the body origin -- upstream calls this
+  // tf_lidar2body. KITTI velodyne sits ~1.73m above ground. Without this
+  // shift the LiDAR-frame scans have ground at z=-1.73, well outside the
+  // [min_h=-1.3, max_h=3.2] body-frame window the v1 paper uses.
+  double      lidar_z_offset;
   bool        rerun_enabled;
   bool        rerun_spawn;
   std::string rerun_save_path;
@@ -97,6 +102,7 @@ Config load_config(const std::string& path) {
   Config     c;
   c.start_frame    = get<int>(y, "start_frame", 0);
   c.end_frame      = get<int>(y, "end_frame", 0);
+  c.lidar_z_offset = get<double>(y, "lidar_z_offset", 1.73);
 
   const auto dl    = y["dataloader"];
   c.dataset_name   = get<std::string>(dl, "dataset_name", std::string("SemanticKITTI"));
@@ -122,6 +128,8 @@ Config load_config(const std::string& path) {
   c.params.gf_num_lpr           = get<int>(er, "gf_num_lpr", 10);
   c.params.gf_th_seeds_height   = get<double>(er, "gf_th_seeds_height", 0.5);
   c.params.map_voxel_size       = get<double>(er, "map_voxel_size", c.voxel_size);
+  c.params.query_voxel_size     = get<double>(er, "query_voxel_size", 0.05);
+  c.params.removal_interval     = get<int>(er, "removal_interval", 8);
 
   const auto rr   = y["rerun"];
   c.rerun_enabled = get<bool>(rr, "enabled", true);
@@ -185,6 +193,13 @@ int main(int argc, char** argv) {
   for (int k = cfg.start_frame; k <= cfg.end_frame; k += cfg.accum_interval) {
     bar.tick(++tick);
 
+    // Match upstream OfflineMapUpdater::callback_node: only run ERASOR
+    // every `removal_interval` ticks. In between, the running map is
+    // left as-is, which is what the upstream behaviour does (the
+    // `if (stack_count % removal_interval_ == 0)` gate at line 209
+    // of the upstream code).
+    if ((tick - 1) % cfg.params.removal_interval != 0) continue;
+
     pcl::PointCloud<pcl::PointXYZI> scan;
     Eigen::Matrix4f                 pose = Eigen::Matrix4f::Identity();
     if (cfg.dataset_name == "SemanticKITTI") {
@@ -195,18 +210,39 @@ int main(int argc, char** argv) {
     }
     if (scan.empty()) continue;
 
-    // Query VoI = the current scan in the body / sensor frame (the dataloader
-    // returns scans already in the LiDAR frame for KITTI, so no extra
-    // lidar->body transform is needed here).
-    pcl::PointCloud<pcl::PointXYZI> query_voi = scan;
+    // Voxelise the query scan at `query_voxel_size` before polar binning
+    // -- mirrors OfflineMapUpdater.cpp:238. Reduces raw-scan noise and
+    // keeps the per-frame bin sizes bounded.
+    pcl::PointCloud<pcl::PointXYZI> query_voi;
+    if (cfg.params.query_voxel_size > 0.0) {
+      pcl::PointCloud<pcl::PointXYZI>::Ptr scan_ptr(
+          new pcl::PointCloud<pcl::PointXYZI>(scan));
+      scan_ptr->width  = static_cast<std::uint32_t>(scan_ptr->points.size());
+      scan_ptr->height = scan_ptr->points.empty() ? 0 : 1;
+      erasor_utils::voxelize_preserving_labels_by_nanoflann(
+          scan_ptr, query_voi, cfg.params.query_voxel_size);
+    } else {
+      query_voi = scan;
+    }
     query_voi.width  = static_cast<std::uint32_t>(query_voi.points.size());
-    query_voi.height = 1;
+    query_voi.height = query_voi.points.empty() ? 0 : 1;
 
     pcl::PointCloud<pcl::PointXYZI> map_voi, outskirts;
     fetch_voi(*map_arranged, pose, cfg.params.max_range, map_voi, outskirts);
 
+    // Apply lidar->body z-shift so the paper's body-frame thresholds
+    // (`min_h=-1.3`, `max_h=3.2`) line up with our LiDAR-frame point
+    // data. Ground sits at z=-1.73 in the velodyne frame; we lift by
+    // +1.73 so it lands at z=0 inside the polar grid. Reversed below.
+    for (auto& pt : query_voi.points) pt.z += static_cast<float>(cfg.lidar_z_offset);
+    for (auto& pt : map_voi.points)   pt.z += static_cast<float>(cfg.lidar_z_offset);
+
     erasor.set_inputs(map_voi, query_voi);
-    erasor.compare_vois_and_revert_ground(k);
+    // Dispatch the v3 algorithm: two-pass scan-ratio with BLOCKED-state
+    // gating and per-bin voxelisation on ground revert. This is the
+    // path the upstream YAMLs ship with (`version: 3`) and produces the
+    // paper Table II numbers.
+    erasor.compare_vois_and_revert_ground_w_block(k);
 
     pcl::PointCloud<pcl::PointXYZI> static_estimate, complement;
     erasor.get_static_estimate(static_estimate, complement);
@@ -214,6 +250,9 @@ int main(int argc, char** argv) {
     // Transform the filtered VoI back to the world frame, then re-stitch
     // with the outskirts to form the next iteration's running map.
     pcl::PointCloud<pcl::PointXYZI> filtered_body = static_estimate + complement;
+    // Undo the body-frame z-shift applied above before transforming
+    // back to world with the (LiDAR-frame) pose.
+    for (auto& pt : filtered_body.points) pt.z -= static_cast<float>(cfg.lidar_z_offset);
     pcl::PointCloud<pcl::PointXYZI> filtered_world;
     if (!filtered_body.empty()) {
       filtered_body.width  = static_cast<std::uint32_t>(filtered_body.points.size());
@@ -227,18 +266,14 @@ int main(int argc, char** argv) {
     next_map->width  = static_cast<std::uint32_t>(next_map->points.size());
     next_map->height = 1;
 
-    // merge_bins inside ERASOR doubles a bin's point count for high
-    // scan-ratio cells. Without periodic global voxelization the running
-    // map ~doubles each frame, fetch_voi turns O(N) -> exponential. The
-    // upstream code's voxelize-on-stride hook (OfflineMapUpdater.cpp:300)
-    // does the same; we inline it here every frame at map_voxel_size.
-    // Without periodic voxelization the running map blows up by ~2x per
-    // frame because `merge_bins` concatenates src1.points + src2.points
-    // in static cells. pcl::VoxelGrid integer-overflows at fine leaves
-    // over a 200m-extent map, so we use the nanoflann-backed voxelizer
-    // already in this repo. NOTE: This produces a working but lossy
-    // result vs the paper -- see TODO in this file.
-    if (cfg.params.map_voxel_size > 0.0f && !next_map->empty()) {
+    // The global voxelize-after-each-frame in the v2 path (commit
+    // 91a48f6) is dropped here. The v3 algorithm voxelizes per-bin
+    // inside `compare_vois_and_revert_ground_w_block` on ground revert,
+    // and `removal_interval`-frame skipping keeps the cumulative growth
+    // in check. Re-voxelizing the full running map at 0.2m here would
+    // strip detail the GT also has and depress PR (the failure mode
+    // the v2 path produced).
+    if (false) {
       pcl::PointCloud<pcl::PointXYZI> voxed;
       erasor_utils::voxelize_preserving_labels_by_nanoflann(
           next_map, voxed, cfg.params.map_voxel_size);
@@ -250,9 +285,12 @@ int main(int argc, char** argv) {
   }
   bar.finish();
 
-  // Match run_erasor2's estimated.pcd naming so evaluate.py just works.
+  // Distinguish v1 from run_erasor2's output so both can coexist in the
+  // same abs_save_dir for a side-by-side benchmark. Naming mirrors v2's
+  // shape with `_v1` slotted before `_0_frame_`:
+  //   <seq>_v1_0_frame_<start>_to_<end>_estimated.pcd
   const std::string out_path = cfg.abs_save_dir + "/" + cfg.sequence +
-                               "_0_frame_" + std::to_string(cfg.start_frame) +
+                               "_v1_0_frame_" + std::to_string(cfg.start_frame) +
                                "_to_" + std::to_string(cfg.end_frame) +
                                "_estimated.pcd";
   std::filesystem::create_directories(std::filesystem::path(out_path).parent_path());

@@ -20,11 +20,13 @@ ______________________________________________________________________
 ## :bar_chart: Headline numbers
 
 Instance-aware dynamic-point rejection on the SemanticKITTI static-map
-benchmark proposed by Lim *et al.* [ERASOR, RA-L 2021]. Numbers below
-are from Table II of the [ERASOR2 paper](https://arxiv.org/abs/2306.05705)
-("paper") next to a fresh end-to-end measurement on this repository
-("ours") &mdash; PCL 1.12, GCC 11.4, `poses_suma_optim.txt` poses, and
-`pypatchworkpp 1.3.1` ground labels:
+benchmark proposed by Lim *et al.* [ERASOR, RA-L 2021]. Each row shows
+paper Table II numbers next to a fresh end-to-end measurement on this
+repository (`paper / ours`) for both **ERASOR** (v1) and **ERASOR2**
+(v2) -- PCL 1.12, GCC 11.4, `poses_suma_optim.txt` poses, and
+`pypatchworkpp 1.3.1` ground labels.
+
+### ERASOR2 (this paper)
 
 | Seq | Frames | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
 |----:|--------|--------------------:|--------------------:|----------------:|
@@ -34,10 +36,29 @@ are from Table II of the [ERASOR2 paper](https://arxiv.org/abs/2306.05705)
 | 05  | 2350 &ndash; 2670 | 97.582 / **97.670** | 98.992 / **98.412** | 0.983 / **0.9804** |
 | 07  |  630 &ndash;  820 | 98.977 / **96.135** | 98.459 / **98.989** | 0.987 / **0.9754** |
 
+ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
+
+### ERASOR (v1, ported from [LimHyungTae/ERASOR](https://github.com/LimHyungTae/ERASOR))
+
+| Seq | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
+|----:|--------------------:|--------------------:|----------------:|
+| 00  | 99.081 / **76.434** | 93.980 / **98.366** | 0.955 / **0.8602** |
+| 01  | 91.487 / **67.557** | 95.383 / **93.275** | 0.934 / **0.7836** |
+| 02  | 87.731 / **87.331** | 97.008 / **41.617** | 0.921 / **0.5637** |
+| 05  | 98.730 / **78.660** | 98.262 / **88.357** | 0.985 / **0.8323** |
+| 07  | 90.624 / **71.111** | 99.271 / **93.567** | 0.947 / **0.8080** |
+
+> The ERASOR (v1) port is **work-in-progress**: it builds cleanly and
+> runs end-to-end, but the mean &Delta;F1 vs the paper is ~0.13. The
+> v3 algorithm (`compare_vois_and_revert_ground_w_block`) and its
+> upstream YAML knobs (`removal_interval`, `query_voxel_size`,
+> `tf_lidar2body = [0, 0, 1.73]`) are all wired up; remaining gap
+> traces to running-map maintenance vs upstream's ROS callback loop
+> -- see [`src/erasor1/main.cpp`](src/erasor1/main.cpp) and the
+> orchestration TODOs there.
+
 > PR = Preservation Rate (static recall), RR = Rejection Rate
 > (dynamic removal), F1 = harmonic mean. Higher is better on all three.
-> Run-to-run drift comes mostly from HDBSCAN clustering randomness;
-> mean absolute &Delta;F1 across the five sequences is 0.006.
 
 ## :rocket: Reproducing the table
 

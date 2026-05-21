@@ -62,6 +62,16 @@ struct Params {
   int    gf_num_lpr           = 10;
   double gf_th_seeds_height   = 0.5;
   double map_voxel_size       = 0.2;
+  // v3-only orchestration knobs (see compare_vois_and_revert_ground_w_block):
+  // query is voxelised at this leaf before polar binning to dedup raw scan
+  // points; ERASOR is only invoked every `removal_interval` frames so the
+  // bin-merge growth stays bounded between calls.
+  double query_voxel_size     = 0.05;
+  // Default lifted from upstream's seq_05.yaml. Running ERASOR every
+  // frame (=1) keeps the bin-merge growth pathological and the
+  // running map blows up; 8 is what the paper benchmark used and
+  // strikes a reasonable cost/coverage balance.
+  int    removal_interval     = 8;
 };
 
 class ERASOR {
@@ -75,6 +85,12 @@ class ERASOR {
 
   // The "v2 algorithm" from the original repo (with-ground-revert).
   void compare_vois_and_revert_ground(int frame);
+
+  // The "v3 algorithm" from the original repo: two-pass scan-ratio +
+  // ground-revert with per-bin voxelization and BLOCKED-state gating
+  // when a dynamic neighbour is nearby. This is the path the upstream
+  // YAMLs ship with (`version: 3`) and the one whose numbers we target.
+  void compare_vois_and_revert_ground_w_block(int frame);
 
   // Pull the filtered static map back out of the bin grid.
   void get_static_estimate(pcl::PointCloud<pcl::PointXYZI>& arranged,
@@ -150,6 +166,15 @@ class ERASOR {
   bool has_dynamic(Bin& bin);
   void merge_bins(const Bin& src1, const Bin& src2, Bin& dst);
   void r_pod2pc(const R_POD& sc, pcl::PointCloud<pcl::PointXYZI>& pc);
+
+  // True iff any neighbouring bin within (r_range, theta_range) of
+  // (r_target, theta_target) is flagged CURR_IS_HIGHER -- used by v3
+  // to suppress merge spuriously triggered by a nearby dynamic object.
+  bool is_dynamic_obj_close(R_POD& r_pod_selected,
+                            int    r_target,
+                            int    theta_target,
+                            int    r_range,
+                            int    theta_range);
 };
 
 }  // namespace erasor1

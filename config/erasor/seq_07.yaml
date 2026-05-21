@@ -1,0 +1,38 @@
+# Ported from github.com/LimHyungTae/ERASOR/blob/master/config/seq_07.yaml.
+# Algorithm parameters match the upstream v1 config (paper Table II row).
+start_frame: 630
+end_frame: 820
+is_large_scale: true
+
+dataloader:
+    dataset_name: "SemanticKITTI"
+    abs_data_dir: "/home/url/datasets/kitti/dataset/sequences"
+    sequence: "07"
+    abs_save_dir: "/home/url/datasets/erasor2_outputs/SemanticKITTI"
+    accum_interval: 2
+    voxel_size: 0.2
+
+erasor:
+    version: 3
+    max_range: 80.0
+    num_rings: 20
+    num_sectors: 108
+    min_h: -0.8
+    max_h: 3.1
+    th_bin_max_h: 0.2
+    scan_ratio_threshold: 0.2
+    minimum_num_pts: 6
+    rejection_ratio: 0
+    gf_dist_thr: 0.125
+    gf_iter: 3
+    gf_num_lpr: 10
+    gf_th_seeds_height: 0.5
+    num_lowest_pts: 1
+    map_voxel_size: 0.2
+    query_voxel_size: 0.2
+    removal_interval: 5
+
+rerun:
+    enabled: true
+    spawn: true
+    save_path: ""

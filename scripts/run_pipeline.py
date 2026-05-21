@@ -160,7 +160,14 @@ def main():
     # 2. Resolve binaries from the cmake build dir --------------------------
     bdir = Path(args.build_dir)
     mapgen_bin = bdir / "mapgen"
-    erasor_bin = bdir / "run_erasor2"
+    # Dispatch on which algorithm to run -- v1 (the ERASOR paper port) vs
+    # v2 (ERASOR2). The config path is the canonical signal: configs under
+    # config/erasor/ -> run_erasor (v1), under config/erasor2/ -> run_erasor2.
+    cfg_path = Path(args.config).resolve()
+    if any(p.name == "erasor" for p in cfg_path.parents):
+        erasor_bin = bdir / "run_erasor"
+    else:
+        erasor_bin = bdir / "run_erasor2"
     for b in (mapgen_bin, erasor_bin):
         if not b.exists():
             sys.exit(
@@ -197,12 +204,14 @@ def main():
     else:
         run([str(mapgen_bin), args.config], env=cpp_env)
 
-    # 4. run_erasor2 ---------------------------------------------------------
-    est_pcd = Path(save_dir) / "{}_0_frame_{}_to_{}_estimated.pcd".format(
-        seq,
-        start,
-        end,
+    # 4. run_erasor / run_erasor2 -------------------------------------------
+    # v1 writes <seq>_v1_0_frame_..., v2 writes <seq>_0_frame_..., so a
+    # single abs_save_dir can hold both algorithms' outputs side by side.
+    is_v1 = erasor_bin.name == "run_erasor"
+    est_name = "{}_{}0_frame_{}_to_{}_estimated.pcd".format(
+        seq, "v1_" if is_v1 else "", start, end
     )
+    est_pcd = Path(save_dir) / est_name
     if args.skip_erasor2 and est_pcd.exists():
         print("[pipeline] Reusing existing {}".format(est_pcd))
     else:

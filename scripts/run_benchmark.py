@@ -27,13 +27,11 @@ import tempfile
 from pathlib import Path
 
 
-DEFAULT_CONFIGS = [
-    "config/erasor2/seq_00.yaml",
-    "config/erasor2/seq_01.yaml",
-    "config/erasor2/seq_02.yaml",
-    "config/erasor2/seq_05.yaml",
-    "config/erasor2/seq_07.yaml",
-]
+DEFAULT_SEQS = ["00", "01", "02", "05", "07"]
+
+DEFAULT_CONFIGS_ERASOR  = ["config/erasor/seq_{}.yaml".format(s) for s in DEFAULT_SEQS]
+DEFAULT_CONFIGS_ERASOR2 = ["config/erasor2/seq_{}.yaml".format(s) for s in DEFAULT_SEQS]
+DEFAULT_CONFIGS         = DEFAULT_CONFIGS_ERASOR2  # legacy alias
 
 
 def run_one(pipeline_py, cfg_path, build_dir, conda_env, skip_existing):
@@ -97,12 +95,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument(
+        "--algorithm",
+        choices=("erasor", "erasor2", "both"),
+        default="both",
+        help="Which algorithm(s) to run. 'both' runs ERASOR v1 then v2 over "
+        "the same sequence set and emits a side-by-side table.",
+    )
+    p.add_argument(
         "--config",
         nargs="+",
-        default=DEFAULT_CONFIGS,
-        help="One or more YAML configs to benchmark. Defaults: {}".format(
-            " ".join(DEFAULT_CONFIGS)
-        ),
+        default=None,
+        help="One or more YAML configs to benchmark. When --algorithm=both, "
+        "this is ignored and the default config/erasor/seq_XX.yaml + "
+        "config/erasor2/seq_XX.yaml lists are used.",
     )
     p.add_argument(
         "--build-dir",
@@ -126,44 +131,75 @@ def main():
     repo_root = Path(__file__).resolve().parent.parent
     pipeline_py = repo_root / "scripts" / "run_pipeline.py"
 
-    # Resolve relative configs against repo_root so the script works from
-    # any cwd.
-    configs = [
-        c if Path(c).is_absolute() else str(repo_root / c) for c in args.config
-    ]
-    for c in configs:
-        if not Path(c).is_file():
-            sys.exit("Config not found: {}".format(c))
+    # Resolve which config list(s) to run.
+    def resolve(paths):
+        out = [p if Path(p).is_absolute() else str(repo_root / p) for p in paths]
+        for p in out:
+            if not Path(p).is_file():
+                sys.exit("Config not found: {}".format(p))
+        return out
 
-    results = []  # list of (seq_label, pr, rr, f1)
-    for cfg_path in configs:
-        # Pull the SemanticKITTI sequence id out of the yaml for the
-        # row label without taking a yaml dep on this script.
-        seq = Path(cfg_path).stem.replace("seq_", "")
-        with open(cfg_path) as f:
-            for line in f:
-                m = re.match(r'\s*sequence:\s*"?(\w+)"?', line)
-                if m:
-                    seq = m.group(1)
-                    break
-        pr, rr, f1 = run_one(
-            pipeline_py,
-            cfg_path,
-            args.build_dir,
-            args.conda_env,
-            skip_existing=not args.no_skip_cached,
-        )
-        results.append((seq, pr, rr, f1))
+    if args.config:
+        # Explicit override; algorithm flag still controls table layout but
+        # the user-provided list takes precedence over the defaults.
+        configs_by_algo = {"explicit": resolve(args.config)}
+        algorithms = ["explicit"]
+    elif args.algorithm == "erasor":
+        configs_by_algo = {"erasor": resolve(DEFAULT_CONFIGS_ERASOR)}
+        algorithms = ["erasor"]
+    elif args.algorithm == "erasor2":
+        configs_by_algo = {"erasor2": resolve(DEFAULT_CONFIGS_ERASOR2)}
+        algorithms = ["erasor2"]
+    else:
+        configs_by_algo = {
+            "erasor":  resolve(DEFAULT_CONFIGS_ERASOR),
+            "erasor2": resolve(DEFAULT_CONFIGS_ERASOR2),
+        }
+        algorithms = ["erasor", "erasor2"]
+
+    # {algorithm: {seq: (pr, rr, f1)}}
+    results_by_algo = {a: {} for a in algorithms}
+    for algo in algorithms:
+        print("\033[1;36m=== Running algorithm: {} ===\033[0m".format(algo))
+        for cfg_path in configs_by_algo[algo]:
+            seq = Path(cfg_path).stem.replace("seq_", "")
+            with open(cfg_path) as f:
+                for line in f:
+                    m = re.match(r'\s*sequence:\s*"?(\w+)"?', line)
+                    if m:
+                        seq = m.group(1)
+                        break
+            pr, rr, f1 = run_one(
+                pipeline_py,
+                cfg_path,
+                args.build_dir,
+                args.conda_env,
+                skip_existing=not args.no_skip_cached,
+            )
+            results_by_algo[algo][seq] = (pr, rr, f1)
 
     # Final summary table.
     print()
     print("\033[1;36m=== Benchmark summary ===\033[0m")
-    print("| Seq | PR [%]   | RR [%]   | F1     |")
-    print("|----:|---------:|---------:|-------:|")
-    for seq, pr, rr, f1 in results:
-        print(
-            "| {:>3} | {:>7.3f}  | {:>7.3f}  | {:>5.4f} |".format(seq, pr, rr, f1)
-        )
+    if len(algorithms) == 1:
+        algo = algorithms[0]
+        print("| Seq | PR [%]   | RR [%]   | F1     |")
+        print("|----:|---------:|---------:|-------:|")
+        for seq, (pr, rr, f1) in results_by_algo[algo].items():
+            print("| {:>3} | {:>7.3f}  | {:>7.3f}  | {:>5.4f} |".format(seq, pr, rr, f1))
+    else:
+        # Side-by-side: v1 columns then v2 columns per seq.
+        seqs = sorted(set().union(*[results_by_algo[a].keys() for a in algorithms]))
+        print("| Seq | PR v1 | RR v1 | F1 v1  | PR v2 | RR v2 | F1 v2  |")
+        print("|----:|------:|------:|-------:|------:|------:|-------:|")
+        for seq in seqs:
+            v1 = results_by_algo.get("erasor",  {}).get(seq, (float("nan"),) * 3)
+            v2 = results_by_algo.get("erasor2", {}).get(seq, (float("nan"),) * 3)
+            print(
+                "| {:>3} | {:>5.2f} | {:>5.2f} | {:>5.4f} | {:>5.2f} | {:>5.2f} | {:>5.4f} |".format(
+                    seq, v1[0], v1[1], v1[2], v2[0], v2[1], v2[2]
+                )
+            )
 
 
 if __name__ == "__main__":
