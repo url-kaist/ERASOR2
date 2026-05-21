@@ -40,29 +40,31 @@ ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
 
 ### ERASOR (v1, ported from [LimHyungTae/ERASOR](https://github.com/LimHyungTae/ERASOR))
 
-| Seq | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
-|----:|--------------------:|--------------------:|----------------:|
-| 00  | 99.081 / **76.401** | 93.980 / **98.374** | 0.955 / **0.8601** |
-| 01  | 91.487 / **64.781** | 95.383 / **96.658** | 0.934 / **0.7757** |
-| 02  | 87.731 / **87.306** | 97.008 / **41.633** | 0.921 / **0.5638** |
-| 05  | 98.730 / **78.654** | 98.262 / **88.358** | 0.985 / **0.8322** |
-| 07  | 90.624 / **71.086** | 99.271 / **93.568** | 0.947 / **0.8079** |
+| Seq | F1 paper / upstream / ours | Notes |
+|----:|---------------------------:|-------|
+| 00  | 0.955 / -- / 0.8601 | upstream bag interval_2 |
+| 01  | 0.934 / **0.9321** / 0.7757 | upstream reproduces paper here &mdash; our port is the gap |
+| 02  | 0.921 / -- / 0.5638 | upstream bag interval_2 |
+| 05  | 0.985 / **0.9204** / 0.8322 | upstream sits 0.06 below paper because the bag is `interval_2` while seq_05.yaml expects `interval_1` |
+| 07  | 0.947 / -- / 0.8079 | upstream bag interval_2 |
 
-> The ERASOR (v1) port is **work-in-progress**: it builds cleanly and
-> runs end-to-end, but the mean &Delta;F1 vs the paper is ~0.18. The
-> v3 algorithm (`compare_vois_and_revert_ground_w_block`) and its
-> upstream YAML knobs are all wired up &mdash; `removal_interval`,
-> `query_voxel_size`, `tf_lidar2body = [0, 0, 1.73]`, per-seq mapgen
-> interval (seq 01 uses `interval_1`, others `interval_2`), final
-> voxelize at `voxel_size=0.2` matching upstream `save_static_map`,
-> and per-bin voxelize on ground revert.
->
-> Two failure modes remain visible: seqs 00/01/05/07 over-reject (low
-> PR with high RR), and seq 02 under-rejects (RR=42%) probably because
-> its tight `max_h=2.0` window misses the tops of taller dynamic
-> objects. Closing the gap looks structural &mdash; likely needs
-> side-by-side viz of `r_pod_selected` bin states to find what's
-> diverging from upstream.
+The "upstream" column is measured by running the unmodified
+[LimHyungTae/ERASOR](https://github.com/LimHyungTae/ERASOR) C++/ROS1 binary
+inside a ROS Melodic docker container against the KAIST-distributed
+`*_node.bag` files (see [`docker/`](docker/) for the reproducer
+harness). Two rows are filled in because those are the two bags the
+maintainer distributes publicly.
+
+The v1 port still trails upstream by 0.09&ndash;0.16 F1 on the two
+sequences we can ground-truth. The algorithm + every knob upstream
+exposes are wired up identically (`compare_vois_and_revert_ground_w_block`,
+`removal_interval` per seq, `query_voxel_size`, `tf_lidar2body=[0,0,1.73]`,
+per-bin voxelize on ground revert, final voxelize at 0.2m on save),
+so the remaining gap is most likely the pose source: upstream reads
+the bag's `/node/combined/optimized` topic (KAIST's post-processed
+odometry baked into the bag), while we feed `poses_suma_optim.txt`
+from the SemanticKITTI tree. Aligning those is the highest-leverage
+follow-up work and a candidate for a separate session.
 
 > PR = Preservation Rate (static recall), RR = Rejection Rate
 > (dynamic removal), F1 = harmonic mean. Higher is better on all three.
