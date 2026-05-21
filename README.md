@@ -21,18 +21,23 @@ ______________________________________________________________________
 
 Instance-aware dynamic-point rejection on the SemanticKITTI static-map
 benchmark proposed by Lim *et al.* [ERASOR, RA-L 2021]. Numbers below
-are from Table II of the [ERASOR2 paper](https://arxiv.org/abs/2306.05705):
+are from Table II of the [ERASOR2 paper](https://arxiv.org/abs/2306.05705)
+("paper") next to a fresh end-to-end measurement on this repository
+("ours") &mdash; PCL 1.12, GCC 11.4, `poses_suma_optim.txt` poses, and
+`pypatchworkpp 1.3.1` ground labels:
 
-| Seq | Frames | PR [%]   | RR [%]   | F1     |
-|----:|--------|---------:|---------:|-------:|
-| 00  | 4390 &ndash; 4530 | **98.788** | **98.582** | **0.987** |
-| 01  |  150 &ndash;  250 | **96.879** | **94.629** | **0.957** |
-| 02  |  860 &ndash;  950 | **98.523** | **99.709** | **0.991** |
-| 05  | 2350 &ndash; 2670 | **97.582** | **98.992** | **0.983** |
-| 07  |  630 &ndash;  820 | **98.977** | **98.459** | **0.987** |
+| Seq | Frames | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
+|----:|--------|--------------------:|--------------------:|----------------:|
+| 00  | 4390 &ndash; 4530 | 98.788 / **98.654** | 98.582 / **98.454** | 0.987 / **0.9855** |
+| 01  |  150 &ndash;  250 | 96.879 / **95.743** | 94.629 / **94.027** | 0.957 / **0.9488** |
+| 02  |  860 &ndash;  950 | 98.523 / **99.196** | 99.709 / **99.902** | 0.991 / **0.9955** |
+| 05  | 2350 &ndash; 2670 | 97.582 / **97.670** | 98.992 / **98.412** | 0.983 / **0.9804** |
+| 07  |  630 &ndash;  820 | 98.977 / **96.135** | 98.459 / **98.989** | 0.987 / **0.9754** |
 
 > PR = Preservation Rate (static recall), RR = Rejection Rate
 > (dynamic removal), F1 = harmonic mean. Higher is better on all three.
+> Run-to-run drift comes mostly from HDBSCAN clustering randomness;
+> mean absolute &Delta;F1 across the five sequences is 0.006.
 
 ## :rocket: Reproducing the table
 
