@@ -148,11 +148,10 @@ papers.
 
 ```bibtex
 @inproceedings{lim2024helimos,
-  title        = {{HeLiMOS}: A Dataset for Moving Object Segmentation in 3D Point Clouds from Heterogeneous LiDAR Sensors},
-  author       = {Lim, Hyungtae and Jang, Seoyeon and Mersch, Benedikt and Behley, Jens and Myung, Hyun and Stachniss, Cyrill},
-  booktitle    = {2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
-  pages        = {14087--14094},
-  year         = {2024},
-  organization = {IEEE}
+  title     = {{HeLiMOS: A dataset for moving object segmentation in 3D point clouds from heterogeneous LiDAR sensors}},
+  author    = {Lim, Hyungtae and Jang, Seoyeon and Mersch, Benedikt and Behley, Jens and Myung, Hyun and Stachniss, Cyrill},
+  booktitle = {2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  pages     = {14087--14094},
+  year      = {2024}
 }
 ```
