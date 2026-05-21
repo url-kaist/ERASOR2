@@ -1,5 +1,6 @@
 #include "erasor2/Config.hpp"
 #include "erasor2/RerunLogger.hpp"
+#include "erasor2/progress_bar.hpp"
 
 #include "dataloader/dataloader.h"
 #include "mapgen/mapgen.hpp"
@@ -31,11 +32,10 @@ int main(int argc, char **argv) {
   int accum_interval = mapgen->accum_interval_;
 
   int cnt = 0;
+  erasor2::ProgressBar mapgen_bar("[mapgen]  accumulate ", end_frame - start_frame + 1);
   for (int i = start_frame; i < end_frame + accum_interval; ++i) {
     signal(SIGINT, erasor_utils::signal_callback_handler);
-    if (i % 10 == 0) {
-      std::cout << "[MAPGEN] frame " << i << " / " << end_frame << std::endl;
-    }
+    mapgen_bar.tick(i - start_frame + 1);
 
     if (accum_interval > 1 && ++cnt / accum_interval >= 1) {
       cnt = 0;
@@ -57,6 +57,7 @@ int main(int argc, char **argv) {
     loader->rejectNeighboringPoints(*cloud_raw, mapgen->robot_body_size_, *cloud, *noise);
     mapgen->accumPointCloud(*cloud, pose);
   }
+  mapgen_bar.finish();
 
   string abs_save_dir = mapgen->abs_save_dir_;
   string interval     = to_string(mapgen->accum_interval_);

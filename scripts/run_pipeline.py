@@ -177,6 +177,12 @@ def main():
     env_root = args.conda_env or os.environ.get("CONDA_PREFIX") or sys.prefix
     if env_root and (Path(env_root) / "bin" / "rerun").exists():
         cpp_env["PATH"] = "{}/bin:{}".format(env_root, cpp_env.get("PATH", ""))
+    # Quiet down rerun's chatty info/error spam (e.g. the
+    # `re_grpc_client::write: Write messages call failed: transport
+    # error` line that prints whenever the viewer window is closed
+    # mid-stream). Show only warn+ from rerun crates; keep our own
+    # stdout intact.
+    cpp_env.setdefault("RUST_LOG", "warn,re_grpc_client=off,re_sdk_comms=off")
 
     # 3. mapgen --------------------------------------------------------------
     gt_pcd = Path(save_dir) / "{}_{}_to_{}_w_interval_{}_voxel_{}.pcd".format(

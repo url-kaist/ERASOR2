@@ -3,6 +3,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include "erasor2/grid_map.hpp"
+#include "erasor2/progress_bar.hpp"
 
 using namespace std;
 
@@ -395,8 +396,9 @@ ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &c
 }
 
 void ERASOR2::updateSteppableRegion() {
+  erasor2::ProgressBar bar("[erasor2] update     ", num_data_);
   for (int k = 0; k < num_data_; k += update_interval_) {
-    cout << "\r[ERASOR2] Updating " << k + 1 << " / " << num_data_ << flush;
+    bar.tick(k + 1);
     gridmap_submap_["elevation"].setConstant(NOT_UPDATED);
     //        erasor2::Position pos_xy(poses_submap_[k](0, 3), poses_submap_[k](1, 3));//
     //        new_origin_ 을 기준으로 삼아서 pose 를 저장해놓은 것에서 저 떄의 로봇 x, y 좌표의 위치
@@ -489,14 +491,15 @@ void ERASOR2::updateSteppableRegion() {
     }
   }
   logOddsGrid2probGrid();
-  cout << "\n";
+  bar.finish();
 }
 
 // Re-project ground likelihood to each scan
 void ERASOR2::detectMovingObjects() {
   GridPublisher.publish(gridmap_submap_, "prob");
+  erasor2::ProgressBar bar("[erasor2] detect     ", num_data_);
   for (int k = 0; k < num_data_; ++k) {
-    cout << "\r[Detect] Detecting moving instances " << k + 1 << " / " << num_data_ << flush;
+    bar.tick(k + 1);
     vector<float> dyn_cand_ids;  // temp. variable
     //        unordered_map<float, DynamicInstance> &ids_clusters  = ids_instances_set_[k];
     noisy_points_transformed_[k].reserve(100);
@@ -546,7 +549,7 @@ void ERASOR2::detectMovingObjects() {
       }
     }
   }
-  cout << "\n";
+  bar.finish();
 }
 
 void ERASOR2::saveDynamicLabels(const string &dynamic_label_root, const vector<size_t> &indices) {
@@ -554,17 +557,17 @@ void ERASOR2::saveDynamicLabels(const string &dynamic_label_root, const vector<s
   // Thus, we only save the labels of our interest
   // i.e., the input of ERASOR2 was `frames` + `expanded frames`
   int save_data_size = indices.size();
-  std::cout << "[ERASOR2] On saving label results..." << std::endl;
+  erasor2::ProgressBar bar("[erasor2] save labels", save_data_size);
   for (int k = 0; k < save_data_size; ++k) {
     int frame_num = indices[k];
-    cout << "\r[ERASOR2] Saving dynamic labels " << frame_num << " (" << k << " / "
-         << save_data_size << ")" << flush;
+    bar.tick(k + 1);
     erasor_utils::save_dyn_label(dynamic_label_root,
                                  frame_num,
                                  pcs_transformed_[k],
                                  dynamic_points_transformed_[k],
                                  potential_dynamic_points_transformed_[k]);
   }
+  bar.finish();
 }
 
 void ERASOR2::filterDynamicObjects() {
@@ -696,12 +699,6 @@ void ERASOR2::filterDynamicObjects() {
         }
       }
       DynInstCurrCloudPublisher.publish(inst_colored);
-
-      cout << pcs_transformed_[k].points.size() << " => "
-           << static_points_transformed_[k].points.size() << " / ";
-      cout << dynamic_points_transformed_[k].points.size() << " / "
-           << noisy_points_transformed_[k].size() << " / ";
-      cout << potential_dynamic_points_transformed_[k].points.size() << endl;
 
       CurrCloudPublisher.publish(pcs_transformed_[k]);
       DynCurrCloudPublisher.publish(dynamic_points_transformed_[k]);
@@ -1109,8 +1106,6 @@ void ERASOR2::volumetricOutlierRemoval(const pcl::PointCloud<pcl::PointXYZI> &st
   potential_dynamic_points.width =
       static_cast<std::uint32_t>(potential_dynamic_points.points.size());
   potential_dynamic_points.height = potential_dynamic_points.points.empty() ? 0 : 1;
-  cout << "\033[1;32mTotal " << potential_dynamic_points.size() << " points are filtered\033[0m"
-       << endl;
 }
 
 void ERASOR2::discernStaticAndDynamicPoints(const pcl::PointCloud<pcl::PointXYZI> &cloud,

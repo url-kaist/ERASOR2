@@ -199,7 +199,6 @@ void save_dyn_label(const std::string abs_dir,
   std::string count_str_padded = std::string(NUM_ZEROS - count_str.length(), '0') + count_str;
   std::string abs_label_path   = abs_dir + "/" + count_str_padded + ".label";
 
-  std::cout << "\033[1;32m" << abs_label_path << "\033[0m" << std::endl;
   std::ofstream output_file(abs_label_path, std::ios::out | std::ios::binary);
   output_file.write(reinterpret_cast<char *>(&labels[0]), num_cloud_raw * sizeof(uint32_t));
 }
