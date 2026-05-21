@@ -42,20 +42,27 @@ ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
 
 | Seq | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
 |----:|--------------------:|--------------------:|----------------:|
-| 00  | 99.081 / **76.434** | 93.980 / **98.366** | 0.955 / **0.8602** |
-| 01  | 91.487 / **67.557** | 95.383 / **93.275** | 0.934 / **0.7836** |
-| 02  | 87.731 / **87.331** | 97.008 / **41.617** | 0.921 / **0.5637** |
-| 05  | 98.730 / **78.660** | 98.262 / **88.357** | 0.985 / **0.8323** |
-| 07  | 90.624 / **71.111** | 99.271 / **93.567** | 0.947 / **0.8080** |
+| 00  | 99.081 / **76.401** | 93.980 / **98.374** | 0.955 / **0.8601** |
+| 01  | 91.487 / **64.781** | 95.383 / **96.658** | 0.934 / **0.7757** |
+| 02  | 87.731 / **87.306** | 97.008 / **41.633** | 0.921 / **0.5638** |
+| 05  | 98.730 / **78.654** | 98.262 / **88.358** | 0.985 / **0.8322** |
+| 07  | 90.624 / **71.086** | 99.271 / **93.568** | 0.947 / **0.8079** |
 
 > The ERASOR (v1) port is **work-in-progress**: it builds cleanly and
-> runs end-to-end, but the mean &Delta;F1 vs the paper is ~0.13. The
+> runs end-to-end, but the mean &Delta;F1 vs the paper is ~0.18. The
 > v3 algorithm (`compare_vois_and_revert_ground_w_block`) and its
-> upstream YAML knobs (`removal_interval`, `query_voxel_size`,
-> `tf_lidar2body = [0, 0, 1.73]`) are all wired up; remaining gap
-> traces to running-map maintenance vs upstream's ROS callback loop
-> -- see [`src/erasor1/main.cpp`](src/erasor1/main.cpp) and the
-> orchestration TODOs there.
+> upstream YAML knobs are all wired up &mdash; `removal_interval`,
+> `query_voxel_size`, `tf_lidar2body = [0, 0, 1.73]`, per-seq mapgen
+> interval (seq 01 uses `interval_1`, others `interval_2`), final
+> voxelize at `voxel_size=0.2` matching upstream `save_static_map`,
+> and per-bin voxelize on ground revert.
+>
+> Two failure modes remain visible: seqs 00/01/05/07 over-reject (low
+> PR with high RR), and seq 02 under-rejects (RR=42%) probably because
+> its tight `max_h=2.0` window misses the tops of taller dynamic
+> objects. Closing the gap looks structural &mdash; likely needs
+> side-by-side viz of `r_pod_selected` bin states to find what's
+> diverging from upstream.
 
 > PR = Preservation Rate (static recall), RR = Rejection Rate
 > (dynamic removal), F1 = harmonic mean. Higher is better on all three.

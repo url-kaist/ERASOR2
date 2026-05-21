@@ -295,11 +295,22 @@ int main(int argc, char** argv) {
                                "_estimated.pcd";
   std::filesystem::create_directories(std::filesystem::path(out_path).parent_path());
 
-  map_arranged->width  = static_cast<std::uint32_t>(map_arranged->points.size());
-  map_arranged->height = 1;
-  pcl::io::savePCDFileASCII(out_path, *map_arranged);
+  // Final voxelize at `voxel_size` (the dataloader.voxel_size, default
+  // 0.2). Mirrors OfflineMapUpdater::save_static_map line 186 which
+  // is triggered from the upstream README's
+  //     rostopic pub /saveflag std_msgs/Float32 "data: 0.2"
+  // Without this, the saved map carries uneven density (fine-voxel
+  // MAP_IS_HIGHER bins next to raw running-map regions) while the GT
+  // PCD is uniform at 0.2m -- the evaluate.py kNN check then misses
+  // matches and PR tanks.
+  pcl::PointCloud<pcl::PointXYZI> final_map;
+  erasor_utils::voxelize_preserving_labels_by_nanoflann(
+      map_arranged, final_map, cfg.voxel_size);
+  final_map.width  = static_cast<std::uint32_t>(final_map.points.size());
+  final_map.height = final_map.points.empty() ? 0 : 1;
+  pcl::io::savePCDFileASCII(out_path, final_map);
   std::cout << "\033[1;32m[erasor1] Saved static map: " << out_path
-            << " (" << map_arranged->size() << " pts)\033[0m\n";
+            << " (" << final_map.size() << " pts)\033[0m\n";
 
   erasor2::viz::shutdown();
   return 0;

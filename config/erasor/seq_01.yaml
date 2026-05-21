@@ -9,7 +9,12 @@ dataloader:
     abs_data_dir: "/home/url/datasets/kitti/dataset/sequences"
     sequence: "01"
     abs_save_dir: "/home/url/datasets/erasor2_outputs/SemanticKITTI"
-    accum_interval: 2
+    # seq 01's upstream bag is `01_150_to_250_w_interval_1_node.bag` and the
+    # paper-benchmark mapgen was built from every scan. accum_interval=1
+    # here matches that, producing `01_150_to_250_w_interval_1_voxel_0_2.pcd`
+    # which run_erasor will load as the initial map. Other seqs (00, 02,
+    # 05, 07) all ship interval_2 bags so they stay at accum_interval=2.
+    accum_interval: 1
     voxel_size: 0.2
 
 erasor:
