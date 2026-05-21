@@ -20,27 +20,19 @@ ______________________________________________________________________
 ## :bar_chart: Headline numbers
 
 Instance-aware dynamic-point rejection on the SemanticKITTI static-map
-benchmark proposed by Lim *et al.* [ERASOR, RA-L 2021]. Numbers below are
-from Table II of the [ERASOR2 paper](https://arxiv.org/abs/2306.05705)
-(reference frame ranges in the same table); seq 08 is added here as a
-user-extensible row (not in the paper).
+benchmark proposed by Lim *et al.* [ERASOR, RA-L 2021]. Numbers below
+are from Table II of the [ERASOR2 paper](https://arxiv.org/abs/2306.05705):
 
 | Seq | Frames | PR [%]   | RR [%]   | F1     |
 |----:|--------|---------:|---------:|-------:|
 | 00  | 4390 &ndash; 4530 | **98.788** | **98.582** | **0.987** |
+| 01  |  150 &ndash;  250 | **96.879** | **94.629** | **0.957** |
 | 02  |  860 &ndash;  950 | **98.523** | **99.709** | **0.991** |
 | 05  | 2350 &ndash; 2670 | **97.582** | **98.992** | **0.983** |
 | 07  |  630 &ndash;  820 | **98.977** | **98.459** | **0.987** |
-| 08  | 1500 &ndash; 1700 |   *(your hardware)*   |   *(your hardware)*   |   *(your hardware)*   |
 
 > PR = Preservation Rate (static recall), RR = Rejection Rate
 > (dynamic removal), F1 = harmonic mean. Higher is better on all three.
-
-> [!NOTE]
-> The original paper benchmark covers seqs **00, 01, 02, 05, 07**.
-> The fifth row here is **08** (per request) rather than 01; if you want
-> the paper-exact set, swap `config/seq_08.yaml` for `config/seq_01.yaml`
-> in the `run_benchmark.py` invocation below.
 
 ## :rocket: Reproducing the table
 
@@ -54,13 +46,13 @@ conda activate erasor2
 
 # 3. Generate per-frame ground + instance labels for each sequence.
 #    --kitti_dir is the directory ABOVE 'dataset/' for SemanticKITTI.
-for seq in 00 02 05 07 08; do
+for seq in 00 01 02 05 07; do
   case $seq in
     00) i=4390; e=4530;;
+    01)  i=150; e= 250;;
     02)  i=860; e= 950;;
     05) i=2350; e=2670;;
     07)  i=630; e= 820;;
-    08) i=1500; e=1700;;
   esac
   python scripts/kitti_clustering.py \
       --kitti_dir /path/to/kitti \
@@ -68,7 +60,7 @@ for seq in 00 02 05 07 08; do
       --save-instance-labels --save-ground-labels
 done
 
-# 4. Edit `config/seq_{00,02,05,07,08}.yaml` to point at your kitti and
+# 4. Edit `config/seq_{00,01,02,05,07}.yaml` to point at your kitti and
 #    output directories, then run the full benchmark in one shot.
 python scripts/run_benchmark.py
 ```

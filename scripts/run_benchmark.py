@@ -28,10 +28,10 @@ from pathlib import Path
 
 DEFAULT_CONFIGS = [
     "config/seq_00.yaml",
+    "config/seq_01.yaml",
     "config/seq_02.yaml",
     "config/seq_05.yaml",
     "config/seq_07.yaml",
-    "config/seq_08.yaml",
 ]
 
 
