@@ -38,33 +38,40 @@ repository (`paper / ours`) for both **ERASOR** (v1) and **ERASOR2**
 
 ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
 
-### ERASOR (v1, ported from [LimHyungTae/ERASOR](https://github.com/LimHyungTae/ERASOR))
+### ERASOR (v1, ported from [LimHyungTae/ERASOR](https://github.com/LimHyungTae/ERASOR)) &mdash; **TODO**
 
 | Seq | F1 paper / upstream / ours | Notes |
 |----:|---------------------------:|-------|
-| 00  | 0.955 / -- / 0.8601 | upstream bag interval_2 |
-| 01  | 0.934 / **0.9321** / 0.7757 | upstream reproduces paper here &mdash; our port is the gap |
-| 02  | 0.921 / -- / 0.5638 | upstream bag interval_2 |
-| 05  | 0.985 / **0.9204** / 0.8322 | upstream sits 0.06 below paper because the bag is `interval_2` while seq_05.yaml expects `interval_1` |
-| 07  | 0.947 / -- / 0.8079 | upstream bag interval_2 |
+| 00  | 0.955 / -- / 0.8601 | upstream bag not measured |
+| 01  | 0.934 / **0.9321** / 0.7757 | upstream reproduces paper &mdash; our port has a real 0.16 F1 gap |
+| 02  | 0.921 / -- / 0.5638 | upstream bag not measured |
+| 05  | 0.985 / **0.9204** / 0.8322 | upstream sits 0.06 below paper because the bag is `interval_2` while `seq_05.yaml`'s `initial_map_path` expects `interval_1` |
+| 07  | 0.947 / -- / 0.8079 | upstream bag not measured |
 
 The "upstream" column is measured by running the unmodified
-[LimHyungTae/ERASOR](https://github.com/LimHyungTae/ERASOR) C++/ROS1 binary
-inside a ROS Melodic docker container against the KAIST-distributed
+[LimHyungTae/ERASOR](https://github.com/LimHyungTae/ERASOR) C++/ROS1
+binary in a ROS Melodic docker container against the KAIST-distributed
 `*_node.bag` files (see [`docker/`](docker/) for the reproducer
-harness). Two rows are filled in because those are the two bags the
-maintainer distributes publicly.
+harness). Only the two bags the maintainer ships publicly were
+measured.
 
-The v1 port still trails upstream by 0.09&ndash;0.16 F1 on the two
-sequences we can ground-truth. The algorithm + every knob upstream
-exposes are wired up identically (`compare_vois_and_revert_ground_w_block`,
-`removal_interval` per seq, `query_voxel_size`, `tf_lidar2body=[0,0,1.73]`,
-per-bin voxelize on ground revert, final voxelize at 0.2m on save),
-so the remaining gap is most likely the pose source: upstream reads
-the bag's `/node/combined/optimized` topic (KAIST's post-processed
-odometry baked into the bag), while we feed `poses_suma_optim.txt`
-from the SemanticKITTI tree. Aligning those is the highest-leverage
-follow-up work and a candidate for a separate session.
+**Status: WIP, not yet at parity.** The algorithm + every upstream
+knob is wired identically
+(`compare_vois_and_revert_ground_w_block`, `removal_interval` per
+seq, `query_voxel_size`, `tf_lidar2body=[0, 0, 1.73]`, per-bin
+voxelize on ground revert, final voxelize at 0.2m on save). The
+0.09&ndash;0.16 F1 gap traces to the **pose source**: upstream
+reads `/node/combined/optimized` (KAIST's post-processed odometry
+baked into the bag, in a bag-local world frame), our port feeds
+`poses_suma_optim.txt` from the SemanticKITTI tree (a different
+world frame entirely). A quick experiment that piped the bag-extracted
+poses into our dataloader produced PR&asymp;99 but RR=0 -- the polar
+grid then sees a coordinate system the v3 algorithm was tuned
+against but the running-map maintenance is still wrong (the bag
+poses are *partial*: only for the bag-covered frames, not the full
+KITTI sequence). Closing this is a focused follow-up session; the
+docker harness in [`docker/`](docker/) keeps the ground-truth
+reproducible.
 
 > PR = Preservation Rate (static recall), RR = Rejection Rate
 > (dynamic removal), F1 = harmonic mean. Higher is better on all three.
