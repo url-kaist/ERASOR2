@@ -603,10 +603,14 @@ void ERASOR2::filterDynamicObjects() {
                << "\033[0m" << endl;
 
           if (viz_over_seg_) {
+            erasor2::viz::setFrame(static_cast<int64_t>(k));
             CurrCloudPublisher.publish(pcs_transformed_[k]);
             DynCurrCloudPublisher.publish(dynamic_instance.cloud_);
             NoiseCurrCloudPublisher.publish(partial_dynamic_inst.cloud_);
-            cin.ignore();
+            if (stop_for_each_frame_) {
+              std::cout << "[Over-seg] Waiting for pressing a key" << std::endl;
+              cin.ignore();
+            }
           }
 
           OverSegmentedInstance inst_to_be_updated;
