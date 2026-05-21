@@ -14,8 +14,8 @@ Typical invocation:
         --build-dir ./build
 
 The defaults match the sequences highlighted in the project README;
-override with `--config config/seq_XX.yaml [config/seq_YY.yaml ...]`
-to benchmark a custom set.
+override with `--config config/erasor2/seq_XX.yaml [...]` to
+benchmark a custom set.
 """
 import argparse
 import os
@@ -27,11 +27,11 @@ from pathlib import Path
 
 
 DEFAULT_CONFIGS = [
-    "config/seq_00.yaml",
-    "config/seq_01.yaml",
-    "config/seq_02.yaml",
-    "config/seq_05.yaml",
-    "config/seq_07.yaml",
+    "config/erasor2/seq_00.yaml",
+    "config/erasor2/seq_01.yaml",
+    "config/erasor2/seq_02.yaml",
+    "config/erasor2/seq_05.yaml",
+    "config/erasor2/seq_07.yaml",
 ]
 
 

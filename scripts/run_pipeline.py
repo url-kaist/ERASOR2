@@ -9,7 +9,7 @@ so a single command takes you from raw SemanticKITTI to PR/RR/F1.
 Typical invocation:
 
     python3 scripts/run_pipeline.py \\
-        --config       config/seq_05.yaml \\
+        --config       config/erasor2/seq_05.yaml \\
         --build-dir    ./build \\
         --preprocess                       # only on first run for a seq
 """

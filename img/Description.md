@@ -91,7 +91,7 @@ rosbag play 05_2350_to_2670_w_interval_2_node.bag
 
 **Step 2. Run ERASOR**
 
-- Set the following parameters in `config/seq_05.yaml`.
+- Set the following parameters in `config/erasor2/seq_05.yaml`.
 
   - `initial_map_path`: The path of naively accumulated map
   - `save_path`: The path where the filtered static map is saved.

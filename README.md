@@ -60,8 +60,8 @@ for seq in 00 01 02 05 07; do
       --save-instance-labels --save-ground-labels
 done
 
-# 4. Edit `config/seq_{00,01,02,05,07}.yaml` to point at your kitti and
-#    output directories, then run the full benchmark in one shot.
+# 4. Edit `config/erasor2/seq_{00,01,02,05,07}.yaml` to point at your kitti
+#    and output directories, then run the full benchmark in one shot.
 python scripts/run_benchmark.py
 ```
 

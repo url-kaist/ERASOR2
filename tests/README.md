@@ -2,7 +2,7 @@
 
 `.github/workflows/parity.yml` re-runs the seq-05 `[2350..2670]` end-to-end
 pipeline on every PR that touches `src/`, `include/`, `CMakeLists.txt`, or
-`config/seq_05*.yaml`. It asserts the output PCDs are **byte-identical** to
+`config/erasor2/seq_05*.yaml`. It asserts the output PCDs are **byte-identical** to
 a frozen golden set, plus a softer PR / RR / F1 tolerance check.
 
 This is the same comparison that was used to validate the ROS-free rerun

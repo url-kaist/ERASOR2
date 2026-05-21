@@ -84,7 +84,7 @@ Stale `VTK::mpi` import in the 24.04 PCL config. Add
 v1.0. Equivalent invocation:
 
 ```bash
-./build/run_erasor2 ./config/seq_05.yaml
+./build/run_erasor2 ./config/erasor2/seq_05.yaml
 ```
 
 The `launch/` and `rviz/` directories are kept for historical
@@ -157,11 +157,11 @@ python scripts/kitti_clustering.py \
     --save-instance-labels --save-ground-labels
 
 # 2. Full pipeline: mapgen → run_erasor2 → evaluate.
-#    Before running, edit `config/seq_05.yaml` and set `abs_data_dir`
+#    Before running, edit `config/erasor2/seq_05.yaml` and set `abs_data_dir`
 #    (= <kitti_dir>/dataset/sequences) and `abs_save_dir` (where mapgen
 #    and run_erasor2 will write the GT/estimated PCDs) for your machine.
 python scripts/run_pipeline.py \
-    --config config/seq_05.yaml \
+    --config config/erasor2/seq_05.yaml \
     --conda-env ~/.miniconda3/envs/erasor2-3.10
 ```
 
@@ -211,8 +211,8 @@ The wrapper just orchestrates the C++ binaries via `subprocess`; you
 can also invoke them directly:
 
 ```bash
-./build/mapgen      config/seq_05.yaml
-./build/run_erasor2 config/seq_05.yaml
+./build/mapgen      config/erasor2/seq_05.yaml
+./build/run_erasor2 config/erasor2/seq_05.yaml
 python scripts/evaluate.py \
     --gt  <abs_save_dir>/<gt>.pcd \
     --est <abs_save_dir>/<est>.pcd
@@ -319,8 +319,8 @@ python scripts/kitti_clustering.py \
     --save-instance-labels --save-ground-labels
 
 # mapgen + run_erasor2 against the HeLiPR config.
-./build/mapgen      config/helipr_mapgen.yaml
-./build/run_erasor2 config/helipr_mapgen.yaml
+./build/mapgen      config/erasor2/helipr_mapgen.yaml
+./build/run_erasor2 config/erasor2/helipr_mapgen.yaml
 ```
 
 > [!WARNING]
@@ -330,14 +330,14 @@ python scripts/kitti_clustering.py \
 > Ouster/Velodyne), so clustering hyperparameters that look fine on one
 > sensor may over- or under-segment on another.
 
-The three shipped HeLiPR configs (`config/HeLiPR.yaml`,
-`config/HeLiPR_kitti.yaml`, `config/helipr_mapgen.yaml`) carry example
+The three shipped HeLiPR configs (`config/erasor2/HeLiPR.yaml`,
+`config/erasor2/HeLiPR_kitti.yaml`, `config/erasor2/helipr_mapgen.yaml`) carry example
 paths from the original dev machines under `/media/...`; repoint
 `abs_data_dir` and `abs_save_dir` before running. The HeLiPR-specific
 preprocessing binaries `helipr_to_kitti` and `merge_heliclouds`
 (per-sensor extraction → time-aligned merge into `Merged`) take their
 own YAMLs — see the `dataprocessor:` section in
-`config/HeLiPR_kitti.yaml`.
+`config/erasor2/HeLiPR_kitti.yaml`.
 
 ______________________________________________________________________
 

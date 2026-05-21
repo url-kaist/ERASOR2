@@ -38,7 +38,7 @@ ${abs_data_dir} ex) /media/se0yeon00/SY_Other/HeliPR/KAIST05
 
 `inspva.csv` 파일로 부터 INS trajectory 를 계산해, txt 파일로 만들어줍니다.
 이는 `timestamp.bin` 으로 명명되어 있는 각각의 라이다 스캔 데이터를 deskewing 할 때 사용됩니다.
-erasor2 의 `config/HeLiPR_kitti.yaml` 을 본인의 폴더 경로와 같이 수정해주세요.
+erasor2 의 `config/erasor2/HeLiPR_kitti.yaml` 을 본인의 폴더 경로와 같이 수정해주세요.
 
 ```
 dataprocessor:

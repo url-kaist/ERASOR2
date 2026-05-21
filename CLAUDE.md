@@ -21,7 +21,7 @@ Keep it under ~150 lines. Anything longer goes in `.claude/memory/`.
 cmake -B build -S . && cmake --build build -j
 
 # Full pipeline (preprocessing → mapgen → run_erasor2 → evaluate):
-python scripts/run_pipeline.py --config config/seq_05.yaml \
+python scripts/run_pipeline.py --config config/erasor2/seq_05.yaml \
     --conda-env ~/.miniconda3/envs/erasor2-3.10
 ```
 
