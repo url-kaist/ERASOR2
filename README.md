@@ -116,17 +116,17 @@ Table III of the paper.
 
 <div align="center">
 
-| Seq | Frames | PR [%] (paper / ours) | RR [%] (paper / ours) | F1 (paper / ours) |
+| Seq | Frames | PR [%] ( $\color{#c026d3}\textsf{paper}$ / $\color{#0969da}\textsf{ours}$ ) | RR [%] ( $\color{#c026d3}\textsf{paper}$ / $\color{#0969da}\textsf{ours}$ ) | F1 ( $\color{#c026d3}\textsf{paper}$ / $\color{#0969da}\textsf{ours}$ ) |
 |:---:|:---:|:---:|:---:|:---:|
-| 00 | 4390 – 4530 | $\color{gray}98.649$ / $\color{#0969da}\mathbf{98.654}$ | $\color{gray}\mathbf{98.582}$ / $\color{#0969da}98.454$ | $\color{gray}\mathbf{0.986}$ / $\color{#0969da}0.9855$ |
-| 01 |  150 –  250 | $\color{gray}93.554$ / $\color{#0969da}\mathbf{95.743}$ | $\color{gray}\mathbf{94.951}$ / $\color{#0969da}94.027$ | $\color{gray}0.943$ / $\color{#0969da}\mathbf{0.9488}$ |
-| 02 |  860 –  950 | $\color{gray}98.339$ / $\color{#0969da}\mathbf{99.196}$ | $\color{gray}99.709$ / $\color{#0969da}\mathbf{99.902}$ | $\color{gray}0.990$ / $\color{#0969da}\mathbf{0.9955}$ |
-| 05 | 2350 – 2670 | $\color{gray}97.473$ / $\color{#0969da}\mathbf{97.670}$ | $\color{gray}\mathbf{99.113}$ / $\color{#0969da}98.412$ | $\color{gray}\mathbf{0.983}$ / $\color{#0969da}0.9804$ |
-| 07 |  630 –  820 | $\color{gray}\mathbf{98.767}$ / $\color{#0969da}96.135$ | $\color{gray}98.800$ / $\color{#0969da}\mathbf{98.989}$ | $\color{gray}\mathbf{0.988}$ / $\color{#0969da}0.9754$ |
+| 00 | 4390 – 4530 | $\color{#c026d3}98.649$ / $\color{#0969da}\mathbf{98.654}$ | $\color{#c026d3}\mathbf{98.582}$ / $\color{#0969da}98.454$ | $\color{#c026d3}\mathbf{0.986}$ / $\color{#0969da}0.9855$ |
+| 01 |  150 –  250 | $\color{#c026d3}93.554$ / $\color{#0969da}\mathbf{95.743}$ | $\color{#c026d3}\mathbf{94.951}$ / $\color{#0969da}94.027$ | $\color{#c026d3}0.943$ / $\color{#0969da}\mathbf{0.9488}$ |
+| 02 |  860 –  950 | $\color{#c026d3}98.339$ / $\color{#0969da}\mathbf{99.196}$ | $\color{#c026d3}99.709$ / $\color{#0969da}\mathbf{99.902}$ | $\color{#c026d3}0.990$ / $\color{#0969da}\mathbf{0.9955}$ |
+| 05 | 2350 – 2670 | $\color{#c026d3}97.473$ / $\color{#0969da}\mathbf{97.670}$ | $\color{#c026d3}\mathbf{99.113}$ / $\color{#0969da}98.412$ | $\color{#c026d3}\mathbf{0.983}$ / $\color{#0969da}0.9804$ |
+| 07 |  630 –  820 | $\color{#c026d3}\mathbf{98.767}$ / $\color{#0969da}96.135$ | $\color{#c026d3}98.800$ / $\color{#0969da}\mathbf{98.989}$ | $\color{#c026d3}\mathbf{0.988}$ / $\color{#0969da}0.9754$ |
 
 </div>
 
-<sub>$\color{gray}\textsf{Gray}$ = paper (Table III, HDBSCAN row), $\color{#0969da}\textsf{blue}$ = our re-run. **Bold** marks the higher value per cell.</sub>
+<sub>$\color{#c026d3}\textsf{Magenta}$ = paper (Table III, HDBSCAN row), $\color{#0969da}\textsf{blue}$ = our re-run. **Bold** marks the higher value per cell.</sub>
 
 ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
 Higher is better on all three metrics:
