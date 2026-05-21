@@ -1,16 +1,29 @@
 <div align="center">
     <h1>ERASOR2</h1>
-    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/-C++-blue?logo=cplusplus" /></a>
-    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/Python-3670A0?logo=python&logoColor=ffdd54" /></a>
-    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/Ubuntu-20.04%20%7C%2022.04-E95420?logo=ubuntu&logoColor=white" /></a>
-    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/CMake-064F8C?logo=cmake&logoColor=white" /></a>
-    <a href="https://github.com/LimHyungTae/ERASOR2"><img src="https://img.shields.io/badge/license-GPLv3-green" /></a>
+    <a href="https://github.com/url-kaist/ERASOR2"><img src="https://img.shields.io/badge/-C++-blue?logo=cplusplus" /></a>
+    <a href="https://github.com/url-kaist/ERASOR2"><img src="https://img.shields.io/badge/Python-3670A0?logo=python&logoColor=ffdd54" /></a>
+    <a href="https://github.com/url-kaist/ERASOR2"><img src="https://img.shields.io/badge/Ubuntu-20.04%20%7C%2022.04-E95420?logo=ubuntu&logoColor=white" /></a>
+    <a href="https://github.com/url-kaist/ERASOR2"><img src="https://img.shields.io/badge/CMake-064F8C?logo=cmake&logoColor=white" /></a>
+    <a href="https://www.ipb.uni-bonn.de/wp-content/papercite-data/pdf/lim2023rss.pdf"><img src="https://img.shields.io/badge/Paper-b33737?logo=arXiv" /></a>
+    <a href="https://www.youtube.com/watch?v=cELvWYxfrpY"><img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white" /></a>
+    <a href="https://github.com/url-kaist/ERASOR2"><img src="https://img.shields.io/badge/license-GPLv3-green" /></a>
+    <br />
+    <br />
+    <a href="https://www.youtube.com/watch?v=cELvWYxfrpY">Video</a>
+    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+    <a href="#package-installation">Install</a>
+    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+    <a href="#rocket-how-to-run">How to Run</a>
+    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+    <a href="https://www.ipb.uni-bonn.de/wp-content/papercite-data/pdf/lim2023rss.pdf">Paper</a>
+    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+    <a href="https://github.com/url-kaist/ERASOR2/issues">Contact Us</a>
     <br />
     <br />
   <p align="center">
     <img width="640" height="485" alt="ERASOR2 demo" src="https://github.com/user-attachments/assets/5dc13005-c22a-4428-a55e-1f3d6ed97339" />
     <br />
-    <img width="640" height="294" alt="ERASOR2 comparison" src="https://github.com/user-attachments/assets/05377816-4e71-4ebe-afb6-9a16260d0248" />
+    <img width="640" height="294" alt="ERASOR2 comparison" src="https://github.com/user-attachments/assets/3eb35e63-7b71-4bfd-84cd-74605ed34a90" />
   </p>
   <p><strong><em>Static-map distillation from accumulated LiDAR maps. ROS-free, catkin-free, just CMake.</em></strong></p>
   <p align="center">
@@ -21,12 +34,6 @@
 ______________________________________________________________________
 
 ## :bar_chart: Headline numbers
-
-Instance-aware dynamic-point rejection on the SemanticKITTI static-map
-benchmark proposed by Lim *et al.* [ERASOR, RA-L 2021]. Each row shows
-paper Table II numbers next to a fresh end-to-end measurement on this
-repository (`paper / ours`) &mdash; PCL 1.12, GCC 11.4,
-`poses_suma_optim.txt` poses, and `pypatchworkpp 1.3.1` ground labels.
 
 | Seq | Frames | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
 |----:|--------|--------------------:|--------------------:|----------------:|
@@ -43,7 +50,7 @@ ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
 
 ______________________________________________________________________
 
-## :rocket: How to reproduce
+## :package: Installation
 
 ```bash
 # 1. Build (one cmake call, no ROS/catkin).
@@ -52,7 +59,16 @@ cmake -B build -S . && cmake --build build -j
 # 2. Conda env for the Python preprocessors + evaluator.
 conda env create -f scripts/environment.yml   # creates env "erasor2"
 conda activate erasor2
+```
 
+See [**USAGE.md**](USAGE.md) for the full dependency list and per-distro
+notes.
+
+______________________________________________________________________
+
+## :rocket: How to Run
+
+```bash
 # 3. Generate per-frame Patchwork ground + HDBSCAN instance labels
 #    for seqs 00, 01, 02, 05, 07 in one shot.
 scripts/generate_labels.sh /path/to/kitti
@@ -64,10 +80,9 @@ python scripts/run_benchmark.py
 
 `scripts/run_benchmark.py` invokes `run_pipeline.py` for each yaml
 (mapgen &rarr; run_erasor2 &rarr; evaluate.py), then prints a single
-consolidated PR / RR / F1 table. See
-[**USAGE.md**](USAGE.md) for further explanation &mdash; the per-step
-breakdown, path-editing conventions, visualizer, YAML reference, and
-HeLiPR / HeLiMOS setup.
+consolidated PR / RR / F1 table. See [**USAGE.md**](USAGE.md) for further
+explanation &mdash; per-step breakdown, path-editing conventions,
+visualizer, YAML reference, and HeLiPR / HeLiMOS setup.
 
 ______________________________________________________________________
 
