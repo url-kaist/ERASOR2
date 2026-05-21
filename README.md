@@ -13,6 +13,11 @@
     <br />
     Full installation, HeLiPR / HeLiMOS, and YAML reference live in <a href="USAGE.md"><strong>USAGE.md</strong></a>.
   </p>
+  <p align="center">
+    <img width="500" height="379" alt="ERASOR2 demo" src="https://github.com/user-attachments/assets/5dc13005-c22a-4428-a55e-1f3d6ed97339" />
+    <br />
+    <img width="400" height="184" alt="ERASOR2 comparison" src="https://github.com/user-attachments/assets/05377816-4e71-4ebe-afb6-9a16260d0248" />
+  </p>
 </div>
 
 ______________________________________________________________________
