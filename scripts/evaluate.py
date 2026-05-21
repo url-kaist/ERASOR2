@@ -231,6 +231,7 @@ def evaluate(gt_xyz, gt_int_u32, est_xyz, est_int_u32, voxelsize=0.2):
             tablefmt="orgtbl",
         )
     )
+    return pr, rr, f1
 
 
 # ---------- main ----------
