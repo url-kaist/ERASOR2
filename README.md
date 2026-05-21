@@ -115,55 +115,18 @@ HDBSCAN for instance segmentation, compare against the HDBSCAN rows in
 Table III of the paper.
 
 <div align="center">
-  <table>
-    <thead>
-      <tr>
-        <th align="center">Seq</th>
-        <th align="center">Frames</th>
-        <th align="center">PR [%] paper / ours</th>
-        <th align="center">RR [%] paper / ours</th>
-        <th align="center">F1 paper / ours</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td align="center">00</td>
-        <td align="center">4390 &ndash; 4530</td>
-        <td align="center">98.649 / <strong>98.654</strong></td>
-        <td align="center">98.582 / <strong>98.454</strong></td>
-        <td align="center">0.986 / <strong>0.9855</strong></td>
-      </tr>
-      <tr>
-        <td align="center">01</td>
-        <td align="center">150 &ndash; 250</td>
-        <td align="center">93.554 / <strong>95.743</strong></td>
-        <td align="center">94.951 / <strong>94.027</strong></td>
-        <td align="center">0.943 / <strong>0.9488</strong></td>
-      </tr>
-      <tr>
-        <td align="center">02</td>
-        <td align="center">860 &ndash; 950</td>
-        <td align="center">98.339 / <strong>99.196</strong></td>
-        <td align="center">99.709 / <strong>99.902</strong></td>
-        <td align="center">0.990 / <strong>0.9955</strong></td>
-      </tr>
-      <tr>
-        <td align="center">05</td>
-        <td align="center">2350 &ndash; 2670</td>
-        <td align="center">97.473 / <strong>97.670</strong></td>
-        <td align="center">99.113 / <strong>98.412</strong></td>
-        <td align="center">0.983 / <strong>0.9804</strong></td>
-      </tr>
-      <tr>
-        <td align="center">07</td>
-        <td align="center">630 &ndash; 820</td>
-        <td align="center">98.767 / <strong>96.135</strong></td>
-        <td align="center">98.800 / <strong>98.989</strong></td>
-        <td align="center">0.988 / <strong>0.9754</strong></td>
-      </tr>
-    </tbody>
-  </table>
+
+| Seq | Frames | PR [%] (paper / ours) | RR [%] (paper / ours) | F1 (paper / ours) |
+|:---:|:---:|:---:|:---:|:---:|
+| 00 | 4390 – 4530 | $\color{gray}98.649$ / $\color{#0969da}\mathbf{98.654}$ | $\color{gray}\mathbf{98.582}$ / $\color{#0969da}98.454$ | $\color{gray}\mathbf{0.986}$ / $\color{#0969da}0.9855$ |
+| 01 |  150 –  250 | $\color{gray}93.554$ / $\color{#0969da}\mathbf{95.743}$ | $\color{gray}\mathbf{94.951}$ / $\color{#0969da}94.027$ | $\color{gray}0.943$ / $\color{#0969da}\mathbf{0.9488}$ |
+| 02 |  860 –  950 | $\color{gray}98.339$ / $\color{#0969da}\mathbf{99.196}$ | $\color{gray}99.709$ / $\color{#0969da}\mathbf{99.902}$ | $\color{gray}0.990$ / $\color{#0969da}\mathbf{0.9955}$ |
+| 05 | 2350 – 2670 | $\color{gray}97.473$ / $\color{#0969da}\mathbf{97.670}$ | $\color{gray}\mathbf{99.113}$ / $\color{#0969da}98.412$ | $\color{gray}\mathbf{0.983}$ / $\color{#0969da}0.9804$ |
+| 07 |  630 –  820 | $\color{gray}\mathbf{98.767}$ / $\color{#0969da}96.135$ | $\color{gray}98.800$ / $\color{#0969da}\mathbf{98.989}$ | $\color{gray}\mathbf{0.988}$ / $\color{#0969da}0.9754$ |
+
 </div>
+
+<sub>$\color{gray}\textsf{Gray}$ = paper (Table III, HDBSCAN row), $\color{#0969da}\textsf{blue}$ = our re-run. **Bold** marks the higher value per cell.</sub>
 
 ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
 Higher is better on all three metrics:
