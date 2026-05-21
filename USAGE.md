@@ -292,6 +292,9 @@ ______________________________________________________________________
 
 ## :truck: HeLiPR / HeLiMOS
 
+> [!WARNING]
+> Not have been tested yet.
+
 The same binaries handle HeLiPR-style data — set
 `dataloader.dataset_name` to `"HeLiPR"` and point `abs_data_dir` at
 the directory that *contains* the per-sensor trees:
