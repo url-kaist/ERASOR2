@@ -33,23 +33,6 @@
 
 ______________________________________________________________________
 
-## :bar_chart: Headline numbers
-
-| Seq | Frames | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
-|----:|--------|--------------------:|--------------------:|----------------:|
-| 00  | 4390 &ndash; 4530 | 98.788 / **98.654** | 98.582 / **98.454** | 0.987 / **0.9855** |
-| 01  |  150 &ndash;  250 | 96.879 / **95.743** | 94.629 / **94.027** | 0.957 / **0.9488** |
-| 02  |  860 &ndash;  950 | 98.523 / **99.196** | 99.709 / **99.902** | 0.991 / **0.9955** |
-| 05  | 2350 &ndash; 2670 | 97.582 / **97.670** | 98.992 / **98.412** | 0.983 / **0.9804** |
-| 07  |  630 &ndash;  820 | 98.977 / **96.135** | 98.459 / **98.989** | 0.987 / **0.9754** |
-
-ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
-
-> PR = Preservation Rate (static recall), RR = Rejection Rate
-> (dynamic removal), F1 = harmonic mean. Higher is better on all three.
-
-______________________________________________________________________
-
 ## :package: Installation
 
 ```bash
@@ -63,6 +46,43 @@ conda activate erasor2
 
 See [**USAGE.md**](USAGE.md) for the full dependency list and per-distro
 notes.
+
+______________________________________________________________________
+
+## SemanticKITTI Setup
+
+Download SemanticKITTI so the sequence folders live under
+`<kitti_dir>/dataset/sequences`. For example, the benchmark tree should
+look like this:
+
+```text
+<kitti_dir>/                         # e.g., /home/url/datasets/kitti
+└── dataset/
+    ├── poses/
+    └── sequences/
+        ├── 00/
+        │   ├── velodyne/
+        │   ├── labels/
+        │   ├── poses_suma_optim.txt
+        │   └── times.txt
+        ├── 01/
+        ├── 02/
+        ├── ...
+        └── 10/
+```
+
+ERASOR2 uses SuMa poses for evaluation. Download the pose archive and
+place each `poses_suma_optim.txt` inside its matching sequence directory:
+
+```bash
+wget -O suma_poses_for_erasor_eval.zip "https://www.dropbox.com/scl/fi/9q3b1b9npsst1zjawgou3/suma_poses_for_erasor_eval.zip?rlkey=vx4igm68iuo3eobpolgq4tblg&st=yt1ola9b&dl=0"
+# unzip, then copy each file to:
+# <kitti_dir>/dataset/sequences/<seq>/poses_suma_optim.txt
+```
+
+For each benchmark config in `config/erasor2/seq_{00,01,02,05,07}.yaml`,
+set `dataloader.abs_data_dir` to `<kitti_dir>/dataset/sequences` and
+`dataloader.abs_save_dir` to your ERASOR2 output directory.
 
 ______________________________________________________________________
 
@@ -83,6 +103,28 @@ python scripts/run_benchmark.py
 consolidated PR / RR / F1 table. See [**USAGE.md**](USAGE.md) for further
 explanation &mdash; per-step breakdown, path-editing conventions,
 visualizer, YAML reference, and HeLiPR / HeLiMOS setup.
+
+______________________________________________________________________
+
+## :bar_chart: Headline numbers
+
+| Seq | Frames | PR [%] paper / ours | RR [%] paper / ours | F1 paper / ours |
+|:---:|:------:|:-------------------:|:-------------------:|:--------------:|
+| 00  | 4390 &ndash; 4530 | 98.788 / **98.654** | 98.582 / **98.454** | 0.987 / **0.9855** |
+| 01  |  150 &ndash;  250 | 96.879 / **95.743** | 94.629 / **94.027** | 0.957 / **0.9488** |
+| 02  |  860 &ndash;  950 | 98.523 / **99.196** | 99.709 / **99.902** | 0.991 / **0.9955** |
+| 05  | 2350 &ndash; 2670 | 97.582 / **97.670** | 98.992 / **98.412** | 0.983 / **0.9804** |
+| 07  |  630 &ndash;  820 | 98.977 / **96.135** | 98.459 / **98.989** | 0.987 / **0.9754** |
+
+ERASOR2 reproduces within run-to-run noise (mean |&Delta;F1| = 0.006).
+Higher is better on all three metrics:
+
+- **PR (Preservation Rate)** measures static-map recall: how much true
+  static structure remains after dynamic-object removal.
+- **RR (Rejection Rate)** measures dynamic removal: how much dynamic
+  structure is correctly rejected from the static map.
+- **F1** is the harmonic mean of PR and RR, giving one balanced score
+  when preservation and rejection both matter.
 
 ______________________________________________________________________
 
