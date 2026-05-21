@@ -168,6 +168,16 @@ def main():
                 "`cmake -B {} -S . && cmake --build {} -j` first?".format(b, bdir, bdir)
             )
 
+    # The C++ binaries call rerun::RecordingStream::spawn() which `exec`s
+    # `rerun` from $PATH. We need the spawned viewer to match the SDK the
+    # binaries link against (rerun-sdk 0.32.x); prepend the conda env's
+    # bin so the env's rerun wins over any older system one. Try
+    # --conda-env, then the env hosting this interpreter.
+    cpp_env = os.environ.copy()
+    env_root = args.conda_env or os.environ.get("CONDA_PREFIX") or sys.prefix
+    if env_root and (Path(env_root) / "bin" / "rerun").exists():
+        cpp_env["PATH"] = "{}/bin:{}".format(env_root, cpp_env.get("PATH", ""))
+
     # 3. mapgen --------------------------------------------------------------
     gt_pcd = Path(save_dir) / "{}_{}_to_{}_w_interval_{}_voxel_{}.pcd".format(
         seq,
@@ -179,7 +189,7 @@ def main():
     if args.skip_mapgen and gt_pcd.exists():
         print("[pipeline] Reusing existing {}".format(gt_pcd))
     else:
-        run([str(mapgen_bin), args.config])
+        run([str(mapgen_bin), args.config], env=cpp_env)
 
     # 4. run_erasor2 ---------------------------------------------------------
     est_pcd = Path(save_dir) / "{}_0_frame_{}_to_{}_estimated.pcd".format(
@@ -190,7 +200,7 @@ def main():
     if args.skip_erasor2 and est_pcd.exists():
         print("[pipeline] Reusing existing {}".format(est_pcd))
     else:
-        run([str(erasor_bin), args.config])
+        run([str(erasor_bin), args.config], env=cpp_env)
 
     # 5. Evaluate ------------------------------------------------------------
     if not args.no_eval:

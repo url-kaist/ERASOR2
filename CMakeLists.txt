@@ -26,7 +26,7 @@ find_package(yaml-cpp REQUIRED)
 include(FetchContent)
 FetchContent_Declare(
     rerun_sdk
-    URL https://github.com/rerun-io/rerun/releases/download/0.21.0/rerun_cpp_sdk.zip
+    URL https://github.com/rerun-io/rerun/releases/download/0.32.1/rerun_cpp_sdk.zip
 )
 FetchContent_MakeAvailable(rerun_sdk)
 

@@ -34,7 +34,7 @@ void init(const std::string& app_id, bool spawn, const std::string& save_path) {
     } else if (spawn) {
       g_rec->spawn().exit_on_failure();
     } else {
-      g_rec->connect_tcp().exit_on_failure();
+      g_rec->connect_grpc().exit_on_failure();
     }
     g_enabled.store(true);
   });
