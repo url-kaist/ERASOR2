@@ -77,6 +77,18 @@ add_executable(accum_4dmos
 )
 target_link_libraries(accum_4dmos erasor2_core stdc++fs)
 
+# --- ERASOR (v1) -----------------------------------------------------------
+# Port of github.com/LimHyungTae/ERASOR's algorithm into this repo (without
+# ROS). Reuses the same dataloader / rerun adapter / utils as v2 so a single
+# build produces both binaries.
+add_executable(run_erasor
+    src/erasor1/main.cpp
+    src/erasor1/erasor.cpp
+    src/erasor2/erasor_utils.cpp
+    src/dataloader/dataloader.cpp
+)
+target_link_libraries(run_erasor erasor2_core stdc++fs)
+
 add_executable(compare_map src/compare_map.cpp src/erasor2/erasor_utils.cpp)
 target_link_libraries(compare_map erasor2_core)
 
