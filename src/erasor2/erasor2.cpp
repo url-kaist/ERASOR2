@@ -176,7 +176,11 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
     NonGroundCurrCloudPublisher.publish(parsed_cloud.non_ground_);
     GroundCurrCloudPublisher.publish(parsed_cloud.ground_);
     NoiseCurrCloudPublisher.publish(parsed_cloud.noise_);
-    EgocentricGridPublisher.publish(gridmap, "elevation");
+    // "elevation" layer is filled with NOT_UPDATED everywhere by
+    // setEgocentricGridMap, so it renders as a uniform black image.
+    // The actual ground-likelihood signal lives in the "log_odds"
+    // layer (NOT_OBSERVED vs GROUND_EXISTS). Publish that instead.
+    EgocentricGridPublisher.publish(gridmap, "log_odds");
     if (stop_for_each_frame_) {
       std::cout << "[Set scan and pose] Waiting for pressing a key" << std::endl;
       cin.ignore();
@@ -258,7 +262,11 @@ void ERASOR2::setScanAndPose(const Eigen::Matrix4f &pose_raw,
     NonGroundCurrCloudPublisher.publish(parsed_cloud.non_ground_);
     GroundCurrCloudPublisher.publish(parsed_cloud.ground_);
     NoiseCurrCloudPublisher.publish(parsed_cloud.noise_);
-    EgocentricGridPublisher.publish(gridmap, "elevation");
+    // "elevation" layer is filled with NOT_UPDATED everywhere by
+    // setEgocentricGridMap, so it renders as a uniform black image.
+    // The actual ground-likelihood signal lives in the "log_odds"
+    // layer (NOT_OBSERVED vs GROUND_EXISTS). Publish that instead.
+    EgocentricGridPublisher.publish(gridmap, "log_odds");
     if (stop_for_each_frame_) {
       std::cout << "[Set scan and pose] Waiting for pressing a key" << std::endl;
       cin.ignore();
@@ -396,7 +404,7 @@ ParsedCurrCloud ERASOR2::parseCurrCloud(const pcl::PointCloud<pcl::PointXYZI> &c
 }
 
 void ERASOR2::updateSteppableRegion() {
-  erasor2::ProgressBar bar("[erasor2] update     ", num_data_);
+  erasor2::ProgressBar bar("[erasor2] update     ", num_data_, erasor2::color::kYellow);
   for (int k = 0; k < num_data_; k += update_interval_) {
     bar.tick(k + 1);
     gridmap_submap_["elevation"].setConstant(NOT_UPDATED);
@@ -497,7 +505,7 @@ void ERASOR2::updateSteppableRegion() {
 // Re-project ground likelihood to each scan
 void ERASOR2::detectMovingObjects() {
   GridPublisher.publish(gridmap_submap_, "prob");
-  erasor2::ProgressBar bar("[erasor2] detect     ", num_data_);
+  erasor2::ProgressBar bar("[erasor2] detect     ", num_data_, erasor2::color::kCyan);
   for (int k = 0; k < num_data_; ++k) {
     bar.tick(k + 1);
     vector<float> dyn_cand_ids;  // temp. variable
@@ -557,7 +565,7 @@ void ERASOR2::saveDynamicLabels(const string &dynamic_label_root, const vector<s
   // Thus, we only save the labels of our interest
   // i.e., the input of ERASOR2 was `frames` + `expanded frames`
   int save_data_size = indices.size();
-  erasor2::ProgressBar bar("[erasor2] save labels", save_data_size);
+  erasor2::ProgressBar bar("[erasor2] save labels", save_data_size, erasor2::color::kMagenta);
   for (int k = 0; k < save_data_size; ++k) {
     int frame_num = indices[k];
     bar.tick(k + 1);
@@ -1192,8 +1200,6 @@ void ERASOR2::saveStaticMap(const string &static_map_path) {
 
   static_map_voxelized_->width  = static_map_voxelized_->points.size();
   static_map_voxelized_->height = 1;
-  std::cout << "[Debug]: (" << static_map_voxelized_->width << ", " << static_map_voxelized_->height
-            << ") => " << static_map_voxelized_->points.size() << std::endl;
   std::cout << "\033[1;32mSaving the map to pcd...\033[0m" << std::endl;
   pcl::io::savePCDFileASCII(static_map_path, *static_map_voxelized_);
   std::cout << "\033[1;32mComplete to save the map!:";
@@ -1364,7 +1370,6 @@ void ERASOR2::voi2xygrid(const pcl::PointCloud<pcl::PointXYZI> &src,
       complement.points.push_back(pt);
     }
   }
-  std::cout << "\n" << std::endl;
 }
 
 void ERASOR2::xygrid2cloud(const vector<pcl::PointCloud<pcl::PointXYZI>> &xygrid,

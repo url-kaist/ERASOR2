@@ -31,7 +31,7 @@ class Mapgen : public RosParamServer {
     cloud_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
 
     const std::string rule(60, '-');
-    std::cout << "\033[1;36m" << rule << "\n"
+    std::cout << "\033[1;32m" << rule << "\n"
               << "[mapgen] configuration\n"
               << rule << "\033[0m\n"
               << "  sequence        : " << sequence_ << "\n"
@@ -40,7 +40,7 @@ class Mapgen : public RosParamServer {
               << "  voxel size      : " << voxel_size_ << "\n"
               << "  large-scale     : " << (is_large_scale_ ? "yes" : "no") << "\n";
     printExtrinsic();
-    std::cout << "\033[1;36m" << rule << "\033[0m" << std::endl;
+    std::cout << "\033[1;32m" << rule << "\033[0m" << std::endl;
   }
 
   ~Mapgen() {}
@@ -124,8 +124,6 @@ class Mapgen : public RosParamServer {
 
     cloud_voxelized->width  = cloud_voxelized->points.size();
     cloud_voxelized->height = 1;
-    std::cout << "[Debug]: (" << cloud_voxelized->width << ", " << cloud_voxelized->height
-              << ") => " << cloud_voxelized->points.size() << std::endl;
     std::cout << "\033[1;32mSaving the map to pcd...\033[0m" << std::endl;
     pcl::io::savePCDFileASCII(voxelized_map_path, *cloud_voxelized);
     std::cout << "\033[1;32mComplete to save the map!:";

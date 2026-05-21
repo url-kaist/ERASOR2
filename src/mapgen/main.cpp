@@ -32,7 +32,8 @@ int main(int argc, char **argv) {
   int accum_interval = mapgen->accum_interval_;
 
   int cnt = 0;
-  erasor2::ProgressBar mapgen_bar("[mapgen]  accumulate ", end_frame - start_frame + 1);
+  erasor2::ProgressBar mapgen_bar(
+      "[mapgen]  accumulate ", end_frame - start_frame + 1, erasor2::color::kGreen);
   for (int i = start_frame; i < end_frame + accum_interval; ++i) {
     signal(SIGINT, erasor_utils::signal_callback_handler);
     mapgen_bar.tick(i - start_frame + 1);

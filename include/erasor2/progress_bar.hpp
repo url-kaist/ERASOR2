@@ -25,12 +25,26 @@
 
 namespace erasor2 {
 
+// ANSI SGR colors -- pick one per stage to distinguish bars at a glance.
+namespace color {
+constexpr const char* kCyan    = "\033[1;36m";
+constexpr const char* kGreen   = "\033[1;32m";
+constexpr const char* kYellow  = "\033[1;33m";
+constexpr const char* kMagenta = "\033[1;35m";
+constexpr const char* kBlue    = "\033[1;34m";
+constexpr const char* kReset   = "\033[0m";
+}  // namespace color
+
 class ProgressBar {
  public:
-  ProgressBar(const std::string& label, int total, int bar_width = 30)
+  ProgressBar(const std::string& label,
+              int total,
+              const char* ansi_color = color::kCyan,
+              int bar_width          = 30)
       : label_(label),
         total_(total < 1 ? 1 : total),
         bar_width_(bar_width),
+        color_(ansi_color ? ansi_color : ""),
         start_(std::chrono::steady_clock::now()),
         last_render_(start_) {}
 
@@ -69,9 +83,9 @@ class ProgressBar {
                              ? elapsed_s * (static_cast<double>(total_ - current) / current)
                              : 0.0;
 
-    // ANSI cyan for the bar to match the configuration banner style.
     std::printf(
-        "\r\033[1;36m%s\033[0m %s %3d%%  (%d/%d) ETA %4.1fs",
+        "\r%s%s\033[0m %s %3d%%  (%d/%d) ETA %4.1fs",
+        color_,
         label_.c_str(),
         bar.c_str(),
         static_cast<int>(frac * 100.0),
@@ -92,6 +106,7 @@ class ProgressBar {
   std::string label_;
   int total_;
   int bar_width_;
+  const char* color_;
   std::chrono::steady_clock::time_point start_;
   std::chrono::steady_clock::time_point last_render_;
 };
