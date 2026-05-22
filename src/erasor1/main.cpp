@@ -84,8 +84,10 @@ struct Config {
   // Sensor mount height above the body origin -- upstream calls this
   // tf_lidar2body. KITTI velodyne sits ~1.73m above ground. Without this
   // shift the LiDAR-frame scans have ground at z=-1.73, well outside the
-  // [min_h=-1.3, max_h=3.2] body-frame window the v1 paper uses.
-  double      lidar_z_offset;
+  // [min_h=-1.3, max_h=3.2] body-frame window the v1 paper uses. Matches
+  // ERASOR2's Config::sensor_height -- mapgen uses the same number to
+  // lift its accumulated map into body-world (see mapgen.hpp:55-59).
+  double      sensor_height;
   bool        rerun_enabled;
   bool        rerun_spawn;
   std::string rerun_save_path;
@@ -102,7 +104,7 @@ Config load_config(const std::string& path) {
   Config     c;
   c.start_frame    = get<int>(y, "start_frame", 0);
   c.end_frame      = get<int>(y, "end_frame", 0);
-  c.lidar_z_offset = get<double>(y, "lidar_z_offset", 1.73);
+  c.sensor_height  = get<double>(y, "sensor_height", 1.73);
 
   const auto dl    = y["dataloader"];
   c.dataset_name   = get<std::string>(dl, "dataset_name", std::string("SemanticKITTI"));
@@ -227,15 +229,21 @@ int main(int argc, char** argv) {
     query_voi.width  = static_cast<std::uint32_t>(query_voi.points.size());
     query_voi.height = query_voi.points.empty() ? 0 : 1;
 
+    // mapgen accumulates by `world_pt = pose * tf_h_of_ground * scan_velo_pt`
+    // (mapgen.hpp:55-59). It applies the velo->world `pose` to body-lifted
+    // coords, which is equivalent to treating `pose` as a body->world map.
+    // Concretely: map_arranged has ground at world_z = 0 (not -1.73), and
+    // `pose.inverse()` is the correct world->body transform here, despite
+    // pose's nominal velo->world semantics elsewhere.
     pcl::PointCloud<pcl::PointXYZI> map_voi, outskirts;
     fetch_voi(*map_arranged, pose, cfg.params.max_range, map_voi, outskirts);
+    // map_voi is now in body frame (ground at z = 0). No extra lift.
 
-    // Apply lidar->body z-shift so the paper's body-frame thresholds
-    // (`min_h=-1.3`, `max_h=3.2`) line up with our LiDAR-frame point
-    // data. Ground sits at z=-1.73 in the velodyne frame; we lift by
-    // +1.73 so it lands at z=0 inside the polar grid. Reversed below.
-    for (auto& pt : query_voi.points) pt.z += static_cast<float>(cfg.lidar_z_offset);
-    for (auto& pt : map_voi.points)   pt.z += static_cast<float>(cfg.lidar_z_offset);
+    // Query is loaded from raw `.bin` in the velodyne frame (ground at
+    // z = -sensor_height). Lift it into body frame so its z lines up
+    // with map_voi. The paper's [min_h=-1.3, max_h=3.2] thresholds
+    // assume body frame (ground = z = 0).
+    for (auto& pt : query_voi.points) pt.z += static_cast<float>(cfg.sensor_height);
 
     erasor.set_inputs(map_voi, query_voi);
     // Dispatch the v3 algorithm: two-pass scan-ratio with BLOCKED-state
@@ -250,9 +258,9 @@ int main(int argc, char** argv) {
     // Transform the filtered VoI back to the world frame, then re-stitch
     // with the outskirts to form the next iteration's running map.
     pcl::PointCloud<pcl::PointXYZI> filtered_body = static_estimate + complement;
-    // Undo the body-frame z-shift applied above before transforming
-    // back to world with the (LiDAR-frame) pose.
-    for (auto& pt : filtered_body.points) pt.z -= static_cast<float>(cfg.lidar_z_offset);
+    // Body -> mapgen-world via `pose` (used here as body->world, matching
+    // mapgen's composition). No z un-lift needed; both filtered_body and
+    // map_arranged share ground = z = 0 in their respective frames.
     pcl::PointCloud<pcl::PointXYZI> filtered_world;
     if (!filtered_body.empty()) {
       filtered_body.width  = static_cast<std::uint32_t>(filtered_body.points.size());
