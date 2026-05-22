@@ -25,10 +25,7 @@
     <br />
     <img width="640" height="294" alt="ERASOR2 comparison" src="https://github.com/user-attachments/assets/3eb35e63-7b71-4bfd-84cd-74605ed34a90" />
   </p>
-  <p><strong><em>Static-map distillation from accumulated LiDAR maps. ROS-free, catkin-free, just CMake.</em></strong></p>
-  <p align="center">
-    <strong>(v1.1, 2026-05-20)</strong> Pure-C++ build &mdash; <code>cmake -B build &amp;&amp; cmake --build build -j</code> is all it takes.
-  </p>
+  <p><strong><em>ROS-free, instance-aware static map building</em></strong></p>
 </div>
 
 ______________________________________________________________________
